@@ -46,7 +46,7 @@
    <Grid Margin="26,18,26,22">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid Background="Transparent" MouseLeftButtonDown="Drag_Down" Height="30">
-     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="MOKU" Foreground="#F7F8FC" FontSize="14" FontWeight="Bold"/><TextBlock Text="  /  SETUP" Foreground="#686E7C" FontSize="10" VerticalAlignment="Center" Margin="4,2,0,0"/></StackPanel>
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="MOKU" Foreground="#F7F8FC" FontSize="14" FontWeight="Bold"/><TextBlock x:Name="ModeLabel" Text="  /  SETUP" Foreground="#686E7C" FontSize="10" VerticalAlignment="Center" Margin="4,2,0,0"/></StackPanel>
      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
       <Button x:Name="RuButton" Content="RU" Style="{StaticResource Quiet}" Click="Ru_Click" Margin="0,0,6,0"/>
       <Button x:Name="EnButton" Content="EN" Style="{StaticResource Quiet}" Click="En_Click" Margin="0,0,10,0"/>
@@ -79,6 +79,7 @@
           <Button x:Name="BrowseButton" Style="{StaticResource Quiet}" Width="68" Height="26" HorizontalAlignment="Right" Margin="0,0,4,0" Click="Browse_Click"/></Grid>
          <CheckBox x:Name="DesktopCheck" Style="{StaticResource Chk}" Margin="0,16,0,0" IsChecked="True"/>
          <CheckBox x:Name="AutoCheck" Style="{StaticResource Chk}" Margin="0,10,0,0" IsChecked="True"/>
+         <CheckBox x:Name="KeepSettingsCheck" Style="{StaticResource Chk}" Margin="0,10,0,0" IsChecked="True"/>
         </StackPanel>
         <!-- 2: установка -->
         <StackPanel x:Name="Page2" VerticalAlignment="Top" Visibility="Collapsed">
