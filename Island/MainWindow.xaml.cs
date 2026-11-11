@@ -113,7 +113,7 @@ public partial class MainWindow : Window
     System.Drawing.Icon? _ownedTrayIcon;
     System.Windows.Forms.ContextMenuStrip? _trayMenu;
     Action? _refreshTrayLanguage;
-    int _animVer, _totalChars;
+    int _animVer, _fullFadeVer, _totalChars;
     NowPlaying? _now;
     string? _lastTrack;
     SolidColorBrush _accent = Brushes.White;
@@ -937,12 +937,14 @@ public partial class MainWindow : Window
         RevealEyes();
 
         // Fade the expanded content out instead of cutting it off on the first frame.
+        int fadeVer = ++_fullFadeVer;
         var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(125))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         fade.Completed += (_, _) =>
         {
+            if (fadeVer != _fullFadeVer || _state != IslandState.Collapsed) return;
             Full.BeginAnimation(OpacityProperty, null);
             Full.Opacity = 1;
             Full.Visibility = Visibility.Collapsed;
@@ -981,6 +983,7 @@ public partial class MainWindow : Window
 
     void Expand()
     {
+        ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
         Mini.Visibility = Visibility.Collapsed;
