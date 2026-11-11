@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -97,6 +98,6 @@ public partial class App : Application
             MessageBox.Show("Could not complete uninstall: " + ex.Message, "Moku",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        finally { Shutdown(); }
+        finally { Application.Current?.Shutdown(); }
     }
 }
