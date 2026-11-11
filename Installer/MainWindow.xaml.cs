@@ -188,6 +188,88 @@ public partial class MainWindow : Window
         if (_page == 3) Finish();
     }
 
+    async Task UninstallAsync()
+    {
+        string installDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(FolderBox.Text));
+        string root = Path.GetPathRoot(installDir) ?? "";
+        if (string.Equals(installDir, Path.TrimEndingDirectorySeparator(root), StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(this, T("Путь установки выглядит небезопасно. Удаление отменено.", "The install path is unsafe. Uninstall was cancelled."), "Moku", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        string appPath = Path.Combine(installDir, "Moku.exe");
+        try
+        {
+            _installing = true; GoPage(2);
+            StatusText.Text = T("ШАГ 1 ИЗ 3  ·  ЗАКРЫВАЮ MOKU", "STEP 1 OF 3  ·  CLOSING MOKU");
+            foreach (var process in Process.GetProcessesByName("Moku"))
+            {
+                try
+                {
+                    string? processPath = process.MainModule?.FileName;
+                    if (processPath != null && string.Equals(Path.GetFullPath(processPath), Path.GetFullPath(appPath), StringComparison.OrdinalIgnoreCase))
+                    {
+                        process.Kill(entireProcessTree: true);
+                        process.WaitForExit(5000);
+                    }
+                }
+                catch { }
+            }
+
+            StatusText.Text = T("ШАГ 2 ИЗ 3  ·  УДАЛЯЮ ЯРЛЫКИ И АВТОЗАПУСК", "STEP 2 OF 3  ·  REMOVING SHORTCUTS & STARTUP");
+            string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Moku");
+            try { File.Delete(Path.Combine(startMenu, "Moku.lnk")); } catch { }
+            try { File.Delete(Path.Combine(startMenu, "Uninstall Moku.lnk")); } catch { }
+            try { if (Directory.Exists(startMenu)) Directory.Delete(startMenu, true); } catch { }
+
+            if (DesktopCheck.IsChecked == true)
+            {
+                string desktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Moku.lnk");
+                try { File.Delete(desktop); } catch { }
+            }
+            if (AutoCheck.IsChecked == true)
+            {
+                try
+                {
+                    using var run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true);
+                    run?.DeleteValue("Moku", false);
+                }
+                catch { }
+            }
+            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Moku", false); } catch { }
+
+            if (KeepSettingsCheck.IsChecked != true)
+            {
+                string dataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Moku");
+                try { if (Directory.Exists(dataDir)) Directory.Delete(dataDir, true); } catch { }
+            }
+
+            StatusText.Text = T("ШАГ 3 ИЗ 3  ·  ЗАВЕРШАЮ УДАЛЕНИЕ", "STEP 3 OF 3  ·  FINISHING REMOVAL");
+            string script = Path.Combine(Path.GetTempPath(), "Moku-Remove-" + Guid.NewGuid().ToString("N") + ".cmd");
+            string safeDir = installDir.Replace("%", "%%");
+            File.WriteAllText(script, "@echo off\r\ntimeout /t 3 /nobreak >nul\r\nrmdir /s /q \"" + safeDir + "\"\r\ndel \"%~f0\"\r\n", System.Text.Encoding.Default);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c \"\"" + script + "\"\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            });
+            Progress.Value = 100;
+            _installing = false;
+            _done = true;
+            GoPage(3);
+        }
+        catch (Exception ex)
+        {
+            _installing = false;
+            GoPage(1);
+            MessageBox.Show(this, T("Не удалось удалить Moku: ", "Uninstall failed: ") + ex.Message, "Moku", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     async Task InstallAsync()
     {
         var target = FolderBox.Text.Trim();
