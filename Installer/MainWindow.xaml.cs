@@ -237,7 +237,6 @@ public partial class MainWindow : Window
 
             string desktopShortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Moku.lnk");
             if (DesktopCheck.IsChecked == true) CreateShortcut(desktopShortcut, exe);
-            else if (File.Exists(desktopShortcut)) File.Delete(desktopShortcut);
 
             string? currentInstaller = Environment.ProcessPath;
             string uninstaller = Path.Combine(target, "Moku-Uninstall.exe");

@@ -19,6 +19,23 @@ public partial class App : Application
         new MainWindow().Show();
     }
 
+    private static void DeleteShortcutIfTargets(string shortcutPath, string expectedTarget)
+    {
+        try
+        {
+            if (!File.Exists(shortcutPath)) return;
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType == null) return;
+            dynamic shell = Activator.CreateInstance(shellType)!;
+            dynamic shortcut = shell.CreateShortcut(shortcutPath);
+            string? target = shortcut.TargetPath as string;
+            if (!string.IsNullOrWhiteSpace(target) &&
+                string.Equals(Path.GetFullPath(target), Path.GetFullPath(expectedTarget), StringComparison.OrdinalIgnoreCase))
+                File.Delete(shortcutPath);
+        }
+        catch { /* Не удаляем ярлык, если не удалось проверить его назначение. */ }
+    }
+
     private static void RunUninstaller()
     {
         string installDir = Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory);
@@ -57,7 +74,7 @@ public partial class App : Application
             string desktopShortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Moku.lnk");
             try { File.Delete(Path.Combine(startMenu, "Moku.lnk")); } catch { }
             try { File.Delete(Path.Combine(startMenu, "Uninstall Moku.lnk")); } catch { }
-            try { File.Delete(desktopShortcut); } catch { }
+            DeleteShortcutIfTargets(desktopShortcut, appPath);
             try { if (Directory.Exists(startMenu)) Directory.Delete(startMenu, recursive: true); } catch { }
 
             string script = Path.Combine(Path.GetTempPath(), "Moku-Uninstall-" + Guid.NewGuid().ToString("N") + ".cmd");
