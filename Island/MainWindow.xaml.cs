@@ -512,13 +512,22 @@ public partial class MainWindow : Window
         }
     }
 
-    void UpdateAutoButton() =>
+    void UpdateAutoButton()
+    {
+        // Language events can arrive before the XAML tree has finished loading.
+        if (AutoBtn == null) return;
+
         AutoBtn.Content = _s.Language == "ru"
             ? (IsAutostart() ? "Запуск при старте: Вкл" : "Запуск при старте: Выкл")
             : (IsAutostart() ? "Launch at startup: On" : "Launch at startup: Off");
+    }
 
     void Language_Checked(object sender, RoutedEventArgs e)
     {
+        // XAML raises Checked while InitializeComponent is still constructing the window.
+        // Ignore those initialization events; the saved language is applied after loading.
+        if (!_ready) return;
+
         if (sender == LanguageEnglish) SetLanguage("en");
         else if (sender == LanguageRussian) SetLanguage("ru");
     }
