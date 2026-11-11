@@ -866,8 +866,30 @@ public partial class MainWindow : Window
         TimePanel.Visibility = Visibility.Visible;
         SearchBox.Text = "";
         UpdateMini();
+        RevealEyes();
         Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: false);
         EnsureFx();
+    }
+
+    void RevealEyes()
+    {
+        // Start from a neutral gaze so returning from the expanded panel never
+        // makes the eyes snap toward the current mouse position.
+        _lLx = _lLy = _lRx = _lRy = 0;
+        EyeLShift.X = EyeLShift.Y = EyeRShift.X = EyeRShift.Y = 0;
+        EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        EyeRScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+
+        foreach (var scale in new[] { EyeLScale, EyeRScale })
+        {
+            var reveal = new DoubleAnimationUsingKeyFrames();
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(0.12, KeyTime.FromTimeSpan(TimeSpan.Zero), ease));
+            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(1.12, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), ease));
+            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(245)), ease));
+            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(360)), ease));
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, reveal);
+        }
     }
 
     void Expand()
@@ -1124,9 +1146,11 @@ public partial class MainWindow : Window
                 {
                     var c = eye.PointToScreen(new Point(eye.ActualWidth / 2, eye.ActualHeight / 2));
                     double dx = cur.X - c.X, dy = cur.Y - c.Y, d = Math.Sqrt(dx * dx + dy * dy);
-                    if (d > 1)
+                    // Ignore a distant cursor. Otherwise the first frame after
+                    // startup can pull both eyes hard to one side of the pill.
+                    if (d > 1 && d < 220)
                     {
-                        double k = Math.Min(1.0, d / 160.0);
+                        double k = Smooth(d / 220.0);
                         tx = dx / d * 2.35 * k;
                         ty = dy / d * 2.15 * k;
                     }
