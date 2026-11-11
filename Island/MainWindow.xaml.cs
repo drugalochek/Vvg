@@ -131,24 +131,34 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        string startupStage = "InitializeComponent";
+        try
+        {
         InitializeComponent();
+        Log.Info("MainWindow: XAML loaded");
+        startupStage = "window setup";
         Pill.VerticalAlignment = VerticalAlignment.Top;
         Pill.RenderTransformOrigin = new Point(0.5, 0.5);
         Pill.RenderTransform = _jellyTransform;
 
+        startupStage = "history and data context";
         HistoryView = CollectionViewSource.GetDefaultView(History);
         HistoryView.Filter = o =>
             string.IsNullOrWhiteSpace(SearchBox?.Text) ||
             ((ClipItem)o).Text.Contains(SearchBox.Text, StringComparison.OrdinalIgnoreCase);
         DataContext = this;
 
+        startupStage = "building tiles";
         BuildTiles();
+        startupStage = "building accent swatches";
         BuildAccentSwatches();
         // Language selector is now the native WPF English/Russian segmented control.
         // ApplyLanguage() synchronizes its selected state from saved settings.
+        startupStage = "applying language";
         ApplyLanguage();
 
         // применить сохранённые настройки
+        startupStage = "applying saved settings";
         (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
         OffsetText.Text = _s.OffsetY + " px";
         ScaleText.Text = _s.Scale + "%";
@@ -156,6 +166,7 @@ public partial class MainWindow : Window
         ApplyScale();
         ApplyAccent();
 
+        startupStage = "initializing timers";
         _clock.Tick += (_, _) => { UpdateMini(); ScheduleClock(); };
         UpdateMini();
         ScheduleClock();
@@ -171,17 +182,27 @@ public partial class MainWindow : Window
             await ReadClipboardAsync();
         };
 
+        startupStage = "starting media watcher";
         _media.Changed += OnMediaChanged;
         _ = _media.StartAsync();
 
+        startupStage = "initializing visual effects and weather";
         InitLiquid();
 
+        startupStage = "registering window events";
         SourceInitialized += OnSourceInitialized;
         Loaded += (_, _) => InitializeTray();
         Closing += OnWindowClosing;
         Closed += OnClosed;
         ApplyPosition();
         _ready = true;
+        Log.Info("MainWindow: initialization complete");
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"MainWindow constructor failed at stage: {startupStage}", ex);
+            throw;
+        }
     }
 
     // ================= Системное =================
