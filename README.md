@@ -48,14 +48,7 @@
    - `Island\\release\\Moku-Setup-1.0.0-x64.exe` — полноценный установщик с мастером установки, ярлыками, автозапуском и деинсталляцией через «Программы и компоненты».
 
 ### Опубликовать на GitHub Releases
-Проект содержит workflow `.github/workflows/release.yml`. Загрузи репозиторий на GitHub и создай тег версии, например `v1.0.0`:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-GitHub Actions соберёт автономный EXE и установщик, затем приложит оба файла к GitHub Release. Перед публичным релизом рекомендуется подписать EXE/установщик Authenticode-сертификатом, чтобы Windows SmartScreen меньше предупреждал пользователей.
+Чтобы опубликовать релиз, собери файлы командой выше и приложи `Island\\publish\\Moku.exe` и `Island\\release\\Moku-Setup-1.0.0-x64.exe` к GitHub Release. Перед публичным релизом рекомендуется подписать EXE/установщик Authenticode-сертификатом, чтобы Windows SmartScreen меньше предупреждал пользователей.
 
 
 ## English UI and system tray
