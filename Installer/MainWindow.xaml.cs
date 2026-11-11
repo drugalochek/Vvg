@@ -13,7 +13,7 @@ namespace MokuInstaller;
 
 public partial class MainWindow : Window
 {
-    bool _en, _installing, _done;
+    bool _en, _installing, _done, _uninstallMode;
     int _page;
     FrameworkElement? _anchor;
     DispatcherTimer? _hop;
@@ -26,13 +26,21 @@ public partial class MainWindow : Window
 
     string T(string ru, string en) => _en ? en : ru;
 
-    public MainWindow()
+    public MainWindow(bool uninstallMode = false)
     {
+        _uninstallMode = uninstallMode;
         InitializeComponent();
         var wa = SystemParameters.WorkArea;
         double k = Math.Min(1.0, Math.Min(wa.Width * 0.92 / 600, wa.Height * 0.92 / 440));
         Width = 600 * k; Height = 440 * k;   // окно всегда целиком помещается на экран
-        FolderBox.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Moku");
+        FolderBox.Text = _uninstallMode ? Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Moku");
+        if (_uninstallMode)
+        {
+            FolderBox.IsReadOnly = true;
+            BrowseButton.Visibility = Visibility.Collapsed;
+            LaunchCheck.Visibility = Visibility.Collapsed;
+            KeepSettingsCheck.IsChecked = true;
+        }
         _en = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "ru";
         CompositionTarget.Rendering += Frame;
         Closed += (_, _) => CompositionTarget.Rendering -= Frame;
@@ -43,8 +51,9 @@ public partial class MainWindow : Window
     // ---------- тексты и состояние ----------
     void Refresh()
     {
-        Title = T("Установка Moku", "Moku Setup");
-        var names = new[] { T("Лицензия", "License"), T("Папка", "Location"), T("Установка", "Install"), T("Готово", "Done") };
+        Title = _uninstallMode ? T("Удаление Moku", "Moku Uninstaller") : T("Установка Moku", "Moku Setup");
+        ModeLabel.Text = _uninstallMode ? "  /  UNINSTALL" : "  /  SETUP";
+        var names = _uninstallMode ? new[] { T("Подтверждение", "Confirm"), T("Параметры", "Options"), T("Удаление", "Uninstall"), T("Готово", "Done") } : new[] { T("Лицензия", "License"), T("Папка", "Location"), T("Установка", "Install"), T("Готово", "Done") };
         var steps = new[] { Step0, Step1, Step2, Step3 };
         for (int i = 0; i < 4; i++)
         {
@@ -59,26 +68,28 @@ public partial class MainWindow : Window
         RuButton.Opacity = _en ? .5 : 1; EnButton.Opacity = _en ? 1 : .5;
         BackButton.Content = T("← Назад", "← Back");
         BackButton.Visibility = _page == 1 ? Visibility.Visible : Visibility.Hidden;
-        LicenseBox.Text = T(
+        LicenseBox.Text = _uninstallMode ? T("Будет удалена программа Moku и её ярлыки. Настройки и пользовательские данные сохранятся, если оставить соответствующий пункт включённым. Для завершения удаления Moku будет закрыта.", "Moku and its shortcuts will be removed. Settings and user data will be kept if the corresponding option remains enabled. Moku will be closed to complete the removal.") : T(
             "Moku — бесплатная программа «как есть», без гарантий.\r\n\r\n1. Moku работает локально и не требует аккаунта. История буфера обмена и настройки хранятся только на этом компьютере.\r\n2. Для погоды приложение может обращаться к сервису прогноза, для медиа — к системным данным Windows.\r\n3. Вы можете пользоваться, копировать и удалять Moku свободно. Автор не отвечает за возможный ущерб от использования.\r\n4. Moku можно удалить в любой момент: закройте его в трее и удалите папку установки.",
             "Moku is a free program provided \"as is\", without warranty.\r\n\r\n1. Moku works locally and needs no account. Clipboard history and settings stay on this computer.\r\n2. The app may contact a weather service for the forecast and uses Windows system data for media.\r\n3. You may use, copy and remove Moku freely. The author is not liable for any damage from its use.\r\n4. To uninstall, exit Moku from the tray and delete the install folder.");
-        AgreeCheck.Content = T("Я принимаю условия лицензии", "I accept the license terms");
-        FolderLabel.Text = T("ПАПКА УСТАНОВКИ", "INSTALL LOCATION");
+        AgreeCheck.Content = _uninstallMode ? T("Я действительно хочу удалить Moku", "I want to uninstall Moku") : T("Я принимаю условия лицензии", "I accept the license terms");
+        FolderLabel.Text = _uninstallMode ? T("ТЕКУЩАЯ ПАПКА ПРОГРАММЫ", "CURRENT INSTALL LOCATION") : T("ПАПКА УСТАНОВКИ", "INSTALL LOCATION");
         BrowseButton.Content = T("Выбрать", "Choose");
-        DesktopCheck.Content = T("Ярлык на рабочем столе", "Desktop shortcut");
-        AutoCheck.Content = T("Запускать вместе с Windows", "Start with Windows");
+        DesktopCheck.Content = _uninstallMode ? T("Удалить ярлык с рабочего стола", "Remove desktop shortcut") : T("Ярлык на рабочем столе", "Desktop shortcut");
+        AutoCheck.Content = _uninstallMode ? T("Отключить запуск вместе с Windows", "Disable startup with Windows") : T("Запускать вместе с Windows", "Start with Windows");
+        KeepSettingsCheck.Content = T("Сохранить настройки и данные пользователя", "Keep settings and user data");
+        KeepSettingsCheck.Visibility = _uninstallMode ? Visibility.Visible : Visibility.Collapsed;
         LaunchCheck.Content = T("Запустить Moku сейчас", "Launch Moku now");
         string hint = "";
         switch (_page)
         {
-            case 0: Headline.Text = T("Лицензия", "License"); hint = AgreeCheck.IsChecked == true ? T("Отлично. Жми «Далее».", "Great. Press Next.") : T("Сначала согласись с условиями, потом пойдём дальше.", "First accept the terms, then we'll move on."); break;
-            case 1: Headline.Text = T("Куда поставим?", "Where to install?"); hint = string.IsNullOrWhiteSpace(FolderBox.Text) ? T("Выбери папку установки.", "Choose an install folder.") : T("Можно оставить как есть и жать «Установить».", "Keep the default and press Install if you like."); break;
-            case 2: Headline.Text = T("Устанавливаю…", "Installing…"); hint = T("Не закрывай окно, это быстро.", "Keep this window open, it's quick."); break;
+            case 0: Headline.Text = _uninstallMode ? T("Удалить Moku?", "Remove Moku?") : T("Лицензия", "License"); hint = AgreeCheck.IsChecked == true ? T("Отлично. Жми «Далее».", "Great. Press Next.") : T("Сначала согласись с условиями, потом пойдём дальше.", "First accept the terms, then we'll move on."); break;
+            case 1: Headline.Text = _uninstallMode ? T("Что удалить?", "What should be removed?") : T("Куда поставим?", "Where to install?"); hint = string.IsNullOrWhiteSpace(FolderBox.Text) ? T("Выбери папку установки.", "Choose an install folder.") : T("Можно оставить как есть и жать «Установить».", "Keep the default and press Install if you like."); break;
+            case 2: Headline.Text = _uninstallMode ? T("Удаляю…", "Uninstalling…") : T("Устанавливаю…", "Installing…"); hint = T("Не закрывай окно, это быстро.", "Keep this window open, it's quick."); break;
             default: Headline.Text = T("Готово!", "All set!"); hint = T("Остров появится сверху экрана, а значок — в трее (возможно, за стрелкой «^»).", "The island appears at the top of the screen; the icon is in the tray (maybe behind the \"^\" arrow)."); break;
         }
         HintText.Text = hint;
-        NextButton.Content = _page switch { 0 => T("Далее →", "Next →"), 1 => T("Установить", "Install"), 2 => T("Подожди…", "Please wait…"), _ => T("Готово", "Finish") };
-        NextButton.IsEnabled = _page switch { 0 => AgreeCheck.IsChecked == true, 1 => !string.IsNullOrWhiteSpace(FolderBox.Text), 2 => false, _ => true };
+        NextButton.Content = _page switch { 0 => T("Далее →", "Next →"), 1 => _uninstallMode ? T("Удалить", "Uninstall") : T("Установить", "Install"), 2 => T("Подожди…", "Please wait…"), _ => T("Готово", "Finish") };
+        NextButton.IsEnabled = _page switch { 0 => AgreeCheck.IsChecked == true, 1 => _uninstallMode || !string.IsNullOrWhiteSpace(FolderBox.Text), 2 => false, _ => true };
     }
 
     void GoPage(int p)
@@ -173,7 +184,7 @@ public partial class MainWindow : Window
     {
         if (_installing) return;
         if (_page == 0) { if (AgreeCheck.IsChecked == true) GoPage(1); return; }
-        if (_page == 1) { await InstallAsync(); return; }
+        if (_page == 1) { if (_uninstallMode) await UninstallAsync(); else await InstallAsync(); return; }
         if (_page == 3) Finish();
     }
 
@@ -292,7 +303,7 @@ public partial class MainWindow : Window
         try
         {
             var exe = Path.Combine(FolderBox.Text.Trim(), "Moku.exe");
-            if (LaunchCheck.IsChecked == true && File.Exists(exe))
+            if (!_uninstallMode && LaunchCheck.IsChecked == true && File.Exists(exe))
                 Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(exe)! });
         }
         catch (Exception ex) { System.Windows.MessageBox.Show(this, ex.Message, "Moku"); }
