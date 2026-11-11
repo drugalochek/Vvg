@@ -1229,14 +1229,14 @@ public partial class MainWindow : Window
             // Данных нет (нет сети/кэша) — честно показываем «—°», без выдуманной иконки.
             WeatherHost.Child = null;
             TempText.Text = "—°";
-            bool showFallback = _now?.Playing != true;
+            bool showFallback = !_welcomeRunning && _now?.Playing != true;
             WeatherHost.Visibility = Visibility.Collapsed;
             TempText.Visibility = showFallback ? Visibility.Visible : Visibility.Collapsed;
             return;
         }
         WeatherHost.Child = WeatherIcons.Build(w.Kind, w.IsDay);
         TempText.Text = (w.TempC > 0 ? "+" : "") + w.TempC + "°";
-        bool showWeather = _now?.Playing != true;
+        bool showWeather = !_welcomeRunning && _now?.Playing != true;
         WeatherHost.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
         TempText.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
     }
