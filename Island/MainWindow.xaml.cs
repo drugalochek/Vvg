@@ -767,8 +767,8 @@ public partial class MainWindow : Window
         int ver = ++_animVer;
         SetWindowBox(Math.Max(_boxW, w), Math.Max(_boxH, h));   // одно изменение размера окна на старте анимации
         _boxW = w; _boxH = h;
-        // Calm, premium motion: no elastic overshoot or rubber-band snap.
-        var dur = TimeSpan.FromMilliseconds(spring ? 560 : 480);
+        // Soft layout motion; the pill itself gets a separate multi-stage jelly settle.
+        var dur = TimeSpan.FromMilliseconds(spring ? 520 : 460);
         IEasingFunction ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
 
         var aw = new DoubleAnimation(w, dur) { EasingFunction = ease };
@@ -787,20 +787,33 @@ public partial class MainWindow : Window
             SetWindowBox(w, h);                                  // одно изменение размера окна по окончании
         };
 
-        // Counter-stretch followed by a damped settle creates a soft jelly response.
+        // Visible jelly motion: stretch on the travel axis, squash on the other,
+        // then make two progressively smaller rebounds before settling.
         _jellyTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         _jellyTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        _jellyTransform.ScaleX = spring ? 0.985 : 1.012;
-        _jellyTransform.ScaleY = spring ? 1.018 : 0.992;
-
-        var sx = new DoubleAnimation(1, TimeSpan.FromMilliseconds(520))
+        var sx = new DoubleAnimationUsingKeyFrames();
+        var sy = new DoubleAnimationUsingKeyFrames();
+        var jellyEase = new CubicEase { EasingMode = EasingMode.EaseOut };
+        if (spring)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
-        };
-        var sy = new DoubleAnimation(1, TimeSpan.FromMilliseconds(560))
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.075, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.965, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(285)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.022, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(540)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.925, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.045, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(285)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.985, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(560)), jellyEase));
+        }
+        else
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
-        };
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.94, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(130)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.035, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(440)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.06, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(130)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.98, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(460)), jellyEase));
+        }
         sx.Completed += (_, _) => _jellyTransform.ScaleX = 1;
         sy.Completed += (_, _) => _jellyTransform.ScaleY = 1;
 
@@ -892,11 +905,20 @@ public partial class MainWindow : Window
     void UpdateMini()
     {
         bool playing = _now?.Playing == true;
+        var now = DateTime.Now;
         TitlePanel.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         TitleText.Text = playing ? _now!.Title : "";
-        TimeText.Text = DateTime.Now.ToString("HH:mm");
-        TimeText.HorizontalAlignment = playing ? HorizontalAlignment.Right : HorizontalAlignment.Center;
-        TimeText.Margin = playing ? new Thickness(0, 0, 84, 0) : new Thickness(0);
+
+        // In music mode the title owns the whole compact row. Hide the clock and
+        // weather completely instead of letting their text overlap the track name.
+        TimeText.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
+        WeatherHost.Visibility = !playing && WeatherHost.Child != null ? Visibility.Visible : Visibility.Collapsed;
+        TempText.Visibility = !playing && !string.IsNullOrEmpty(TempText.Text) ? Visibility.Visible : Visibility.Collapsed;
+
+        TimeText.Text = now.ToString("HH:mm");
+        TimeText.HorizontalAlignment = HorizontalAlignment.Center;
+        TimeText.Margin = new Thickness(0);
+        if (FullClock != null) FullClock.Text = now.ToString("HH:mm");
     }
 
     // ================= Жидкость: волна внизу, глазки, погода =================
@@ -1044,7 +1066,7 @@ public partial class MainWindow : Window
         bool surprised = _eyeMood == EyeMood.Surprised;
         bool focused = _eyeMood == EyeMood.Focused;
         double eyeDt = Math.Clamp((now - _lastEyeUpdate).TotalSeconds, 0.001, 0.05);
-        _eyeFollow = 1 - Math.Exp(-9.5 * eyeDt);
+        _eyeFollow = 1 - Math.Exp(-5.2 * eyeDt);
         double openness = sleepy ? 0.30 : surprised ? 1.24 : focused ? 0.88 : 1.0;
         _open += (openness - _open) * (1 - Math.Exp(-5.5 * eyeDt));
         if (Math.Abs(openness - _open) < 0.002) _open = openness;
@@ -1105,13 +1127,16 @@ public partial class MainWindow : Window
                     if (d > 1)
                     {
                         double k = Math.Min(1.0, d / 160.0);
-                        tx = dx / d * 3.2 * k;
-                        ty = dy / d * 3.0 * k;
+                        tx = dx / d * 2.35 * k;
+                        ty = dy / d * 2.15 * k;
                     }
                 }
                 catch (InvalidOperationException) { }   // окно скрыто/ещё не отрисовано — глаз остаётся на месте
             }
-            if (playing) ty += Math.Sin(_wavePhase * 1.6) * 0.8;   // под музыку чуть «качаются»
+            // Tiny continuous sway keeps the eyes alive without sudden direction changes.
+            double dance = Math.Sin(_wavePhase * (playing ? 1.35 : 0.72));
+            tx += dance * (playing ? 0.24 : 0.12);
+            ty += Math.Sin(_wavePhase * (playing ? 1.8 : 0.95) + 0.6) * (playing ? 0.42 : 0.22);
         }
         lx += (tx - lx) * _eyeFollow;
         ly += (ty - ly) * _eyeFollow;
