@@ -5,7 +5,7 @@ set "APP_VERSION=1.0.0"
 set "RUNTIME=win-x64"
 
 echo [1/3] Publishing Moku application...
-dotnet publish Island.csproj -c Release -r %RUNTIME% --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o publish
+dotnet publish Island.csproj -c Release -r %RUNTIME% --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:InvariantGlobalization=false -p:DebugType=None -p:DebugSymbols=false -o publish
 if errorlevel 1 goto :failed
 if not exist "publish\Moku.exe" (echo ERROR: publish\Moku.exe was not created.& goto :failed)
 for %%A in ("publish\Moku.exe") do if %%~zA LSS 1048576 (echo ERROR: publish\Moku.exe looks incomplete.& goto :failed)
