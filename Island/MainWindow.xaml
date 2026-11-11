@@ -330,8 +330,12 @@
                         <RadioButton x:Name="TabSet" Style="{StaticResource TabBtn}" Content="Settings"
                                      Tag="Set" GroupName="tabs" Checked="Tab_Checked"/>
                     </StackPanel>
-                    <TextBlock Text="Alt + Space" Foreground="#55FFFFFF" FontSize="11"
-                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock x:Name="FullClock" Foreground="White" FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,0,14,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Alt + Space" Foreground="#55FFFFFF" FontSize="11"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
                 </Grid>
 
                 <!-- Home -->
