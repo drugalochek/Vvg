@@ -82,10 +82,26 @@ public partial class MainWindow : Window
         string hint = "";
         switch (_page)
         {
-            case 0: Headline.Text = _uninstallMode ? T("Удалить Moku?", "Remove Moku?") : T("Лицензия", "License"); hint = AgreeCheck.IsChecked == true ? T("Отлично. Жми «Далее».", "Great. Press Next.") : T("Сначала согласись с условиями, потом пойдём дальше.", "First accept the terms, then we'll move on."); break;
-            case 1: Headline.Text = _uninstallMode ? T("Что удалить?", "What should be removed?") : T("Куда поставим?", "Where to install?"); hint = string.IsNullOrWhiteSpace(FolderBox.Text) ? T("Выбери папку установки.", "Choose an install folder.") : T("Можно оставить как есть и жать «Установить».", "Keep the default and press Install if you like."); break;
-            case 2: Headline.Text = _uninstallMode ? T("Удаляю…", "Uninstalling…") : T("Устанавливаю…", "Installing…"); hint = T("Не закрывай окно, это быстро.", "Keep this window open, it's quick."); break;
-            default: Headline.Text = T("Готово!", "All set!"); hint = T("Остров появится сверху экрана, а значок — в трее (возможно, за стрелкой «^»).", "The island appears at the top of the screen; the icon is in the tray (maybe behind the \"^\" arrow)."); break;
+            case 0:
+                Headline.Text = _uninstallMode ? T("Удалить Moku?", "Remove Moku?") : T("Лицензия", "License");
+                hint = _uninstallMode
+                    ? (AgreeCheck.IsChecked == true ? T("Подтверждение принято. Переходи к параметрам удаления.", "Confirmation accepted. Continue to uninstall options.") : T("Подтверди удаление, чтобы продолжить.", "Confirm removal to continue."))
+                    : AgreeCheck.IsChecked == true ? T("Отлично. Жми «Далее».", "Great. Press Next.") : T("Сначала согласись с условиями, потом пойдём дальше.", "First accept the terms, then we'll move on.");
+                break;
+            case 1:
+                Headline.Text = _uninstallMode ? T("Что удалить?", "What should be removed?") : T("Куда поставим?", "Where to install?");
+                hint = _uninstallMode
+                    ? T("Выбери, удалять ли ярлык и автозапуск. Настройки сохраняются по умолчанию.", "Choose whether to remove the shortcut and startup entry. Settings are kept by default.")
+                    : string.IsNullOrWhiteSpace(FolderBox.Text) ? T("Выбери папку установки.", "Choose an install folder.") : T("Можно оставить как есть и жать «Установить».", "Keep the default and press Install if you like.");
+                break;
+            case 2:
+                Headline.Text = _uninstallMode ? T("Удаляю…", "Uninstalling…") : T("Устанавливаю…", "Installing…");
+                hint = T("Не закрывай окно, это быстро.", "Keep this window open, it's quick.");
+                break;
+            default:
+                Headline.Text = T("Готово!", "All set!");
+                hint = _uninstallMode ? T("Moku удалена. Можно закрыть это окно.", "Moku has been removed. You can close this window.") : T("Остров появится сверху экрана, а значок — в трее (возможно, за стрелкой «^»).", "The island appears at the top of the screen; the icon is in the tray (maybe behind the \"^\" arrow).");
+                break;
         }
         HintText.Text = hint;
         NextButton.Content = _page switch { 0 => T("Далее →", "Next →"), 1 => _uninstallMode ? T("Удалить", "Uninstall") : T("Установить", "Install"), 2 => T("Подожди…", "Please wait…"), _ => T("Готово", "Finish") };
