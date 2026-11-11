@@ -13,6 +13,7 @@
     <!-- Стандартный адаптивный GC и tiered JIT для более ровной работы интерфейса -->
     <ServerGarbageCollector>false</ServerGarbageCollector>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup>
