@@ -191,9 +191,23 @@ public partial class MainWindow : Window
 
         startupStage = "registering window events";
         SourceInitialized += OnSourceInitialized;
-        Loaded += (_, _) => InitializeTray();
+        Loaded += (_, _) =>
+        {
+            InitializeTray();
+            StartWelcomeIntro();
+        };
         Closing += OnWindowClosing;
         Closed += OnClosed;
+        // Start as a small round island; the welcome animation unfolds it after Loaded.
+        _boxW = 48;
+        Pill.Width = 48;
+        Pill.Height = CollapsedH;
+        Pill.CornerRadius = new CornerRadius(18);
+        Eyes.HorizontalAlignment = HorizontalAlignment.Center;
+        Eyes.Margin = new Thickness(0);
+        TimeText.Visibility = Visibility.Collapsed;
+        WeatherHost.Visibility = Visibility.Collapsed;
+        TempText.Visibility = Visibility.Collapsed;
         ApplyPosition();
         _ready = true;
         Log.Info("MainWindow: initialization complete");
@@ -857,6 +871,40 @@ public partial class MainWindow : Window
         el.BeginAnimation(OpacityProperty, a);
     }
 
+    async void StartWelcomeIntro()
+    {
+        if (!IsVisible || _state != IslandState.Collapsed) return;
+        _welcomeRunning = true;
+        TimePanel.Visibility = Visibility.Visible;
+        TimeText.Visibility = Visibility.Collapsed;
+        WeatherHost.Visibility = Visibility.Collapsed;
+        TempText.Visibility = Visibility.Collapsed;
+
+        // Let the little round face appear first, then give it a single wink.
+        await Task.Delay(420);
+        var wink = new DoubleAnimationUsingKeyFrames();
+        var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
+        wink.KeyFrames.Add(new EasingDoubleKeyFrame(0.08, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100)), ease));
+        wink.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(270)), ease));
+        wink.Completed += (_, _) =>
+        {
+            EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            EyeLScale.ScaleY = 1;
+        };
+        EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, wink);
+
+        await Task.Delay(360);
+        Eyes.HorizontalAlignment = HorizontalAlignment.Left;
+        Eyes.Margin = new Thickness(15, 0, 0, 0);
+        TimeText.Visibility = _now?.Playing == true ? Visibility.Collapsed : Visibility.Visible;
+        UpdateMini();
+        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: true);
+
+        await Task.Delay(560);
+        _welcomeRunning = false;
+        EnsureFx();
+    }
+
     void Collapse()
     {
         _state = IslandState.Collapsed;
@@ -953,6 +1001,7 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT p);
 
     bool _fxAttached;
+    bool _welcomeRunning = true;
     TimeSpan _lastRenderTime;
     readonly Random _rng = new();
     readonly WeatherWatcher _weather = new();
@@ -1004,7 +1053,7 @@ public partial class MainWindow : Window
         _wavePhase += 3.25 * dt;
 
         bool wave = _waveAmp > 0.01;
-        bool eyes = IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
+        bool eyes = !_welcomeRunning && IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
         if (eyes) UpdateEyes(playing);
         if (wave || _lastWave) RebuildBody();
         _lastWave = wave;
@@ -1180,7 +1229,9 @@ public partial class MainWindow : Window
             // Данных нет (нет сети/кэша) — честно показываем «—°», без выдуманной иконки.
             WeatherHost.Child = null;
             TempText.Text = "—°";
-            TempText.Visibility = Visibility.Visible;
+            bool showFallback = _now?.Playing != true;
+            WeatherHost.Visibility = Visibility.Collapsed;
+            TempText.Visibility = showFallback ? Visibility.Visible : Visibility.Collapsed;
             return;
         }
         WeatherHost.Child = WeatherIcons.Build(w.Kind, w.IsDay);
