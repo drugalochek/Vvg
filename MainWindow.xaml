@@ -1,0 +1,110 @@
+<Window x:Class="MokuInstaller.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Moku" Width="600" Height="440" WindowStartupLocation="CenterScreen" WindowStyle="None"
+ AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+ FontFamily="Segoe UI Variable Display, Segoe UI" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
+ Loaded="Window_Loaded" MouseMove="Window_MouseMove">
+ <Window.Resources>
+  <Style x:Key="Primary" TargetType="Button">
+   <Setter Property="Focusable" Value="False"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FontSize" Value="13"/><Setter Property="FontWeight" Value="SemiBold"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+    <Border x:Name="Bd" Background="#ECEEF4" CornerRadius="17" Padding="26,10" MinWidth="120"><TextBlock x:Name="Tx" Text="{TemplateBinding Content}" Foreground="#050608" HorizontalAlignment="Center"/></Border>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#FFFFFF"/></Trigger>
+     <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Background" Value="#C9CCD6"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.3"/></Trigger>
+    </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="Quiet" TargetType="Button">
+   <Setter Property="Focusable" Value="False"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FontSize" Value="11"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+    <Border x:Name="Bd" Background="#111319" BorderBrush="#2A2E37" BorderThickness="1" CornerRadius="13" Padding="12,6"><TextBlock Text="{TemplateBinding Content}" Foreground="#C8CCD6" HorizontalAlignment="Center"/></Border>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="#1D2027"/></Trigger>
+     <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Background" Value="#2A2E37"/></Trigger>
+     <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.35"/></Trigger>
+    </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="Chk" TargetType="CheckBox">
+   <Setter Property="Focusable" Value="False"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Foreground" Value="#C9CEDA"/><Setter Property="FontSize" Value="12"/>
+   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+    <StackPanel Orientation="Horizontal" Background="Transparent">
+     <Border x:Name="Box" Width="18" Height="18" CornerRadius="6" BorderThickness="1" BorderBrush="#3A3F4B" Background="#0B0C10">
+      <Path x:Name="Tick" Data="M4,9 L7.5,12.5 L14,5.5" Stroke="#050608" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/></Border>
+     <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center"/>
+    </StackPanel>
+    <ControlTemplate.Triggers>
+     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="#9AA0B0"/></Trigger>
+     <Trigger Property="IsChecked" Value="True"><Setter TargetName="Box" Property="Background" Value="#F5F6FA"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger>
+    </ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+  </Style>
+ </Window.Resources>
+ <Viewbox Stretch="Uniform">
+  <Grid x:Name="Root" Width="600" Height="440">
+   <Border CornerRadius="30" Background="#000000" BorderBrush="#2A2E37" BorderThickness="1"/>
+   <Grid Margin="26,18,26,22">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid Background="Transparent" MouseLeftButtonDown="Drag_Down" Height="30">
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><TextBlock Text="MOKU" Foreground="#F7F8FC" FontSize="14" FontWeight="Bold"/><TextBlock Text="  /  SETUP" Foreground="#686E7C" FontSize="10" VerticalAlignment="Center" Margin="4,2,0,0"/></StackPanel>
+     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+      <Button x:Name="RuButton" Content="RU" Style="{StaticResource Quiet}" Click="Ru_Click" Margin="0,0,6,0"/>
+      <Button x:Name="EnButton" Content="EN" Style="{StaticResource Quiet}" Click="En_Click" Margin="0,0,10,0"/>
+      <Button Content="×" Style="{StaticResource Quiet}" Click="Close_Click"/>
+     </StackPanel>
+    </Grid>
+    <Grid Grid.Row="1" Margin="0,14,0,12">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <StackPanel VerticalAlignment="Top" Margin="0,14,0,0">
+      <TextBlock x:Name="Step0" FontSize="12" Margin="40,9,0,9"/>
+      <TextBlock x:Name="Step1" FontSize="12" Margin="40,9,0,9"/>
+      <TextBlock x:Name="Step2" FontSize="12" Margin="40,9,0,9"/>
+      <TextBlock x:Name="Step3" FontSize="12" Margin="40,9,0,9"/>
+     </StackPanel>
+     <Border Grid.Column="1" Background="#0A0B0F" BorderBrush="#20242C" BorderThickness="1" CornerRadius="22" Padding="38,20,22,18">
+      <Grid>
+       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+       <TextBlock x:Name="Headline" FontSize="21" FontWeight="SemiBold" Foreground="#F7F8FC" TextWrapping="Wrap"/>
+       <TextBlock x:Name="HintText" Grid.Row="1" FontSize="12" Foreground="#9298A8" TextWrapping="Wrap" Margin="0,6,0,14" MinHeight="32"/>
+       <Grid Grid.Row="2">
+        <!-- 0: лицензия -->
+        <StackPanel x:Name="Page0" VerticalAlignment="Top">
+         <TextBox x:Name="LicenseBox" Height="128" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#050608" Foreground="#B7BCC9" BorderBrush="#252933" FontSize="11" Padding="10,8" IsReadOnlyCaretVisible="False"/>
+         <CheckBox x:Name="AgreeCheck" Style="{StaticResource Chk}" Margin="0,14,0,0" Checked="Agree_Changed" Unchecked="Agree_Changed"/>
+        </StackPanel>
+        <!-- 1: папка -->
+        <StackPanel x:Name="Page1" VerticalAlignment="Top" Visibility="Collapsed">
+         <TextBlock x:Name="FolderLabel" FontSize="9" FontWeight="SemiBold" Foreground="#AAB0BE" Margin="0,0,0,7"/>
+         <Grid><TextBox x:Name="FolderBox" Height="34" VerticalContentAlignment="Center" Padding="10,0,80,0" Background="#050608" Foreground="#F5F6FA" BorderBrush="#292D37" CaretBrush="White" FontSize="11" TextChanged="Folder_Changed"/>
+          <Button x:Name="BrowseButton" Style="{StaticResource Quiet}" Width="68" Height="26" HorizontalAlignment="Right" Margin="0,0,4,0" Click="Browse_Click"/></Grid>
+         <CheckBox x:Name="DesktopCheck" Style="{StaticResource Chk}" Margin="0,16,0,0" IsChecked="True"/>
+         <CheckBox x:Name="AutoCheck" Style="{StaticResource Chk}" Margin="0,10,0,0" IsChecked="True"/>
+        </StackPanel>
+        <!-- 2: установка -->
+        <StackPanel x:Name="Page2" VerticalAlignment="Top" Visibility="Collapsed">
+         <ProgressBar x:Name="Progress" Height="4" Minimum="0" Maximum="100" Background="#252933" Foreground="#F1F3F8" BorderThickness="0" Margin="0,10,0,12"/>
+         <TextBlock x:Name="StatusText" FontSize="10" Foreground="#777E8D"/>
+        </StackPanel>
+        <!-- 3: готово -->
+        <StackPanel x:Name="Page3" VerticalAlignment="Top" Visibility="Collapsed">
+         <CheckBox x:Name="LaunchCheck" Style="{StaticResource Chk}" Margin="0,10,0,0" IsChecked="True"/>
+        </StackPanel>
+       </Grid>
+      </Grid>
+     </Border>
+    </Grid>
+    <Grid Grid.Row="2">
+     <Button x:Name="BackButton" Style="{StaticResource Quiet}" HorizontalAlignment="Left" Padding="14,8" Click="Back_Click"/>
+     <Button x:Name="NextButton" Style="{StaticResource Primary}" HorizontalAlignment="Right" Click="Next_Click"/>
+    </Grid>
+   </Grid>
+   <!-- глазки: перелетают к текущему пункту -->
+   <Canvas x:Name="EyeLayer" IsHitTestVisible="False">
+    <StackPanel x:Name="Eyes" Orientation="Horizontal" Canvas.Left="-100" Canvas.Top="-100">
+     <Ellipse Width="5" Height="16" Fill="White" Margin="0,0,9,0" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><ScaleTransform x:Name="EyeLScale"/></Ellipse.RenderTransform></Ellipse>
+     <Ellipse Width="5" Height="16" Fill="White" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><ScaleTransform x:Name="EyeRScale"/></Ellipse.RenderTransform></Ellipse>
+    </StackPanel>
+   </Canvas>
+  </Grid>
+ </Viewbox>
+</Window>
