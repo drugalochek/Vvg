@@ -200,9 +200,10 @@ public partial class MainWindow : Window
         Closed += OnClosed;
         // Start as a small round island; the welcome animation unfolds it after Loaded.
         _boxW = 48;
+        _boxH = 48;
         Pill.Width = 48;
-        Pill.Height = CollapsedH;
-        Pill.CornerRadius = new CornerRadius(18);
+        Pill.Height = 48;
+        Pill.CornerRadius = new CornerRadius(24);
         Eyes.HorizontalAlignment = HorizontalAlignment.Center;
         Eyes.Margin = new Thickness(0);
         TimeText.Visibility = Visibility.Collapsed;
@@ -875,10 +876,27 @@ public partial class MainWindow : Window
     {
         if (!IsVisible || _state != IslandState.Collapsed) return;
         _welcomeRunning = true;
+
+        // The intro is a separate visual state: a true 48x48 black circle,
+        // with only the two eyes visible. Keep every other panel out of the tree's
+        // visible layer until the circle has finished unfolding.
+        _boxW = 48;
+        _boxH = 48;
+        Pill.Width = 48;
+        Pill.Height = 48;
+        Pill.CornerRadius = new CornerRadius(24);
+        Eyes.HorizontalAlignment = HorizontalAlignment.Center;
+        Eyes.Margin = new Thickness(0);
+        Mini.Visibility = Visibility.Visible;
         TimePanel.Visibility = Visibility.Visible;
+        TitlePanel.Visibility = Visibility.Collapsed;
         TimeText.Visibility = Visibility.Collapsed;
         WeatherHost.Visibility = Visibility.Collapsed;
         TempText.Visibility = Visibility.Collapsed;
+        ToastPanel.Visibility = Visibility.Collapsed;
+        Full.Visibility = Visibility.Collapsed;
+        ApplyPosition();
+        RebuildBody();
 
         // 1. Pause on the round face so the greeting is actually visible.
         await Task.Delay(360);
@@ -913,9 +931,12 @@ public partial class MainWindow : Window
         UpdateMini();
 
         // 4. Only now unfold the island.
-        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: true);
+        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 24, spring: true);
         await Task.Delay(390);
+        Pill.CornerRadius = new CornerRadius(18);
+        RebuildBody();
         _welcomeRunning = false;
+        UpdateMini();
         EnsureFx();
     }
 
@@ -1016,6 +1037,17 @@ public partial class MainWindow : Window
 
     void UpdateMini()
     {
+        // Clock/media/weather updates can arrive while the welcome animation is
+        // running. They must never leak into the initial eyes-only circle.
+        if (_welcomeRunning)
+        {
+            TitlePanel.Visibility = Visibility.Collapsed;
+            TimeText.Visibility = Visibility.Collapsed;
+            WeatherHost.Visibility = Visibility.Collapsed;
+            TempText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         bool playing = _now?.Playing == true;
         var now = DateTime.Now;
         TitlePanel.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
