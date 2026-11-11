@@ -69,6 +69,20 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        // Create the window explicitly so constructor/XAML failures are logged with
+        // their original exception instead of being hidden inside StartupUri reflection.
+        try
+        {
+            var window = new MainWindow();
+            MainWindow = window;
+            window.Show();
+        }
+        catch (Exception ex)
+        {
+            Fail("Не удалось создать главное окно Moku.", ex);
+            return;
+        }
+
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         new Thread(() =>
