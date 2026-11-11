@@ -11,12 +11,8 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        if (e.Args.Any(a => string.Equals(a, "--uninstall", StringComparison.OrdinalIgnoreCase)))
-        {
-            RunUninstaller();
-            return;
-        }
-        new MainWindow().Show();
+        bool uninstall = e.Args.Any(a => string.Equals(a, "--uninstall", StringComparison.OrdinalIgnoreCase));
+        new MainWindow(uninstall).Show();
     }
 
     private static void DeleteShortcutIfTargets(string shortcutPath, string expectedTarget)
