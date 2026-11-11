@@ -811,23 +811,23 @@ public partial class MainWindow : Window
         var jellyEase = new CubicEase { EasingMode = EasingMode.EaseOut };
         if (spring)
         {
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.075, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(95)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.965, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.022, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(265)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(350)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.925, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(95)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.045, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.985, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(265)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(350)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.15, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(90)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.91, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(175)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.045, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(270)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.84, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(90)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.10, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(175)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.97, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(270)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
         }
         else
         {
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.94, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(80)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.035, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(285)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.06, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(80)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.98, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(300)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.86, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(75)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.075, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(315)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.14, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(75)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.95, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(315)), jellyEase));
         }
         sx.Completed += (_, _) => _jellyTransform.ScaleX = 1;
         sy.Completed += (_, _) => _jellyTransform.ScaleY = 1;
