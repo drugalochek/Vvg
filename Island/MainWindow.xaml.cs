@@ -782,7 +782,7 @@ public partial class MainWindow : Window
         SetWindowBox(Math.Max(_boxW, w), Math.Max(_boxH, h));   // одно изменение размера окна на старте анимации
         _boxW = w; _boxH = h;
         // Soft layout motion; the pill itself gets a separate multi-stage jelly settle.
-        var dur = TimeSpan.FromMilliseconds(spring ? 520 : 460);
+        var dur = TimeSpan.FromMilliseconds(spring ? 340 : 285);
         IEasingFunction ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
 
         var aw = new DoubleAnimation(w, dur) { EasingFunction = ease };
@@ -810,23 +810,23 @@ public partial class MainWindow : Window
         var jellyEase = new CubicEase { EasingMode = EasingMode.EaseOut };
         if (spring)
         {
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.075, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.965, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(285)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.022, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(540)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.925, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.045, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(285)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.985, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(560)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.075, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(95)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.965, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.022, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(265)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(350)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.925, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(95)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.045, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.985, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(265)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(350)), jellyEase));
         }
         else
         {
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.94, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(130)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.035, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(440)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.06, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(130)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.98, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(260)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(460)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.94, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(80)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.035, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
+            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(285)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.06, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(80)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.98, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
+            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(300)), jellyEase));
         }
         sx.Completed += (_, _) => _jellyTransform.ScaleX = 1;
         sy.Completed += (_, _) => _jellyTransform.ScaleY = 1;
@@ -880,41 +880,75 @@ public partial class MainWindow : Window
         WeatherHost.Visibility = Visibility.Collapsed;
         TempText.Visibility = Visibility.Collapsed;
 
-        // Let the little round face appear first, then give it a single wink.
-        await Task.Delay(420);
+        // 1. Pause on the round face so the greeting is actually visible.
+        await Task.Delay(360);
+
+        // 2. Complete the wink before starting the gaze movement.
         var wink = new DoubleAnimationUsingKeyFrames();
         var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
-        wink.KeyFrames.Add(new EasingDoubleKeyFrame(0.08, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100)), ease));
-        wink.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(270)), ease));
+        wink.KeyFrames.Add(new EasingDoubleKeyFrame(0.08, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(75)), ease));
+        wink.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(235)), ease));
         wink.Completed += (_, _) =>
         {
             EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
             EyeLScale.ScaleY = 1;
         };
         EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, wink);
+        await Task.Delay(255);
 
-        await Task.Delay(360);
+        // 3. Both eyes briefly look toward the eye that just winked.
+        var gaze = new DoubleAnimation(-2.6, TimeSpan.FromMilliseconds(145))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        EyeLShift.BeginAnimation(TranslateTransform.XProperty, gaze);
+        EyeRShift.BeginAnimation(TranslateTransform.XProperty, gaze);
+        await Task.Delay(250);
+
+        EyeLShift.BeginAnimation(TranslateTransform.XProperty, null);
+        EyeRShift.BeginAnimation(TranslateTransform.XProperty, null);
+        EyeLShift.X = EyeRShift.X = 0;
         Eyes.HorizontalAlignment = HorizontalAlignment.Left;
         Eyes.Margin = new Thickness(15, 0, 0, 0);
-        TimeText.Visibility = _now?.Playing == true ? Visibility.Collapsed : Visibility.Visible;
         UpdateMini();
-        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: true);
 
-        await Task.Delay(560);
+        // 4. Only now unfold the island.
+        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: true);
+        await Task.Delay(390);
         _welcomeRunning = false;
         EnsureFx();
     }
 
     void Collapse()
     {
+        if (_state == IslandState.Collapsed && Full.Visibility != Visibility.Visible)
+        {
+            UpdateMini();
+            EnsureFx();
+            return;
+        }
+
         _state = IslandState.Collapsed;
-        Full.Visibility = Visibility.Collapsed;
         Mini.Visibility = Visibility.Visible;
         ToastPanel.Visibility = Visibility.Collapsed;
         TimePanel.Visibility = Visibility.Visible;
         SearchBox.Text = "";
         UpdateMini();
         RevealEyes();
+
+        // Fade the expanded content out instead of cutting it off on the first frame.
+        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(125))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        fade.Completed += (_, _) =>
+        {
+            Full.BeginAnimation(OpacityProperty, null);
+            Full.Opacity = 1;
+            Full.Visibility = Visibility.Collapsed;
+        };
+        Full.BeginAnimation(OpacityProperty, fade);
+
         Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: false);
         EnsureFx();
     }
@@ -1047,7 +1081,7 @@ public partial class MainWindow : Window
         _lastRenderTime = args.RenderingTime;
         bool playing = _now?.Playing == true;
         double target = playing ? 5.0 : 0.0;
-        double follow = 1 - Math.Exp(-6.3 * dt);
+        double follow = 1 - Math.Exp(-11.0 * dt);
         _waveAmp += (target - _waveAmp) * follow;
         if (Math.Abs(target - _waveAmp) < 0.03) _waveAmp = target;
         _wavePhase += 3.25 * dt;
@@ -1142,23 +1176,16 @@ public partial class MainWindow : Window
         bool surprised = _eyeMood == EyeMood.Surprised;
         bool focused = _eyeMood == EyeMood.Focused;
         double eyeDt = Math.Clamp((now - _lastEyeUpdate).TotalSeconds, 0.001, 0.05);
-        _eyeFollow = 1 - Math.Exp(-5.2 * eyeDt);
+        _eyeFollow = 1 - Math.Exp(-12.0 * eyeDt);
         double openness = sleepy ? 0.30 : surprised ? 1.24 : focused ? 0.88 : 1.0;
         _open += (openness - _open) * (1 - Math.Exp(-5.5 * eyeDt));
         if (Math.Abs(openness - _open) < 0.002) _open = openness;
         _lastEyeUpdate = now;
 
-        // мышь стоит несколько секунд — глаза сами поглядывают по сторонам
-        bool idle = !sleepy && (now - _lastMove).TotalSeconds > 3;
-        if (idle && now >= _nextGlance)
-        {
-            _glX = (_rng.NextDouble() * 2 - 1) * 3.2;
-            _glY = (_rng.NextDouble() * 2 - 1) * 1.8;
-            _nextGlance = now.AddSeconds(1.2 + _rng.NextDouble() * 2.6);
-        }
-
-        Look(EyeL, p, sleepy, idle, playing, ref _lLx, ref _lLy);
-        Look(EyeR, p, sleepy, idle, playing, ref _lRx, ref _lRy);
+        // Keep following the pointer even when it is stationary. Random idle glances
+        // used to override the pointer target after three seconds, making tracking appear broken.
+        Look(EyeL, p, sleepy, false, playing, ref _lLx, ref _lLy);
+        Look(EyeR, p, sleepy, false, playing, ref _lRx, ref _lRy);
         if (excited) { _lLy += Math.Sin(now.TimeOfDay.TotalSeconds * 11) * 0.65; _lRy += Math.Sin(now.TimeOfDay.TotalSeconds * 11 + 0.45) * 0.65; }
         if (_eyeMood == EyeMood.Happy) { _lLy += 0.35; _lRy += 0.35; }
         EyeLShift.X = _lLx; EyeLShift.Y = _lLy;
@@ -1202,9 +1229,9 @@ public partial class MainWindow : Window
                     double dx = cur.X - c.X, dy = cur.Y - c.Y, d = Math.Sqrt(dx * dx + dy * dy);
                     // Ignore a distant cursor. Otherwise the first frame after
                     // startup can pull both eyes hard to one side of the pill.
-                    if (d > 1 && d < 220)
+                    if (d > 1)
                     {
-                        double k = Smooth(d / 220.0);
+                        double k = Smooth(Math.Min(1.0, d / 90.0));
                         tx = dx / d * 2.35 * k;
                         ty = dy / d * 2.15 * k;
                     }
