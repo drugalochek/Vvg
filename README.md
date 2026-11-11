@@ -1,7 +1,8 @@
 # Moku — Dynamic Moku для Windows
 
 ## Запуск из исходников
-    cd Island\n    dotnet run -c Release
+    cd Island
+    dotnet run -c Release
 
 ## Как получить Moku.exe
 1. Поставь .NET 8 SDK: https://dotnet.microsoft.com/download/dotnet/8.0
