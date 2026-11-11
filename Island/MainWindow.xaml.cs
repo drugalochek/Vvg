@@ -1155,10 +1155,10 @@ public partial class MainWindow : Window
             return;
         }
         WeatherHost.Child = WeatherIcons.Build(w.Kind, w.IsDay);
-        WeatherHost.Visibility = Visibility.Visible;
         TempText.Text = (w.TempC > 0 ? "+" : "") + w.TempC + "°";
-        WeatherHost.Visibility = Visibility.Visible;
-        TempText.Visibility = Visibility.Visible;
+        bool showWeather = _now?.Playing != true;
+        WeatherHost.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
+        TempText.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ================= Обработчики окна =================
