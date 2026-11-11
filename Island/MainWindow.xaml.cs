@@ -888,6 +888,11 @@ public partial class MainWindow : Window
             reveal.KeyFrames.Add(new EasingDoubleKeyFrame(1.12, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), ease));
             reveal.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(245)), ease));
             reveal.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(360)), ease));
+            reveal.Completed += (_, _) =>
+            {
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                scale.ScaleY = 1;
+            };
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, reveal);
         }
     }
