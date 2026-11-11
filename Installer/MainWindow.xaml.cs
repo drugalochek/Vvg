@@ -180,26 +180,40 @@ public partial class MainWindow : Window
     async Task InstallAsync()
     {
         var target = FolderBox.Text.Trim();
-        var exe = Path.Combine(target, "Moku.exe");
+        string exe;
+        string tempExe = "";
         try
         {
+            target = Path.GetFullPath(target);
+            if (target.Length <= Path.GetPathRoot(target)!.Length)
+                throw new InvalidOperationException(T("Нельзя установить программу в корень диска.", "The drive root cannot be used as the install folder."));
+            exe = Path.Combine(target, "Moku.exe");
+            tempExe = exe + ".installing";
             _installing = true; GoPage(2);
             StatusText.Text = T("ШАГ 1 ИЗ 3  ·  ЗАКРЫВАЮ СТАРУЮ КОПИЮ", "STEP 1 OF 3  ·  STOPPING OLD COPY");
             // старая копия, висящая в фоне, блокировала файл и не давала острову показаться
-            foreach (var pr in Process.GetProcessesByName("Moku")) { try { pr.Kill(true); pr.WaitForExit(4000); } catch { } }
+            foreach (var pr in Process.GetProcessesByName("Moku"))
+            {
+                try
+                {
+                    string? processPath = pr.MainModule?.FileName;
+                    if (processPath != null &&
+                        string.Equals(Path.GetFullPath(processPath), Path.GetFullPath(exe), StringComparison.OrdinalIgnoreCase))
+                    {
+                        pr.Kill(entireProcessTree: true);
+                        pr.WaitForExit(5000);
+                    }
+                }
+                catch { /* Не трогаем процесс, путь которого не удалось проверить. */ }
+            }
+
             StatusText.Text = T("ШАГ 2 ИЗ 3  ·  КОПИРУЮ ФАЙЛЫ", "STEP 2 OF 3  ·  COPYING FILES");
             await Task.Run(() =>
             {
                 Directory.CreateDirectory(target);
                 using var src = Assembly.GetExecutingAssembly().GetManifestResourceStream("MokuInstaller.Payload.Moku.exe")
                     ?? throw new InvalidOperationException("Payload missing");
-                FileStream? output = null;
-                for (int a = 0; a < 6 && output == null; a++)
-                {
-                    try { output = new FileStream(exe, FileMode.Create, FileAccess.Write, FileShare.None); }
-                    catch (IOException) when (a < 5) { Thread.Sleep(400); }
-                }
-                using (output!)
+                using (var output = new FileStream(tempExe, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     var buf = new byte[1 << 16]; long total = src.Length, done = 0; int n;
                     while ((n = src.Read(buf, 0, buf.Length)) > 0)
@@ -210,20 +224,52 @@ public partial class MainWindow : Window
                     }
                     output.Flush(true);
                 }
-                if (new FileInfo(exe).Length < 1024 * 1024) throw new InvalidOperationException("Incomplete file");
+                if (new FileInfo(tempExe).Length < 1024 * 1024)
+                    throw new InvalidOperationException("Incomplete file");
+                File.Move(tempExe, exe, overwrite: true);
             });
+
             StatusText.Text = T("ШАГ 3 ИЗ 3  ·  ЯРЛЫКИ И НАСТРОЙКИ", "STEP 3 OF 3  ·  SHORTCUTS & SETTINGS");
             SetAnchor(StatusText); Progress.Value = 88;
             var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Moku");
             Directory.CreateDirectory(startMenu);
             CreateShortcut(Path.Combine(startMenu, "Moku.lnk"), exe);
-            if (DesktopCheck.IsChecked == true) CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Moku.lnk"), exe);
+
+            string desktopShortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Moku.lnk");
+            if (DesktopCheck.IsChecked == true) CreateShortcut(desktopShortcut, exe);
+            else if (File.Exists(desktopShortcut)) File.Delete(desktopShortcut);
+
+            string? currentInstaller = Environment.ProcessPath;
+            string uninstaller = Path.Combine(target, "Moku-Uninstall.exe");
+            if (!string.IsNullOrWhiteSpace(currentInstaller) && File.Exists(currentInstaller) &&
+                !string.Equals(Path.GetFullPath(currentInstaller), Path.GetFullPath(uninstaller), StringComparison.OrdinalIgnoreCase))
+            {
+                File.Copy(currentInstaller, uninstaller, overwrite: true);
+                CreateShortcut(Path.Combine(startMenu, "Uninstall Moku.lnk"), uninstaller, "--uninstall");
+                using var uninstallKey = Registry.CurrentUser.CreateSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Moku");
+                if (uninstallKey != null)
+                {
+                    uninstallKey.SetValue("DisplayName", "Moku");
+                    uninstallKey.SetValue("DisplayVersion", "1.0.0");
+                    uninstallKey.SetValue("InstallLocation", target);
+                    uninstallKey.SetValue("UninstallString", "\"" + uninstaller + "\" --uninstall");
+                    uninstallKey.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                    uninstallKey.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                }
+            }
+
             try
             {
                 using var run = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-                if (AutoCheck.IsChecked == true) run.SetValue("Moku", "\"" + exe + "\""); else run.DeleteValue("Moku", false);
+                if (run != null)
+                {
+                    if (AutoCheck.IsChecked == true) run.SetValue("Moku", "\"" + exe + "\"");
+                    else run.DeleteValue("Moku", false);
+                }
             }
             catch { }
+
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Moku");
             Directory.CreateDirectory(dir);
             var sp = Path.Combine(dir, "settings.json");
@@ -236,6 +282,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            try { if (!string.IsNullOrEmpty(tempExe) && File.Exists(tempExe)) File.Delete(tempExe); } catch { }
             _installing = false; GoPage(1);
             System.Windows.MessageBox.Show(this, T("Не удалось установить: ", "Install failed: ") + ex.Message, "Moku", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -253,11 +300,16 @@ public partial class MainWindow : Window
         Close();
     }
 
-    static void CreateShortcut(string path, string target)
+    static void CreateShortcut(string path, string target, string arguments = "")
     {
-        var t = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("WSH unavailable");
+        var t = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("Windows Script Host is unavailable");
         dynamic shell = Activator.CreateInstance(t)!;
         dynamic sc = shell.CreateShortcut(path);
-        sc.TargetPath = target; sc.WorkingDirectory = Path.GetDirectoryName(target); sc.IconLocation = target + ",0"; sc.Description = "Moku"; sc.Save();
+        sc.TargetPath = target;
+        sc.Arguments = arguments;
+        sc.WorkingDirectory = Path.GetDirectoryName(target);
+        sc.IconLocation = target + ",0";
+        sc.Description = "Moku";
+        sc.Save();
     }
 }
