@@ -1562,44 +1562,6 @@ public partial class MainWindow : Window
         AddSavedApp(path, name);
     }
 
-    void AddSteamLink_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Window
-        {
-            Title = _s.Language == "ru" ? "Добавить игру Steam" : "Add Steam game",
-            Owner = this, Width = 420, Height = 176, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize, WindowStyle = WindowStyle.ToolWindow,
-            Background = new SolidColorBrush(Color.FromRgb(30, 30, 36)), Foreground = Brushes.White
-        };
-        var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new TextBlock {
-            Text = _s.Language == "ru" ? "Вставь ссылку steam://rungameid/..." : "Paste a steam://rungameid/... link",
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-        var input = new System.Windows.Controls.TextBox {
-            Height = 30, Padding = new Thickness(7), Text = Clipboard.ContainsText() ? Clipboard.GetText().Trim() : ""
-        };
-        panel.Children.Add(input);
-        var buttons = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-        var add = new Button { Content = _s.Language == "ru" ? "Добавить" : "Add", Width = 88, Padding = new Thickness(8, 5, 8, 5), IsDefault = true };
-        var cancel = new Button { Content = _s.Language == "ru" ? "Отмена" : "Cancel", Width = 88, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(8, 5, 8, 5), IsCancel = true };
-        add.Click += (_, _) => { dialog.DialogResult = true; dialog.Close(); };
-        cancel.Click += (_, _) => { dialog.DialogResult = false; dialog.Close(); };
-        buttons.Children.Add(add); buttons.Children.Add(cancel); panel.Children.Add(buttons);
-        dialog.Content = panel;
-        input.Focus();
-        if (dialog.ShowDialog() != true) return;
-
-        string link = input.Text.Trim();
-        if (!IsSteamLink(link))
-        {
-            ShowToast("Moku", _s.Language == "ru" ? "Нужна ссылка Steam вида steam://rungameid/ID" : "Enter a Steam link like steam://rungameid/ID", ColorError);
-            return;
-        }
-        string id = link.Split('/').LastOrDefault() ?? "";
-        AddSavedApp(link, "Steam " + id);
-    }
-
     static bool IsSteamLink(string value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
         uri.Scheme.Equals("steam", StringComparison.OrdinalIgnoreCase);
