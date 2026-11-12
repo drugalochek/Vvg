@@ -2019,9 +2019,9 @@ public partial class MainWindow : Window
                 return;
             }
             double duration = timeline.EndTime.TotalSeconds;
-            if (!SeekSlider.IsMouseCaptureWithin && !SeekSlider.IsKeyboardFocusWithin)
-                SeekSlider.Value = Math.Clamp(timeline.Position.TotalSeconds, 0, duration);
             SeekSlider.Maximum = duration;
+            if (!SeekSlider.IsMouseCaptureWithin)
+                SeekSlider.Value = Math.Clamp(timeline.Position.TotalSeconds, 0, duration);
             SeekSlider.IsEnabled = true;
             SeekCurrentText.Text = FormatMediaTime(timeline.Position);
             SeekDurationText.Text = FormatMediaTime(timeline.EndTime);
@@ -2032,7 +2032,10 @@ public partial class MainWindow : Window
     static string FormatMediaTime(TimeSpan time) =>
         time.TotalHours >= 1 ? time.ToString(@"h\:mm\:ss") : time.ToString(@"m\:ss");
 
-    async void SeekSlider_Commit(object sender, RoutedEventArgs e)
+    void SeekSlider_MouseUp(object sender, MouseButtonEventArgs e) => CommitSeek();
+    void SeekSlider_KeyUp(object sender, KeyEventArgs e) => CommitSeek();
+
+    async void CommitSeek()
     {
         if (_mediaSession == null || !SeekSlider.IsEnabled) return;
         try
