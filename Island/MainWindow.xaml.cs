@@ -481,7 +481,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    void Pill_DragMove(object sender, MouseEventArgs e)
+    void Pill_DragMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (!_dragging || e.LeftButton != MouseButtonState.Pressed) return;
         var physical = PointToScreen(e.GetPosition(this));
