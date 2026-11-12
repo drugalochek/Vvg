@@ -21,6 +21,9 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Island.Tests" />
     <Compile Remove="..\Island.Tests\**" />
   </ItemGroup>
