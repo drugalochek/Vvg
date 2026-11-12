@@ -36,7 +36,12 @@ public sealed class ColorPickerWindow : Window
         SelectedColor=initial; (h,s,v)=ToHsv(initial);
         Width=430; Height=410; ResizeMode=ResizeMode.NoResize; WindowStyle=WindowStyle.None;
         AllowsTransparency=true; Background=Brushes.Transparent; WindowStartupLocation=WindowStartupLocation.CenterOwner; ShowInTaskbar=false;
-        var shell=new Border { Background=new SolidColorBrush(Color.FromRgb(19,20,27)), BorderBrush=new SolidColorBrush(Color.FromArgb(65,255,255,255)), BorderThickness=new Thickness(1), CornerRadius=new CornerRadius(16), Padding=new Thickness(18), Effect=new System.Windows.Media.Effects.DropShadowEffect { BlurRadius=24, ShadowDepth=4, Opacity=.45, Color=Colors.Black } };
+        var shell=new Border { Background=new LinearGradientBrush(
+            new GradientStopCollection {
+                new GradientStop(Color.FromArgb(248,34,37,49),0),
+                new GradientStop(Color.FromArgb(242,18,20,29),1)
+            }, new Point(0,0), new Point(0,1)),
+            BorderBrush=new SolidColorBrush(Color.FromArgb(75,255,255,255)), BorderThickness=new Thickness(1), CornerRadius=new CornerRadius(16), Padding=new Thickness(18), Effect=new System.Windows.Media.Effects.DropShadowEffect { BlurRadius=24, ShadowDepth=4, Opacity=.45, Color=Colors.Black } };
         Content=shell;
         var root=new Grid();
         root.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
@@ -47,7 +52,7 @@ public sealed class ColorPickerWindow : Window
         shell.Child=root;
         var header=new DockPanel { Margin=new Thickness(0,0,0,14) };
         var close=MakeButton("×",32,false); close.Click+=(_,_)=>{ DialogResult=false; Close(); }; DockPanel.SetDock(close,Dock.Right); header.Children.Add(close);
-        header.Children.Add(new TextBlock { Text="CUSTOM COLOR", Foreground=Brushes.White, FontSize=13, FontWeight=FontWeights.SemiBold, VerticalAlignment=VerticalAlignment.Center });
+        header.Children.Add(new TextBlock { Text="THEME COLOR", Foreground=Brushes.White, FontSize=13, FontWeight=FontWeights.SemiBold, VerticalAlignment=VerticalAlignment.Center });
         root.Children.Add(header);
         var picker=new Grid { Margin=new Thickness(0,0,0,14) };
         picker.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });
@@ -79,7 +84,7 @@ public sealed class ColorPickerWindow : Window
         var cancel=MakeButton("Отмена",92,false); cancel.Margin=new Thickness(0,0,8,0); cancel.Click+=(_,_)=>{DialogResult=false;Close();};
         var apply=MakeButton("Применить",112,true); apply.Click+=(_,_)=>{ReadHex();SelectedColor=Current();DialogResult=true;Close();};
         var alphaRow = new DockPanel { Margin = new Thickness(0, 0, 0, 12), LastChildFill = true };
-        alphaRow.Children.Add(new TextBlock { Text = "ALPHA", Foreground = new SolidColorBrush(Color.FromRgb(160,165,180)), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,12,0) });
+        alphaRow.Children.Add(new TextBlock { Text = "COLOR TRANSPARENCY", Foreground = new SolidColorBrush(Color.FromRgb(160,165,180)), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,12,0) });
         alphaText.Text = "255";
         DockPanel.SetDock(alphaText, Dock.Right);
         alphaRow.Children.Add(alphaText);
@@ -91,7 +96,31 @@ public sealed class ColorPickerWindow : Window
         actions.Children.Add(cancel); actions.Children.Add(apply); Grid.SetRow(actions,4); root.Children.Add(actions);
         Loaded+=(_,_)=>{LayoutMarkers();UpdateView();};
     }
-    Button MakeButton(string text,double width,bool primary)=>new() { Content=text, Width=width, Height=34, BorderThickness=new Thickness(1), BorderBrush=new SolidColorBrush(Color.FromArgb(75,255,255,255)), Background=primary?new SolidColorBrush(Color.FromArgb(42,255,255,255)):new SolidColorBrush(Color.FromArgb(24,255,255,255)), Foreground=Brushes.White, FontSize=12, Cursor=Cursors.Hand };
+    Button MakeButton(string text,double width,bool primary)
+    {
+        var button = new Button {
+            Content=text, Width=width, Height=34, BorderThickness=new Thickness(1),
+            BorderBrush=new SolidColorBrush(Color.FromArgb(primary ? (byte)105 : (byte)55,255,255,255)),
+            Background=primary
+                ? new LinearGradientBrush(Color.FromArgb(58,255,255,255),Color.FromArgb(28,255,255,255),90)
+                : new SolidColorBrush(Color.FromArgb(20,255,255,255)),
+            Foreground=Brushes.White, FontSize=12, FontWeight=FontWeights.SemiBold,
+            Cursor=Cursors.Hand, Padding=new Thickness(10,0,10,0)
+        };
+        var template = new ControlTemplate(typeof(Button));
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.CornerRadiusProperty,new CornerRadius(10));
+        border.SetValue(Border.BackgroundProperty,new TemplateBindingExtension(Button.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty,new TemplateBindingExtension(Button.BorderBrushProperty));
+        border.SetValue(Border.BorderThicknessProperty,new TemplateBindingExtension(Button.BorderThicknessProperty));
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty,HorizontalAlignment.Center);
+        presenter.SetValue(ContentPresenter.VerticalAlignmentProperty,VerticalAlignment.Center);
+        border.AppendChild(presenter);
+        template.VisualTree=border;
+        button.Template=template;
+        return button;
+    }
     void LayoutMarkers()
     {
         double w=square.ActualWidth,sh=square.ActualHeight;
