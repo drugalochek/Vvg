@@ -495,14 +495,19 @@
                             <TextBlock x:Name="AppsHint" Text="Add your favorite apps for one-click launch."
                                        Foreground="#88FFFFFF" FontSize="11" Margin="0,3,0,0"/>
                         </StackPanel>
-                        <Button x:Name="AddAppButton" Grid.Column="1" Style="{StaticResource TileBtn}"
-                                Height="34" Width="112" Margin="0" HorizontalAlignment="Right"
-                                Click="AddApp_Click">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="&#xE710;" FontFamily="{StaticResource Icons}" Margin="0,0,7,0"/>
-                                <TextBlock x:Name="AddAppText" Text="Add app" FontSize="12"/>
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="AddSteamButton" Style="{StaticResource TileBtn}"
+                                    Height="34" Width="104" Margin="0,0,6,0" Click="AddSteamLink_Click">
+                                <TextBlock Text="Steam +" FontSize="12" HorizontalAlignment="Center"/>
+                            </Button>
+                            <Button x:Name="AddAppButton" Style="{StaticResource TileBtn}"
+                                    Height="34" Width="104" Margin="0" HorizontalAlignment="Right" Click="AddApp_Click">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE710;" FontFamily="{StaticResource Icons}" Margin="0,0,7,0"/>
+                                    <TextBlock x:Name="AddAppText" Text="Add app" FontSize="12"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
