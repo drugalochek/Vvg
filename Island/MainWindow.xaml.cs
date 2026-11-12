@@ -169,6 +169,15 @@ public partial class MainWindow : Window
         (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
         OffsetText.Text = _s.OffsetY + " px";
         ScaleText.Text = _s.Scale + "%";
+        if (ScaleSlider != null && (int)ScaleSlider.Value != _s.Scale) ScaleSlider.Value = _s.Scale;
+        if (OpacitySlider != null && (int)OpacitySlider.Value != _s.GlassOpacity) OpacitySlider.Value = _s.GlassOpacity;
+        if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius;
+        if (OffsetXSlider != null && (int)OffsetXSlider.Value != _s.OffsetX) OffsetXSlider.Value = _s.OffsetX;
+        if (OffsetYSlider != null && (int)OffsetYSlider.Value != _s.OffsetY) OffsetYSlider.Value = _s.OffsetY;
+        OffsetXText.Text = _s.OffsetX + " px"; RadiusText.Text = _s.CornerRadius + " px";
+        AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B;
+        ( _s.VerticalAlign switch { "Bottom" => VerticalBottom, "Center" => VerticalCenter, _ => VerticalTop }).IsChecked = true;
+        ThemeCombo.SelectedValue = _s.Theme;
         GlassOpacityText.Text = _s.GlassOpacity + "%";
         UpdateAutoButton();
         ApplyScale();
@@ -358,7 +367,8 @@ public partial class MainWindow : Window
             "Left" => 16 - GlowPad,
             "Right" => sw - w - 16 + GlowPad,
             _ => (sw - w) / 2
-        };
+        } + _s.OffsetX;
+        Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
         Pill.HorizontalAlignment = _s.Align switch
         {
             "Left" => HorizontalAlignment.Left,
@@ -370,13 +380,16 @@ public partial class MainWindow : Window
         var src = hwnd == IntPtr.Zero ? null : PresentationSource.FromVisual(this);
         if (src?.CompositionTarget == null)
         {
-            Width = w; Height = h; Left = left; Top = _s.OffsetY;   // окно ещё не создано
+            double top = _s.VerticalAlign switch { "Bottom" => sh - h - 16, "Center" => (sh - h) / 2, _ => 8 } + _s.OffsetY;
+            Width = w; Height = h; Left = left; Top = top;   // окно ещё не создано
             return;
         }
         var m = src.CompositionTarget.TransformToDevice;
         // Размер и позиция одним вызовом — без промежуточного кадра со сдвинутым островом.
+        double top = _s.VerticalAlign switch { "Bottom" => sh - h - 16, "Center" => (sh - h) / 2, _ => 8 };
+        top += _s.OffsetY;
         SetWindowPos(hwnd, IntPtr.Zero,
-            (int)Math.Round(left * m.M11), (int)Math.Round(_s.OffsetY * m.M22),
+            (int)Math.Round(left * m.M11), (int)Math.Round(top * m.M22),
             (int)Math.Round(w * m.M11), (int)Math.Round(h * m.M22),
             SWP_NOZORDER | SWP_NOACTIVATE);
         _boxW = pillW;
@@ -392,19 +405,45 @@ public partial class MainWindow : Window
 
     void ApplyAppearance()
     {
-        if (_bodyBrush != null) _bodyBrush.Opacity = _s.GlassOpacity / 100.0;
+        if (_bodyBrush != null)
+        {
+            var baseColor = _s.Theme switch
+            {
+                "Ocean" => Color.FromRgb(5, 25, 42), "Amethyst" => Color.FromRgb(27, 13, 42),
+                "Emerald" => Color.FromRgb(8, 31, 24), "Rose" => Color.FromRgb(42, 15, 26),
+                _ => Color.FromRgb(0, 0, 0)
+            };
+            _bodyBrush.GradientStops[0].Color = baseColor;
+            _bodyBrush.Opacity = _s.GlassOpacity / 100.0;
+        }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
+        if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
+        if (AccentR != null) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
+        if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
     }
 
     void SetGlassOpacity(int value)
     {
-        _s.GlassOpacity = Math.Clamp(value, 55, 100);
+        _s.GlassOpacity = Math.Clamp(value, 0, 100);
         ApplyAppearance();
         _s.Save();
     }
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
+    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); Pill.CornerRadius = new CornerRadius(_s.CornerRadius); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); _s.Save(); }
+    void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
+    void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
+    void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
+    void SetOffsetX(int v) { _s.OffsetX = Math.Clamp(v, -500, 500); OffsetXText.Text = _s.OffsetX + " px"; if (OffsetXSlider != null && (int)OffsetXSlider.Value != _s.OffsetX) OffsetXSlider.Value = _s.OffsetX; ApplyPosition(); _s.Save(); }
+    void OffsetX_Minus(object sender, RoutedEventArgs e) => SetOffsetX(_s.OffsetX - 10);
+    void OffsetX_Plus(object sender, RoutedEventArgs e) => SetOffsetX(_s.OffsetX + 10);
+    void OffsetXSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetOffsetX((int)e.NewValue); }
+    void OffsetYSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetOffset((int)e.NewValue); }
+    void ScaleSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetScale((int)e.NewValue); }
+    void OpacitySlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetGlassOpacity((int)e.NewValue); }
+    void RadiusSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetRadius((int)e.NewValue); }
+    void Theme_Changed(object sender, SelectionChangedEventArgs e) { if (!_ready || ThemeCombo.SelectedValue == null) return; _s.Theme = ThemeCombo.SelectedValue.ToString()!; ApplyAppearance(); _s.Save(); }
 
     void ApplyAccent()
     {
@@ -453,19 +492,30 @@ public partial class MainWindow : Window
         AccentPanel.Children.Add(custom);
     }
 
-    void CustomAccent_Click(object sender, RoutedEventArgs e)
+    void CustomAccent_Click(object sender, RoutedEventArgs e) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
+    void Rgb_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        var current = (Color)ColorConverter.ConvertFromString(_s.Accent);
-        using var dialog = new System.Windows.Forms.ColorDialog
-        {
-            Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B),
-            FullOpen = true
-        };
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-        var selected = dialog.Color;
-        _s.Accent = Color.FromArgb(selected.A, selected.R, selected.G, selected.B).ToString();
-        _s.Save();
+        if (!_ready || AccentR == null || AccentG == null || AccentB == null) return;
+        var color = Color.FromRgb((byte)AccentR.Value, (byte)AccentG.Value, (byte)AccentB.Value);
+        _s.Accent = color.ToString(); _s.Save();
+        if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(color);
         ApplyAccent();
+    }
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hwnd);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
+    [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr hdc, int x, int y);
+    void Eyedropper_Click(object sender, RoutedEventArgs e)
+    {
+        if (!GetCursorPos(out var p)) return;
+        IntPtr dc = GetDC(IntPtr.Zero);
+        try
+        {
+            uint pixel = GetPixel(dc, p.X, p.Y);
+            var color = Color.FromRgb((byte)(pixel & 0xFF), (byte)((pixel >> 8) & 0xFF), (byte)((pixel >> 16) & 0xFF));
+            AccentR.Value = color.R; AccentG.Value = color.G; AccentB.Value = color.B;
+            _s.Accent = color.ToString(); _s.Save(); ApplyAccent();
+        }
+        finally { ReleaseDC(IntPtr.Zero, dc); }
     }
 
     void Align_Checked(object sender, RoutedEventArgs e)
@@ -478,8 +528,10 @@ public partial class MainWindow : Window
 
     void SetOffset(int v)
     {
-        _s.OffsetY = Math.Clamp(v, 0, 200);
+        _s.OffsetY = Math.Clamp(v, -500, 500);
+        if (OffsetYSlider != null) OffsetYSlider.Value = _s.OffsetY;
         OffsetText.Text = _s.OffsetY + " px";
+        if (OffsetYSlider != null) OffsetYSlider.Value = _s.OffsetY;
         ApplyPosition();
         _s.Save();
     }
@@ -642,8 +694,7 @@ public partial class MainWindow : Window
         if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
         if (ScanSteamText != null) ScanSteamText.Text = ru ? "Найти игры Steam" : "Find Steam games";
         if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
-        if (SteamScanText != null) SteamScanText.Text = ru ? "Найти Steam" : "Find Steam";
-        if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
+                if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
         if (MenuSettings != null) MenuSettings.Header = ru ? "Настройки" : "Settings";
         if (MenuExit != null) MenuExit.Header = ru ? "Выход" : "Exit";
         if (NowTitle != null) NowTitle.Text = ru ? "Ничего не воспроизводится" : "Nothing playing";
@@ -653,8 +704,15 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
-        if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Непрозрачность острова" : "Island opacity";
-        if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";
+        if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Прозрачность" : "Opacity";
+        if (VerticalPositionLabel != null) VerticalPositionLabel.Text = ru ? "Вертикально" : "Vertical position";
+        if (HorizontalOffsetLabel != null) HorizontalOffsetLabel.Text = ru ? "Сдвиг по X" : "Horizontal offset";
+        if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Сдвиг по Y" : "Vertical offset";
+        if (CornerRadiusLabel != null) CornerRadiusLabel.Text = ru ? "Скругление" : "Corner rounding";
+        if (ThemeLabel != null) ThemeLabel.Text = ru ? "Тема" : "Theme";
+        if (RgbLabel != null) RgbLabel.Text = ru ? "Цвет RGB" : "Custom RGB";
+        if (EyedropperButton != null) EyedropperButton.Content = ru ? "Пипетка" : "Eyedropper";
+        if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
         if (AlignCenter != null) AlignCenter.Content = ru ? "По центру" : "Center";
@@ -1477,6 +1535,8 @@ public partial class MainWindow : Window
         {
             // Данных нет (нет сети/кэша) — честно показываем «—°», без выдуманной иконки.
             WeatherHost.Child = null;
+            if (ExpandedWeatherHost != null) ExpandedWeatherHost.Child = null;
+            if (ExpandedTempText != null) ExpandedTempText.Text = "—°";
             TempText.Text = "—°";
             bool showFallback = !_welcomeRunning && _now?.Playing != true;
             WeatherHost.Visibility = Visibility.Collapsed;
@@ -1485,6 +1545,8 @@ public partial class MainWindow : Window
             return;
         }
         WeatherHost.Child = WeatherIcons.Build(w.Kind, w.IsDay);
+        if (ExpandedWeatherHost != null) ExpandedWeatherHost.Child = WeatherIcons.Build(w.Kind, w.IsDay);
+        if (ExpandedTempText != null) ExpandedTempText.Text = (w.TempC > 0 ? "+" : "") + w.TempC + "°";
         TempText.Text = (w.TempC > 0 ? "+" : "") + w.TempC + "°";
         bool showWeather = !_welcomeRunning && _now?.Playing != true;
         WeatherHost.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
@@ -1555,7 +1617,12 @@ public partial class MainWindow : Window
             var iconView = new System.Windows.Controls.Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
             try
             {
-                if (!steamLink)
+                if (steamLink)
+                {
+                    string appId = app.Path.Split('/').LastOrDefault() ?? "";
+                    iconView.Source = LoadSteamArtwork(appId);
+                }
+                else
                 {
                     using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
                     if (icon != null)
@@ -1610,6 +1677,25 @@ public partial class MainWindow : Window
         }
     }
 
+    ImageSource? LoadSteamArtwork(string appId)
+    {
+        if (string.IsNullOrWhiteSpace(appId) || !Regex.IsMatch(appId, @"^\\d+$")) return null;
+        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string? p) { if (!string.IsNullOrWhiteSpace(p) && Directory.Exists(p)) roots.Add(p); }
+        Add(Registry.GetValue(@"HKEY_CURRENT_USER\\Software\\Valve\\Steam", "SteamPath", null) as string);
+        Add(Registry.GetValue(@"HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Valve\\Steam", "InstallPath", null) as string);
+        Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
+        var candidates = new List<string>();
+        foreach (var root in roots)
+        {
+            candidates.AddRange(new[] { Path.Combine(root,"appcache","librarycache",appId+"_icon.jpg"), Path.Combine(root,"appcache","librarycache",appId+"_header.jpg"), Path.Combine(root,"appcache","librarycache",appId+"_library_600x900.jpg"), Path.Combine(root,"steamapps","librarycache",appId+"_icon.jpg"), Path.Combine(root,"steamapps","librarycache",appId+"_header.jpg") });
+            var games = Path.Combine(root,"steam","games");
+            try { if (Directory.Exists(games)) candidates.AddRange(Directory.EnumerateFiles(games, "*.jpg").Where(p => Path.GetFileName(p).StartsWith(appId, StringComparison.OrdinalIgnoreCase))); } catch { }
+        }
+        foreach (var path in candidates) try { if (File.Exists(path)) { var bitmap = new System.Windows.Media.Imaging.BitmapImage(); bitmap.BeginInit(); bitmap.UriSource = new Uri(path); bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; bitmap.DecodePixelWidth = 96; bitmap.EndInit(); bitmap.Freeze(); return bitmap; } } catch { }
+        return null;
+    }
+
     void BuildSteamCandidates()
     {
         if (SteamGamesGrid == null) return;
@@ -1620,6 +1706,9 @@ public partial class MainWindow : Window
             var add = new Button { Style = (Style)FindResource("TileBtn"), Width = 150, Height = 42,
                 Margin = new Thickness(3), ToolTip = game.Path };
             var panel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var gameId = game.Path.Split('/').LastOrDefault() ?? "";
+            var artwork = LoadSteamArtwork(gameId);
+            if (artwork != null) panel.Children.Add(new System.Windows.Controls.Image { Source = artwork, Width = 30, Height = 30, Stretch = Stretch.UniformToFill, Margin = new Thickness(0,0,7,0) });
             panel.Children.Add(new TextBlock { Text = game.Name, Foreground = Brushes.White, FontSize = 11,
                 Width = 104, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
             panel.Children.Add(new TextBlock { Text = "+", Foreground = Brushes.White, FontSize = 18,
