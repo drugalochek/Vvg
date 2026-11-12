@@ -362,6 +362,7 @@ public partial class MainWindow : Window
         // запас на «желейное» растяжение и пружинный перелёт + поля Pill (12 по бокам, 14 снизу)
         double w = Math.Ceiling(pillW * k * 1.12) + 24, h = Math.Ceiling(pillH * k * 1.1) + 18;
         double sw = SystemParameters.PrimaryScreenWidth;
+        double sh = SystemParameters.PrimaryScreenHeight;
         double left = _s.Align switch
         {
             "Left" => 16 - GlowPad,
@@ -417,6 +418,7 @@ public partial class MainWindow : Window
             _bodyBrush.Opacity = _s.GlassOpacity / 100.0;
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
+        Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
         if (AccentR != null) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
