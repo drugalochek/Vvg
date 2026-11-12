@@ -597,7 +597,8 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
-        if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";\n        if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
+        if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";
+        if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
         if (AlignCenter != null) AlignCenter.Content = ru ? "По центру" : "Center";
         if (AlignRight != null) AlignRight.Content = ru ? "Справа" : "Right";
