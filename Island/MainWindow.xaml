@@ -369,6 +369,8 @@
                                      Tag="Home" GroupName="tabs" IsChecked="True" Checked="Tab_Checked"/>
                         <RadioButton x:Name="TabClip" Style="{StaticResource TabBtn}" Content="Clipboard"
                                      Tag="Clip" GroupName="tabs" Checked="Tab_Checked"/>
+                        <RadioButton x:Name="TabApps" Style="{StaticResource TabBtn}" Content="Apps"
+                                     Tag="Apps" GroupName="tabs" Checked="Tab_Checked"/>
                         <RadioButton x:Name="TabSet" Style="{StaticResource TabBtn}" Content="Settings"
                                      Tag="Set" GroupName="tabs" Checked="Tab_Checked"/>
                     </StackPanel>
@@ -459,6 +461,34 @@
                              ItemTemplate="{StaticResource HistTemplate}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Hidden"/>
+                </Grid>
+
+                <!-- Apps launcher -->
+                <Grid x:Name="AppsPage" Grid.Row="1" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="4,0,4,8">
+                        <StackPanel>
+                            <TextBlock x:Name="AppsHeading" Text="YOUR APPS" Foreground="White"
+                                       FontSize="11" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="AppsHint" Text="Add your favorite apps for one-click launch."
+                                       Foreground="#88FFFFFF" FontSize="11" Margin="0,3,0,0"/>
+                        </StackPanel>
+                        <Button x:Name="AddAppButton" Grid.Column="1" Style="{StaticResource TileBtn}"
+                                Height="34" Width="112" Margin="0" HorizontalAlignment="Right"
+                                Click="AddApp_Click">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Text="&#xE710;" FontFamily="{StaticResource Icons}" Margin="0,0,7,0"/>
+                                <TextBlock x:Name="AddAppText" Text="Add app" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <WrapPanel x:Name="AppsGrid" Margin="0,0,4,4"/>
+                    </ScrollViewer>
                 </Grid>
 
                 <!-- Settings -->
