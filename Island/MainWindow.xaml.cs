@@ -465,7 +465,14 @@ public partial class MainWindow : Window
     void ScaleSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetScale((int)e.NewValue); }
     void OpacitySlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetGlassOpacity((int)e.NewValue); }
     void RadiusSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetRadius((int)e.NewValue); }
-    void Theme_Changed(object sender, SelectionChangedEventArgs e) { if (!_ready || ThemeCombo.SelectedValue == null) return; _s.Theme = ThemeCombo.SelectedValue.ToString()!; ApplyAppearance(); _s.Save(); }
+    void Theme_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || ThemeCombo.SelectedValue == null) return;
+        _s.Theme = ThemeCombo.SelectedValue.ToString()!;
+        if (_s.Theme != "Custom") _s.ThemeColor = "";
+        ApplyAppearance();
+        _s.Save();
+    }
 
     void ThemeColor_Click(object sender, RoutedEventArgs e)
     {
@@ -474,7 +481,9 @@ public partial class MainWindow : Window
             : (Color)ColorConverter.ConvertFromString(_s.ThemeColor);
         var picker = new ColorPickerWindow(initial) { Owner = this };
         if (picker.ShowDialog() != true) return;
+        _s.Theme = "Custom";
         _s.ThemeColor = picker.SelectedColor.ToString();
+        if (ThemeCombo != null) ThemeCombo.SelectedValue = "Custom";
         ApplyAppearance();
         _s.Save();
     }
@@ -724,9 +733,7 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Сдвиг по Y" : "Vertical offset";
         if (CornerRadiusLabel != null) CornerRadiusLabel.Text = ru ? "Скругление" : "Corner rounding";
         if (ThemeLabel != null) ThemeLabel.Text = ru ? "Тема" : "Theme";
-        if (RgbLabel != null) RgbLabel.Text = ru ? "Свой цвет" : "Custom color";
-        if (CustomColorHint != null) CustomColorHint.Text = ru ? "Нажмите + в палитре, чтобы открыть выбор цвета" : "Press + in the palette to choose a color";
-        if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
+                if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
         if (AlignCenter != null) AlignCenter.Content = ru ? "По центру" : "Center";
@@ -734,13 +741,14 @@ public partial class MainWindow : Window
         if (VerticalTop != null) VerticalTop.Content = ru ? "Сверху" : "Top";
         if (VerticalCenter != null) VerticalCenter.Content = ru ? "По центру" : "Center";
         if (VerticalBottom != null) VerticalBottom.Content = ru ? "Снизу" : "Bottom";
-        if (ThemeCombo != null && ThemeCombo.Items.Count >= 5)
+        if (ThemeCombo != null && ThemeCombo.Items.Count >= 6)
         {
             ((ComboBoxItem)ThemeCombo.Items[0]).Content = ru ? "Полночь" : "Midnight";
             ((ComboBoxItem)ThemeCombo.Items[1]).Content = ru ? "Океан" : "Ocean";
             ((ComboBoxItem)ThemeCombo.Items[2]).Content = ru ? "Аметист" : "Amethyst";
             ((ComboBoxItem)ThemeCombo.Items[3]).Content = ru ? "Изумруд" : "Emerald";
             ((ComboBoxItem)ThemeCombo.Items[4]).Content = ru ? "Роза" : "Rose";
+            ((ComboBoxItem)ThemeCombo.Items[5]).Content = ru ? "Свой цвет" : "Custom color";
         }
         UpdateAutoButton();
         if (TileGrid != null)
