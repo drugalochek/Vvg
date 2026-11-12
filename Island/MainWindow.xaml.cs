@@ -1531,10 +1531,8 @@ public partial class MainWindow : Window
         Wave.Visibility = wave ? Visibility.Visible : Visibility.Collapsed;
         Wave.Opacity = Math.Min(1, amp / 1.8);
 
-        // нижняя кромка слегка подкрашивается акцентом
-        double k = 0.34 * Math.Min(1, amp / 3.6);
-        _tintEnd.Color = Color.FromRgb((byte)(_accentColor.R * k), (byte)(_accentColor.G * k), (byte)(_accentColor.B * k));
-        _tintMid.Offset = Math.Max(0.3, 1 - 26.0 / h);
+        // Геометрия волны не должна перезаписывать выбранные цвета темы:
+        // альфа-канал и положение градиента принадлежат настройкам темы.
     }
 
     void UpdateEyes(bool playing)
