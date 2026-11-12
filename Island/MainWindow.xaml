@@ -227,7 +227,7 @@
 
         <Style x:Key="HistItem" TargetType="ListBoxItem">
             <Setter Property="Cursor" Value="Hand"/>
-            <EventSetter Event="PreviewMouseLeftButtonUp" Handler="HistoryItem_Click"/>
+            </>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -396,8 +396,11 @@
                                      Tag="Set" GroupName="tabs" Checked="Tab_Checked"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <TextBlock x:Name="FullClock" Foreground="White" FontSize="14" FontWeight="SemiBold"
-                                   Margin="0,0,14,0" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                            <TextBlock x:Name="FullClock" Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <Border x:Name="ExpandedWeatherHost" Width="20" Height="20" Margin="10,0,3,0"/>
+                            <TextBlock x:Name="ExpandedTempText" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center"/>
+                        </StackPanel>
                         <TextBlock Text="Alt + Space" Foreground="#55FFFFFF" FontSize="11"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -509,12 +512,6 @@
                             </Button>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="SteamScanButton" Style="{StaticResource TileBtn}" Height="34" Width="112" Margin="0,0,6,0" Click="ScanSteam_Click">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="&#xE7FC;" FontFamily="{StaticResource Icons}" Margin="0,0,6,0"/>
-                                    <TextBlock x:Name="SteamScanText" Text="Find Steam" FontSize="12"/>
-                                </StackPanel>
-                            </Button>
                             <Button x:Name="AddAppButton" Style="{StaticResource TileBtn}"
                                     Height="34" Width="104" Margin="0" HorizontalAlignment="Right" Click="AddApp_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -606,13 +603,51 @@
                                     VerticalAlignment="Center"/>
                     </Grid>
 
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="GlassOpacityLabel" Text="Island opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Click="GlassOpacity_Minus"/>
-                            <TextBlock x:Name="GlassOpacityText" Foreground="White" FontSize="13" Width="64" TextAlignment="Center" VerticalAlignment="Center"/>
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Click="GlassOpacity_Plus"/>
+                        <StackPanel Grid.Column="1">
+                            <DockPanel>
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="GlassOpacity_Minus"/>
+                                <TextBlock x:Name="GlassOpacityText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="GlassOpacity_Plus"/>
+                            </DockPanel>
+                            <Slider x:Name="OpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="OpacitySlider_Changed"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="CornerRadiusLabel" Text="Corner rounding" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1">
+                            <DockPanel>
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="Radius_Minus"/>
+                                <TextBlock x:Name="RadiusText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Radius_Plus"/>
+                            </DockPanel>
+                            <Slider x:Name="RadiusSlider" Minimum="0" Maximum="40" TickFrequency="1" ValueChanged="RadiusSlider_Changed"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="ThemeCombo" Grid.Column="1" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
+                                  Background="#FF24242A" Foreground="White" Height="32">
+                            <ComboBoxItem Content="Midnight" Tag="Midnight"/>
+                            <ComboBoxItem Content="Ocean" Tag="Ocean"/>
+                            <ComboBoxItem Content="Amethyst" Tag="Amethyst"/>
+                            <ComboBoxItem Content="Emerald" Tag="Emerald"/>
+                            <ComboBoxItem Content="Rose" Tag="Rose"/>
+                        </ComboBox>
+                    </Grid>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="RgbLabel" Text="Custom RGB" Foreground="White" FontSize="13" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                        <StackPanel Grid.Column="1">
+                            <Border x:Name="RgbPreview" Height="24" CornerRadius="8" Background="#FF7C5CFF" Margin="0,0,0,5"/>
+                            <DockPanel><TextBlock Text="R" Width="18" Foreground="#FFFF6B6B"/><Slider x:Name="AccentR" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
+                            <DockPanel><TextBlock Text="G" Width="18" Foreground="#FF30D158"/><Slider x:Name="AccentG" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
+                            <DockPanel><TextBlock Text="B" Width="18" Foreground="#FF0A84FF"/><Slider x:Name="AccentB" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
+                            <Button x:Name="EyedropperButton" Style="{StaticResource TileBtn}" Height="30" Width="130" HorizontalAlignment="Left" Click="Eyedropper_Click">Pick screen color</Button>
                         </StackPanel>
                     </Grid>
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
