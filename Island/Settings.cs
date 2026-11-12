@@ -22,6 +22,7 @@ public class Settings
     public int FullscreenOpacity { get; set; } = 35;
     public int CornerRadius { get; set; } = 18;
     public string Theme { get; set; } = "Midnight";
+    public string ThemeColor { get; set; } = ""; // пользовательский цвет темы (#AARRGGBB или #RRGGBB)
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
     public List<AppShortcut> Apps { get; set; } = new();
@@ -42,7 +43,8 @@ public class Settings
         GlassOpacity = Math.Clamp(GlassOpacity, 0, 100);
         FullscreenOpacity = Math.Clamp(FullscreenOpacity, 0, 100);
         CornerRadius = Math.Clamp(CornerRadius, 0, 40);
-        if (Theme is not ("Midnight" or "Ocean" or "Amethyst" or "Emerald" or "Rose")) Theme = "Midnight";
+        if (Theme is not ("Midnight" or "Ocean" or "Amethyst" or "Emerald" or "Rose" or "Custom")) Theme = "Midnight";
+        if (ThemeColor == null || (ThemeColor.Length > 0 && !HexColor.IsMatch(ThemeColor))) ThemeColor = "";
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
         Apps ??= new();
