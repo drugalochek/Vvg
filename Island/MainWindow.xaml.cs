@@ -422,7 +422,7 @@ public partial class MainWindow : Window
         Wave.Stroke = _accent;
         Wave.Effect = new DropShadowEffect { Color = c, BlurRadius = 10, ShadowDepth = 0, Opacity = 0.9 };
         UpdatePlayButton();
-        foreach (Border b in AccentPanel.Children)
+        foreach (var b in AccentPanel.Children.OfType<Border>())
             b.BorderBrush = (string)b.Tag == _s.Accent ? Brushes.White : Brushes.Transparent;
     }
 
@@ -451,6 +451,28 @@ public partial class MainWindow : Window
             dot.MouseLeftButtonUp += (_, _) => { _s.Accent = h; _s.Save(); ApplyAccent(); };
             AccentPanel.Children.Add(dot);
         }
+        var custom = new Button
+        {
+            Style = (Style)FindResource("IconBtn"), Width = 30, Height = 30, Margin = new Thickness(0),
+            Content = "\\uE790", ToolTip = _s.Language == "ru" ? "Свой цвет" : "Custom color"
+        };
+        custom.Click += CustomAccent_Click;
+        AccentPanel.Children.Add(custom);
+    }
+
+    void CustomAccent_Click(object sender, RoutedEventArgs e)
+    {
+        var current = (Color)ColorConverter.ConvertFromString(_s.Accent);
+        using var dialog = new System.Windows.Forms.ColorDialog
+        {
+            Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B),
+            FullOpen = true
+        };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+        var selected = dialog.Color;
+        _s.Accent = Color.FromArgb(selected.A, selected.R, selected.G, selected.B).ToString();
+        _s.Save();
+        ApplyAccent();
     }
 
     void Align_Checked(object sender, RoutedEventArgs e)
