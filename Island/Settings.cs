@@ -19,6 +19,7 @@ public class Settings
     public int OffsetY { get; set; } = 8;            // отступ сверху, px
     public int Scale { get; set; } = 100;            // размер острова, %
     public int GlassOpacity { get; set; } = 100;
+    public int FullscreenOpacity { get; set; } = 35;
     public int CornerRadius { get; set; } = 18;
     public string Theme { get; set; } = "Midnight";
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
@@ -39,6 +40,7 @@ public class Settings
         OffsetY = Math.Clamp(OffsetY, -500, 500);
         Scale = Math.Clamp(Scale, 70, 150);
         GlassOpacity = Math.Clamp(GlassOpacity, 0, 100);
+        FullscreenOpacity = Math.Clamp(FullscreenOpacity, 0, 100);
         CornerRadius = Math.Clamp(CornerRadius, 0, 40);
         if (Theme is not ("Midnight" or "Ocean" or "Amethyst" or "Emerald" or "Rose")) Theme = "Midnight";
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
