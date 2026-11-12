@@ -59,7 +59,7 @@ public sealed class ColorPickerWindow : Window
         square.MouseMove+=(_,e)=>{ if(e.LeftButton==MouseButtonState.Pressed) SetSquare(e.GetPosition(square)); };
         square.MouseLeftButtonUp+=(_,_)=>square.ReleaseMouseCapture();
         hueBar.Width=24; hueBar.CornerRadius=new CornerRadius(7);
-        hueBar.Background=new LinearGradientBrush { StartPoint=new Point(0,0), EndPoint=new Point(0,1), GradientStops=new GradientStopCollection { new(Colors.Red,0),new(Colors.Magenta,.16),new(Colors.Blue,.33),new(Colors.Cyan,.5),new(Colors.Lime,.66),new(Colors.Yellow,.83),new(Colors.Red,1) } };
+        hueBar.Background=new LinearGradientBrush { StartPoint=new Point(0,0), EndPoint=new Point(0,1), GradientStops=new GradientStopCollection { new(Colors.Red,0),new(Colors.Yellow,.1667),new(Colors.Lime,.3333),new(Colors.Cyan,.5),new(Colors.Blue,.6667),new(Colors.Magenta,.8333),new(Colors.Red,1) } };
         var hueCanvas=new Canvas { IsHitTestVisible=false }; hueBar.Child=hueCanvas; hueCanvas.Children.Add(hueMarker);
         hueBar.SizeChanged+=(_,_)=>LayoutMarkers();
         hueBar.MouseLeftButtonDown+=(_,e)=>{ hueBar.CaptureMouse(); SetHue(e.GetPosition(hueBar)); };
