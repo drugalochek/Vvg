@@ -1340,6 +1340,13 @@ public partial class MainWindow : Window
             MiniTitleShift.X = 0;
             _miniAnimatedTitle = null;
         }
+        else if (_state == IslandState.Expanded)
+        {
+            // Do not mark the title as animated while the compact title lane is hidden.
+            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+            MiniTitleShift.X = 0;
+            _miniAnimatedTitle = null;
+        }
         else if (_miniAnimatedTitle != _now!.Title)
         {
             _miniAnimatedTitle = _now.Title;
@@ -1350,16 +1357,16 @@ public partial class MainWindow : Window
                 if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
                 double textWidth = TitleText.ActualWidth;
                 double laneWidth = TitleViewport.ActualWidth;
-                // Full left-to-right marquee cycle: enter beyond the left edge,
-                // cross the entire clipped lane, leave on the right, then repeat.
                 if (textWidth <= laneWidth + 12) return;
 
+                // Full right-to-left pass: begin beyond the right edge, cross the
+                // complete clipped lane, and finish only after leaving the left edge.
                 double travel = laneWidth + textWidth;
                 double durationMs = Math.Clamp(travel * 12, 1400, 4200);
                 var scroll = new DoubleAnimation
                 {
-                    From = -textWidth,
-                    To = laneWidth,
+                    From = laneWidth,
+                    To = -textWidth,
                     Duration = TimeSpan.FromMilliseconds(durationMs),
                     RepeatBehavior = RepeatBehavior.Forever,
                     BeginTime = TimeSpan.FromMilliseconds(120),
