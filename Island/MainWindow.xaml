@@ -725,13 +725,11 @@
                     </Grid>
                     <Grid Margin="0,0,0,12">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="RgbLabel" Text="Custom RGB" Foreground="White" FontSize="13" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                        <TextBlock x:Name="RgbLabel" Text="Custom color" Foreground="White" FontSize="13" VerticalAlignment="Top" Margin="0,4,0,0"/>
                         <StackPanel Grid.Column="1">
-                            <Border x:Name="RgbPreview" Height="24" CornerRadius="8" Background="#FF7C5CFF" Margin="0,0,0,5"/>
-                            <DockPanel><TextBlock Text="R" Width="18" Foreground="#FFFF6B6B"/><Slider x:Name="AccentR" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
-                            <DockPanel><TextBlock Text="G" Width="18" Foreground="#FF30D158"/><Slider x:Name="AccentG" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
-                            <DockPanel><TextBlock Text="B" Width="18" Foreground="#FF0A84FF"/><Slider x:Name="AccentB" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
-                            
+                            <Border x:Name="RgbPreview" Height="30" CornerRadius="9" Background="#FF7C5CFF" BorderBrush="#30FFFFFF" BorderThickness="1"/>
+                            <TextBlock x:Name="CustomColorHint" Text="Нажмите + в палитре, чтобы открыть выбор цвета"
+                                       Foreground="#88FFFFFF" FontSize="10" Margin="2,6,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
