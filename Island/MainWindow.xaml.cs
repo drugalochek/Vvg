@@ -102,7 +102,7 @@ public partial class MainWindow : Window
     const double IdleW = 204, PlayW = 312, GlowPad = 12;
 
     static readonly string[] AccentColors =
-        { "#FF7C5CFF", "#FF30D158", "#FF0A84FF", "#FFFF453A", "#FFFF9F0A", "#FFFF375F" };
+        { "#FFFFFFFF", "#FF30D158", "#FF0A84FF", "#FFFF453A", "#FFFF9F0A", "#FFFF375F" };
     const string ColorOk = "#FF30D158", ColorError = "#FFFF453A";
 
     static readonly SolidColorBrush Neutral = Freeze(new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)));
