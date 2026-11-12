@@ -604,8 +604,8 @@ public partial class MainWindow : Window
         UpdateAutoButton();
         if (TileGrid != null)
         {
-            string[] labels = ru ? new[] { "Область", "Весь экран", "Обычный текст", "Проводник", "Блокнот", "Калькулятор", "Терминал", "Диспетчер задач" }
-                                 : new[] { "Region", "Screen", "Plain text", "File Explorer", "Notepad", "Calculator", "Terminal", "Task Manager" };
+            string[] labels = ru ? new[] { "Область", "Проводник", "Блокнот", "Калькулятор", "Терминал", "Диспетчер задач" }
+                                 : new[] { "Region", "File Explorer", "Notepad", "Calculator", "Terminal", "Task Manager" };
             for (int i = 0; i < Math.Min(TileGrid.Children.Count, labels.Length); i++)
                 if (TileGrid.Children[i] is Button b && b.Content is StackPanel sp && sp.Children.Count > 1 && sp.Children[1] is TextBlock tb) tb.Text = labels[i];
         }
@@ -1355,8 +1355,6 @@ public partial class MainWindow : Window
         var tiles = new (string Glyph, string Label, Action Act)[]
         {
             ("\uE722", "Region",      SnipRegion),
-            ("\uE740", "Screen",        SnipFullScreen),
-            ("\uE894", "Plain text", CleanText),
             ("\uE8B7", "File Explorer",    () => Launch("explorer.exe")),
             ("\uE70F", "Notepad",      () => Launch("notepad.exe")),
             ("\uE8EF", "Calculator",  () => Launch("calc.exe")),
@@ -1391,29 +1389,6 @@ public partial class MainWindow : Window
         try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true }); }
         catch (Exception ex) { ShowToast("Could not launch", ex.Message, ColorError); }
     }
-
-    async void CleanText()
-    {
-        try
-        {
-            string source = await ReadClipboardTextWithRetryAsync();
-            if (string.IsNullOrEmpty(source)) { ShowToast("Plain text", "Clipboard has no text", ColorError); return; }
-            var clean = string.Join("\n", source.Split('\n').Select(l => l.Trim()));
-            if (await SetClipboardTextAsync(clean))
-            {
-                Collapse();
-                ShowToast("Plain text", "Extra spaces removed", ColorOk);
-            }
-            else ShowToast("Clipboard busy", "Could not write text", ColorError);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("CleanText", ex);
-            ShowToast("Error", "Could not process the clipboard", ColorError);
-        }
-    }
-
-    async Task<string> ReadClipboardTextWithRetryAsync() => await ReadClipboardTextCoreAsync() ?? string.Empty;
 
     // ================= Скриншоты =================
     (BitmapSource Img, double Sx, double Sy)? CaptureScreen()
@@ -1457,34 +1432,6 @@ public partial class MainWindow : Window
             msg => ShowToast("Screenshot", msg, ColorOk));
         win.Closed += (_, _) => Show();
         win.Show();
-    }
-
-    async void SnipFullScreen()
-    {
-        Collapse();
-        Hide();
-        await Task.Delay(220);
-        var shot = CaptureScreen();
-        Show();
-        if (shot == null) { ShowToast("Error", "Could not capture screenshot", ColorError); return; }
-        try
-        {
-            bool copied = false;
-            for (int attempt = 0; attempt < 6 && !copied; attempt++)
-            {
-                try { Clipboard.SetDataObject(new System.Windows.DataObject(System.Windows.DataFormats.Bitmap, shot.Value.Img), true); copied = true; }
-                catch (Exception ex) when (ex is System.Runtime.InteropServices.ExternalException or InvalidOperationException)
-                { if (attempt < 5) await Task.Delay(70 + attempt * 35); }
-            }
-            if (!copied) { ShowToast("Error", "Clipboard is busy", ColorError); return; }
-        }
-        catch (Exception ex)
-        {
-            Log.Error("SnipFullScreen", ex);
-            ShowToast("Error", "Could not copy screenshot", ColorError);
-            return;
-        }
-        ShowToast("Screenshot", "Full screen copied to clipboard", ColorOk);
     }
 
     // ================= Медиа =================
