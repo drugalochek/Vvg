@@ -8,6 +8,12 @@ using Color = System.Windows.Media.Color;
 using Point = System.Windows.Point;
 using Button = System.Windows.Controls.Button;
 using TextBox = System.Windows.Controls.TextBox;
+using Cursors = System.Windows.Input.Cursors;
+using Brushes = System.Windows.Media.Brushes;
+using Rectangle = System.Windows.Shapes.Rectangle;
+using Orientation = System.Windows.Controls.Orientation;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using ColorConverter = System.Windows.Media.ColorConverter;
 
 namespace Island;
 
@@ -87,6 +93,6 @@ public sealed class ColorPickerWindow : Window
     void UpdateView(){square.Background=new SolidColorBrush(Hsv(h,1,1));var c=Current();preview.Background=new SolidColorBrush(c);syncing=true;hex.Text=c.ToString();syncing=false;LayoutMarkers();}
     void ReadHex(){if(syncing)return;try{var t=hex.Text.Trim();if(t.Length==6)t="#"+t;var c=(Color)ColorConverter.ConvertFromString(t);(h,s,v)=ToHsv(c);UpdateView();}catch{hex.Text=Current().ToString();}}
     Color Current()=>Hsv(h,s,v);
-    static Color Hsv(double h,double s,double v){h=(h%360+360)%360;double c=v*s,x=c*(1-Math.Abs(h/60%2-1)),m=v-c;(double r,double g,double b)=h switch{<60=>(c,x,0),<120=>(x,c,0),<180=>(0,c,x),<240=>(0,x,c),<300=>(x,0,c),_=>(c,0,x)};return Color.FromRgb((byte)Math.Round((r+m)*255),(byte)Math.Round((g+m)*255),(byte)Math.Round((b+m)*255));}
+    static Color Hsv(double h,double s,double v){h=(h%360+360)%360;double c=v*s,x=c*(1-Math.Abs(h/60%2-1)),m=v-c;(double r,double g,double b)=h switch{<60=>(c,x,0d),<120=>(x,c,0d),<180=>(0d,c,x),<240=>(0d,x,c),<300=>(x,0d,c),_=>(c,0d,x)};return Color.FromRgb((byte)Math.Round((r+m)*255),(byte)Math.Round((g+m)*255),(byte)Math.Round((b+m)*255));}
     static (double,double,double) ToHsv(Color c){double r=c.R/255d,g=c.G/255d,b=c.B/255d,max=Math.Max(r,Math.Max(g,b)),min=Math.Min(r,Math.Min(g,b)),d=max-min;double h=d==0?0:max==r?60*((g-b)/d%6):max==g?60*((b-r)/d+2):60*((r-g)/d+4);if(h<0)h+=360;return(h,max==0?0:d/max,max);}
 }
