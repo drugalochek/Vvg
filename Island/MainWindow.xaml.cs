@@ -121,6 +121,7 @@ public partial class MainWindow : Window
     SolidColorBrush _accent = Brushes.White;
 
     readonly MediaWatcher _media = new();
+    readonly AudioBeatAnalyzer _audio = new();
     readonly DispatcherTimer _clock = new();
     readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     readonly DispatcherTimer _clipboardTimer = new() { Interval = TimeSpan.FromMilliseconds(110) };
@@ -307,6 +308,7 @@ public partial class MainWindow : Window
         _source?.RemoveHook(WndProc);
         _weather.Dispose();
         _media.Dispose();
+        _audio.Dispose();
         if (_fxAttached) CompositionTarget.Rendering -= FxRendering;
         _gameTimer?.Stop();
         _clipboardTimer.Stop();
@@ -1185,7 +1187,7 @@ public partial class MainWindow : Window
     readonly GradientStop _tintEnd = new(Color.FromRgb(0, 0, 0), 1.0);
     LinearGradientBrush? _bodyBrush;
     Color _accentColor = Colors.White;
-    double _wavePhase, _waveAmp, _open = 1, _blinkT = -1;
+    double _wavePhase, _waveAmp, _waveBeatPulse, _open = 1, _blinkT = -1;
     double _lLx, _lLy, _lRx, _lRy, _eyeFollow = 0.2;
     double _glX, _glY;                       // «случайный взгляд», когда мышь стоит
     DateTime _nextGlance = DateTime.Now;
@@ -1221,11 +1223,19 @@ public partial class MainWindow : Window
             Math.Clamp((args.RenderingTime - _lastRenderTime).TotalSeconds, 0.001, 0.05);
         _lastRenderTime = args.RenderingTime;
         bool playing = !_welcomeRunning && _now?.Playing == true;
-        double target = playing ? 5.0 : 0.0;
-        double follow = 1 - Math.Exp(-11.0 * dt);
+        if (playing && _audio.ConsumeBeat())
+            _waveBeatPulse = Math.Min(1.0, _waveBeatPulse + 0.82);
+
+        // Bass energy controls the continuous movement; detected low-frequency
+        // transients add a short, sharp swell on actual kick/snare hits.
+        _waveBeatPulse *= Math.Exp(-7.2 * dt);
+        double bass = playing ? _audio.BassLevel : 0;
+        double target = playing ? Math.Clamp(0.9 + bass * 2.3 + _waveBeatPulse * 4.4, 0, 7.2) : 0;
+        double response = target > _waveAmp ? 23.0 : 7.5; // fast attack, softer release
+        double follow = 1 - Math.Exp(-response * dt);
         _waveAmp += (target - _waveAmp) * follow;
-        if (Math.Abs(target - _waveAmp) < 0.03) _waveAmp = target;
-        _wavePhase += 3.25 * dt;
+        if (Math.Abs(target - _waveAmp) < 0.025) _waveAmp = target;
+        _wavePhase += (2.1 + bass * 5.0 + _waveBeatPulse * 1.8) * dt;
 
         bool wave = _waveAmp > 0.01;
         bool eyes = !_welcomeRunning && IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
