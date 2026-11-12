@@ -1367,19 +1367,19 @@ public partial class MainWindow : Window
                 double laneWidth = TitleViewport.ActualWidth;
                 if (textWidth <= laneWidth + 12) return;
 
-                // Full right-to-left pass: begin beyond the right edge, cross the
-                // complete clipped lane, and finish only after leaving the left edge.
-                double travel = laneWidth + textWidth;
+                // Keep the title centered during the pause, then scroll it fully
+                // out to the left. The next loop returns it to the centered position.
+                double centeredX = (laneWidth - textWidth) / 2.0;
+                double travel = centeredX + textWidth;
                 double durationMs = Math.Clamp(travel * 12, 1400, 4200);
-                // Hold the title off-screen before every pass, including after each loop.
                 const double pauseMs = 1400;
                 var scroll = new DoubleAnimationUsingKeyFrames
                 {
                     Duration = TimeSpan.FromMilliseconds(pauseMs + durationMs),
                     RepeatBehavior = RepeatBehavior.Forever
                 };
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(laneWidth, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(laneWidth, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs))));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(centeredX, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(centeredX, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs))));
                 scroll.KeyFrames.Add(new LinearDoubleKeyFrame(-textWidth, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs + durationMs))));
                 MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
             }), DispatcherPriority.Loaded);
