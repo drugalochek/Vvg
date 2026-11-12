@@ -227,7 +227,6 @@
 
         <Style x:Key="HistItem" TargetType="ListBoxItem">
             <Setter Property="Cursor" Value="Hand"/>
-            </>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
