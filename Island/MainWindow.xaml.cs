@@ -415,11 +415,12 @@ public partial class MainWindow : Window
                 _ => Color.FromRgb(0, 0, 0)
             };
             _bodyBrush.GradientStops[0].Color = baseColor;
-            _bodyBrush.Opacity = _s.GlassOpacity / 100.0;
+            _bodyBrush.Opacity = 1.0;
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
         if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
+        if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
         if (AccentR != null) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
