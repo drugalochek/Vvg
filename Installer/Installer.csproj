@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Moku-Setup</AssemblyName>
-    <Version>2.6.2</Version>
-    <AssemblyVersion>2.6.2.0</AssemblyVersion>
-    <FileVersion>2.6.2.0</FileVersion>
-    <InformationalVersion>2.6.2</InformationalVersion>
+    <Version>2.6.3</Version>
+    <AssemblyVersion>2.6.3.0</AssemblyVersion>
+    <FileVersion>2.6.3.0</FileVersion>
+    <InformationalVersion>2.6.3</InformationalVersion>
     <RootNamespace>MokuInstaller</RootNamespace>
     <ApplicationIcon>..\Island\Moku.ico</ApplicationIcon>
   </PropertyGroup>
