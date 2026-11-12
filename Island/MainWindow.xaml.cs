@@ -507,8 +507,6 @@ public partial class MainWindow : Window
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(color);
         ApplyAccent();
     }
-    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hwnd);
-    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
     [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr hdc, int x, int y);
     async void Eyedropper_Click(object sender, RoutedEventArgs e)
     {
