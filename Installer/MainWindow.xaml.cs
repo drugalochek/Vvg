@@ -336,16 +336,24 @@ public partial class MainWindow : Window
                 if (new FileInfo(tempExe).Length < 1024 * 1024)
                     throw new InvalidOperationException("Incomplete file");
                 File.Move(tempExe, exe, overwrite: true);
+
+                // Keep the original ICO beside the app so shortcuts use it directly.
+                using var iconSource = Assembly.GetExecutingAssembly().GetManifestResourceStream("MokuInstaller.Payload.Moku.ico")
+                    ?? throw new InvalidOperationException("Icon payload missing");
+                using var iconOutput = new FileStream(Path.Combine(target, "Moku.ico"), FileMode.Create, FileAccess.Write, FileShare.None);
+                iconSource.CopyTo(iconOutput);
+                iconOutput.Flush(true);
             });
 
             StatusText.Text = T("ШАГ 3 ИЗ 3  ·  ЯРЛЫКИ И НАСТРОЙКИ", "STEP 3 OF 3  ·  SHORTCUTS & SETTINGS");
             SetAnchor(StatusText); Progress.Value = 88;
             var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Moku");
             Directory.CreateDirectory(startMenu);
-            CreateShortcut(Path.Combine(startMenu, "Moku.lnk"), exe);
+            string iconFile = Path.Combine(target, "Moku.ico");
+            CreateShortcut(Path.Combine(startMenu, "Moku.lnk"), exe, iconPath: iconFile);
 
             string desktopShortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Moku.lnk");
-            if (DesktopCheck.IsChecked == true) CreateShortcut(desktopShortcut, exe);
+            if (DesktopCheck.IsChecked == true) CreateShortcut(desktopShortcut, exe, iconPath: iconFile);
 
             string? currentInstaller = Environment.ProcessPath;
             string uninstaller = Path.Combine(target, "Moku-Uninstall.exe");
@@ -353,7 +361,7 @@ public partial class MainWindow : Window
                 !string.Equals(Path.GetFullPath(currentInstaller), Path.GetFullPath(uninstaller), StringComparison.OrdinalIgnoreCase))
             {
                 File.Copy(currentInstaller, uninstaller, overwrite: true);
-                CreateShortcut(Path.Combine(startMenu, "Uninstall Moku.lnk"), uninstaller, "--uninstall");
+                CreateShortcut(Path.Combine(startMenu, "Uninstall Moku.lnk"), uninstaller, "--uninstall", iconFile);
                 using var uninstallKey = Registry.CurrentUser.CreateSubKey(
                     @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Moku");
                 if (uninstallKey != null)
@@ -361,6 +369,7 @@ public partial class MainWindow : Window
                     uninstallKey.SetValue("DisplayName", "Moku");
                     uninstallKey.SetValue("DisplayVersion", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.0.0");
                     uninstallKey.SetValue("InstallLocation", target);
+                    uninstallKey.SetValue("DisplayIcon", iconFile);
                     uninstallKey.SetValue("UninstallString", "\"" + uninstaller + "\" --uninstall");
                     uninstallKey.SetValue("NoModify", 1, RegistryValueKind.DWord);
                     uninstallKey.SetValue("NoRepair", 1, RegistryValueKind.DWord);
@@ -408,7 +417,7 @@ public partial class MainWindow : Window
         Close();
     }
 
-    static void CreateShortcut(string path, string target, string arguments = "")
+    static void CreateShortcut(string path, string target, string arguments = "", string? iconPath = null)
     {
         var t = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("Windows Script Host is unavailable");
         dynamic shell = Activator.CreateInstance(t)!;
@@ -416,7 +425,9 @@ public partial class MainWindow : Window
         sc.TargetPath = target;
         sc.Arguments = arguments;
         sc.WorkingDirectory = Path.GetDirectoryName(target);
-        sc.IconLocation = target + ",0";
+        sc.IconLocation = !string.IsNullOrWhiteSpace(iconPath) && File.Exists(iconPath)
+            ? iconPath + ",0"
+            : target + ",0";
         sc.Description = "Moku";
         sc.Save();
     }
