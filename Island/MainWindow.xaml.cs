@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -105,6 +106,7 @@ public partial class MainWindow : Window
     static readonly SolidColorBrush Neutral = Freeze(new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)));
 
     readonly Settings _s = Settings.Load();
+    readonly List<AppShortcut> _steamCandidates = new();
     IslandState _state = IslandState.Collapsed;
     HwndSource? _source;
     bool _ready;
@@ -166,8 +168,10 @@ public partial class MainWindow : Window
         (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
         OffsetText.Text = _s.OffsetY + " px";
         ScaleText.Text = _s.Scale + "%";
+        GlassOpacityText.Text = _s.GlassOpacity + "%";
         UpdateAutoButton();
         ApplyScale();
+        ApplyAppearance();
         ApplyAccent();
 
         startupStage = "initializing timers";
@@ -385,6 +389,22 @@ public partial class MainWindow : Window
         if (_ready) ApplyPosition();
     }
 
+    void ApplyAppearance()
+    {
+        if (_bodyBrush != null) _bodyBrush.Opacity = _s.GlassOpacity / 100.0;
+        if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
+    }
+
+    void SetGlassOpacity(int value)
+    {
+        _s.GlassOpacity = Math.Clamp(value, 55, 100);
+        ApplyAppearance();
+        _s.Save();
+    }
+
+    void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
+    void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
+
     void ApplyAccent()
     {
         var c = (Color)ColorConverter.ConvertFromString(_s.Accent);
@@ -597,6 +617,7 @@ public partial class MainWindow : Window
         if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
         if (AppsHeading != null) AppsHeading.Text = ru ? "ВАШИ ПРИЛОЖЕНИЯ" : "YOUR APPS";
         if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
+        if (ScanSteamText != null) ScanSteamText.Text = ru ? "Найти игры Steam" : "Find Steam games";
         if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
         if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
         if (MenuSettings != null) MenuSettings.Header = ru ? "Настройки" : "Settings";
@@ -608,6 +629,7 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
+        if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Непрозрачность острова" : "Island opacity";
         if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
@@ -769,21 +791,35 @@ public partial class MainWindow : Window
         foreach (var it in History.Take(3)) Recent.Add(it);
     }
 
+    async Task CopyHistoryItemAsync(ClipItem item)
+    {
+        if (await SetClipboardTextAsync(item.Text))
+        {
+            Collapse();
+            ShowToast("Copied", item.Preview, ColorOk);
+        }
+        else ShowToast("Clipboard busy", "Could not write text. Please try again.", ColorError);
+    }
+
     async void HistoryItem_Click(object sender, MouseButtonEventArgs e)
     {
         try
         {
-        if (sender is FrameworkElement { DataContext: ClipItem item })
-        {
-            if (await SetClipboardTextAsync(item.Text))
-            {
-                Collapse();
-                ShowToast("Copied", item.Preview, ColorOk);
-            }
-            else ShowToast("Clipboard busy", "Could not write text. Please try again.", ColorError);
-        }
+            if (sender is FrameworkElement { DataContext: ClipItem item })
+                await CopyHistoryItemAsync(item);
         }
         catch (Exception ex) { Log.Error("HistoryItem_Click", ex); }
+    }
+
+    async void HistoryCopyButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        try
+        {
+            if (sender is FrameworkElement { DataContext: ClipItem item })
+                await CopyHistoryItemAsync(item);
+        }
+        catch (Exception ex) { Log.Error("HistoryCopyButton", ex); }
     }
 
     void ClearHistory_Click(object sender, RoutedEventArgs e)
@@ -1207,6 +1243,7 @@ public partial class MainWindow : Window
         _bodyBrush.GradientStops.Add(_tintMid);
         _bodyBrush.GradientStops.Add(_tintEnd);
         Body.Fill = _bodyBrush;
+        ApplyAppearance();
         Pill.SizeChanged += (_, _) => RebuildBody();
         _weather.Changed += w => Dispatcher.BeginInvoke(new Action(() => ApplyWeather(w)));
         _ = _weather.StartAsync();
@@ -1456,6 +1493,7 @@ public partial class MainWindow : Window
     {
         if (AppsGrid == null) return;
         AppsGrid.Children.Clear();
+        BuildSteamCandidates();
         foreach (var app in _s.Apps.ToList())
         {
             bool steamLink = app.Path.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
@@ -1528,6 +1566,92 @@ public partial class MainWindow : Window
                 FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
                 TextWrapping = TextWrapping.Wrap, MaxWidth = 440
             });
+        }
+    }
+
+    void BuildSteamCandidates()
+    {
+        if (SteamGamesGrid == null) return;
+        SteamGamesGrid.Children.Clear();
+        foreach (var game in _steamCandidates.Where(g => !_s.Apps.Any(a =>
+            string.Equals(a.Path, g.Path, StringComparison.OrdinalIgnoreCase))))
+        {
+            var add = new Button { Style = (Style)FindResource("TileBtn"), Width = 150, Height = 42,
+                Margin = new Thickness(3), ToolTip = game.Path };
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            panel.Children.Add(new TextBlock { Text = game.Name, Foreground = Brushes.White, FontSize = 11,
+                Width = 104, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+            panel.Children.Add(new TextBlock { Text = "+", Foreground = Brushes.White, FontSize = 18,
+                Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+            add.Content = panel;
+            var candidate = game;
+            add.Click += (_, _) => { AddSavedApp(candidate.Path, candidate.Name); BuildSteamCandidates(); };
+            SteamGamesGrid.Children.Add(add);
+        }
+    }
+
+    void ScanSteam_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            void AddRoot(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                var path = Environment.ExpandEnvironmentVariables(value.Trim().Trim('"'));
+                if (Directory.Exists(path)) roots.Add(path);
+            }
+            AddRoot(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) as string);
+            AddRoot(Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath", null) as string);
+            AddRoot(Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Valve\Steam", "InstallPath", null) as string);
+            AddRoot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
+            AddRoot(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam"));
+
+            var libraries = new HashSet<string>(roots, StringComparer.OrdinalIgnoreCase);
+            foreach (var root in roots)
+            {
+                var vdf = Path.Combine(root, "steamapps", "libraryfolders.vdf");
+                if (!File.Exists(vdf)) continue;
+                foreach (Match match in Regex.Matches(File.ReadAllText(vdf), "\"path\"\s+\"([^\"]+)\""))
+                {
+                    var library = match.Groups[1].Value.Replace("\\\\", "\\");
+                    if (Directory.Exists(library)) libraries.Add(library);
+                }
+            }
+
+            _steamCandidates.Clear();
+            foreach (var library in libraries)
+            {
+                var steamApps = Path.Combine(library, "steamapps");
+                if (!Directory.Exists(steamApps)) continue;
+                foreach (var manifest in Directory.EnumerateFiles(steamApps, "appmanifest_*.acf"))
+                {
+                    try
+                    {
+                        var data = File.ReadAllText(manifest);
+                        var id = Regex.Match(data, "\"appid\"\s+\"(\d+)\"").Groups[1].Value;
+                        var name = Regex.Match(data, "\"name\"\s+\"([^\"]+)\"").Groups[1].Value;
+                        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+                        var link = "steam://rungameid/" + id;
+                        if (_s.Apps.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
+                        if (_steamCandidates.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
+                        _steamCandidates.Add(new AppShortcut { Path = link, Name = name });
+                    }
+                    catch (IOException ex) { Log.Warn("Не удалось прочитать Steam manifest: " + ex.Message); }
+                }
+            }
+            BuildSteamCandidates();
+            var message = _steamCandidates.Count == 0
+                ? (_s.Language == "ru" ? "Установленные игры Steam не найдены" : "No installed Steam games found")
+                : (_s.Language == "ru" ? $"Найдено игр: {_steamCandidates.Count}. Нажми на игру, чтобы добавить её."
+                                       : $"Found {_steamCandidates.Count} games. Select a game to add it.");
+            ShowToast("Steam", message, _steamCandidates.Count == 0 ? ColorError : ColorOk);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Steam game discovery failed", ex);
+            ShowToast("Steam", _s.Language == "ru" ? "Не удалось просканировать библиотеки Steam"
+                                                   : "Could not scan Steam libraries", ColorError);
         }
     }
 
