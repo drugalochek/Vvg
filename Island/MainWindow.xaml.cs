@@ -204,6 +204,8 @@ public partial class MainWindow : Window
         Pill.Width = 48;
         Pill.Height = 48;
         Pill.CornerRadius = new CornerRadius(24);
+        Grid.SetColumn(Eyes, 0);
+        Grid.SetColumnSpan(Eyes, 3);
         Eyes.HorizontalAlignment = HorizontalAlignment.Center;
         Eyes.Margin = new Thickness(0);
         TimeText.Visibility = Visibility.Collapsed;
@@ -595,7 +597,7 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
-        if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";
+        if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";\n        if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
         if (AlignCenter != null) AlignCenter.Content = ru ? "По центру" : "Center";
         if (AlignRight != null) AlignRight.Content = ru ? "Справа" : "Right";
@@ -606,6 +608,17 @@ public partial class MainWindow : Window
                                  : new[] { "Region", "Screen", "Plain text", "File Explorer", "Notepad", "Calculator", "Terminal", "Task Manager" };
             for (int i = 0; i < Math.Min(TileGrid.Children.Count, labels.Length); i++)
                 if (TileGrid.Children[i] is Button b && b.Content is StackPanel sp && sp.Children.Count > 1 && sp.Children[1] is TextBlock tb) tb.Text = labels[i];
+        }
+    }
+
+    void SupportAuthor_Click(object sender, RoutedEventArgs e)
+    {
+        const string url = "https://boosty.to/dollars_ssa/bundle/6ee74471-f9b8-489e-835d-1f9e5d435ee1?share=bundle_link";
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch (Exception ex)
+        {
+            Log.Error("Не удалось открыть страницу поддержки", ex);
+            ShowToast("Boosty", _s.Language == "ru" ? "Не удалось открыть страницу поддержки" : "Could not open the support page", ColorError);
         }
     }
 
@@ -885,6 +898,8 @@ public partial class MainWindow : Window
         Pill.Width = 48;
         Pill.Height = 48;
         Pill.CornerRadius = new CornerRadius(24);
+        Grid.SetColumn(Eyes, 0);
+        Grid.SetColumnSpan(Eyes, 3);
         Eyes.HorizontalAlignment = HorizontalAlignment.Center;
         Eyes.Margin = new Thickness(0);
         Mini.Visibility = Visibility.Visible;
@@ -926,8 +941,9 @@ public partial class MainWindow : Window
         EyeLShift.BeginAnimation(TranslateTransform.XProperty, null);
         EyeRShift.BeginAnimation(TranslateTransform.XProperty, null);
         EyeLShift.X = EyeRShift.X = 0;
+        Grid.SetColumnSpan(Eyes, 1);
         Eyes.HorizontalAlignment = HorizontalAlignment.Left;
-        Eyes.Margin = new Thickness(15, 0, 0, 0);
+        Eyes.Margin = new Thickness(14, 0, 0, 0);
         UpdateMini();
 
         // 4. Only now unfold the island.
