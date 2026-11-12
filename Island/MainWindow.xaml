@@ -496,10 +496,6 @@
                                        Foreground="#88FFFFFF" FontSize="11" Margin="0,3,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button x:Name="AddSteamButton" Style="{StaticResource TileBtn}"
-                                    Height="34" Width="104" Margin="0,0,6,0" Click="AddSteamLink_Click">
-                                <TextBlock Text="Steam +" FontSize="12" HorizontalAlignment="Center"/>
-                            </Button>
                             <Button x:Name="AddAppButton" Style="{StaticResource TileBtn}"
                                     Height="34" Width="104" Margin="0" HorizontalAlignment="Right" Click="AddApp_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
