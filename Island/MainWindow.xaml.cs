@@ -381,8 +381,8 @@ public partial class MainWindow : Window
         var src = hwnd == IntPtr.Zero ? null : PresentationSource.FromVisual(this);
         if (src?.CompositionTarget == null)
         {
-            double top = _s.VerticalAlign switch { "Bottom" => sh - h - 16, "Center" => (sh - h) / 2, _ => 0 } + _s.OffsetY;
-            Width = w; Height = h; Left = left; Top = top;   // окно ещё не создано
+            double initialTop = _s.VerticalAlign switch { "Bottom" => sh - h - 16, "Center" => (sh - h) / 2, _ => 0 } + _s.OffsetY;
+            Width = w; Height = h; Left = left; Top = initialTop;   // окно ещё не создано
             return;
         }
         var m = src.CompositionTarget.TransformToDevice;
