@@ -503,7 +503,7 @@
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock x:Name="SeekCurrentText" Text="0:00" Foreground="#88FFFFFF" FontSize="10" VerticalAlignment="Center" Margin="0,0,7,0"/>
                                     <Slider x:Name="SeekSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0" IsEnabled="False"
-                                            PreviewMouseLeftButtonUp="SeekSlider_Commit" PreviewKeyUp="SeekSlider_Commit"/>
+                                            PreviewMouseLeftButtonUp="SeekSlider_MouseUp" PreviewKeyUp="SeekSlider_KeyUp"/>
                                     <TextBlock x:Name="SeekDurationText" Grid.Column="2" Text="0:00" Foreground="#88FFFFFF" FontSize="10" VerticalAlignment="Center" Margin="7,0,0,0"/>
                                 </Grid>
                             </StackPanel>
