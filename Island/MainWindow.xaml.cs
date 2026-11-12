@@ -178,7 +178,6 @@ public partial class MainWindow : Window
         if (FullscreenOpacitySlider != null && (int)FullscreenOpacitySlider.Value != _s.FullscreenOpacity) FullscreenOpacitySlider.Value = _s.FullscreenOpacity;
         FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         OffsetXInput.Text = _s.OffsetX.ToString(); RadiusText.Text = _s.CornerRadius + " px";
-        AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B;
         ( _s.VerticalAlign switch { "Bottom" => VerticalBottom, "Center" => VerticalCenter, _ => VerticalTop }).IsChecked = true;
         ThemeCombo.SelectedValue = _s.Theme;
         GlassOpacityText.Text = _s.GlassOpacity + "%";
@@ -426,7 +425,6 @@ public partial class MainWindow : Window
         if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
-        if (AccentR != null) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
     }
 
@@ -474,7 +472,6 @@ public partial class MainWindow : Window
         Wave.Effect = new DropShadowEffect { Color = c, BlurRadius = 10, ShadowDepth = 0, Opacity = 0.9 };
         UpdatePlayButton();
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(c);
-        if (AccentR != null) { if ((int)AccentR.Value != c.R) AccentR.Value = c.R; if ((int)AccentG.Value != c.G) AccentG.Value = c.G; if ((int)AccentB.Value != c.B) AccentB.Value = c.B; }
         foreach (var b in AccentPanel.Children.OfType<Border>())
             b.BorderBrush = (string)b.Tag == _s.Accent ? Brushes.White : Brushes.Transparent;
     }
@@ -513,13 +510,12 @@ public partial class MainWindow : Window
         AccentPanel.Children.Add(custom);
     }
 
-    void CustomAccent_Click(object sender, RoutedEventArgs e) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
-    void Rgb_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    void CustomAccent_Click(object sender, RoutedEventArgs e)
     {
-        if (!_ready || AccentR == null || AccentG == null || AccentB == null) return;
-        var color = Color.FromRgb((byte)AccentR.Value, (byte)AccentG.Value, (byte)AccentB.Value);
-        _s.Accent = color.ToString(); _s.Save();
-        if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(color);
+        var picker = new ColorPickerWindow(_accentColor) { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        _s.Accent = picker.SelectedColor.ToString();
+        _s.Save();
         ApplyAccent();
     }
     void Align_Checked(object sender, RoutedEventArgs e)
