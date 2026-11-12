@@ -715,12 +715,12 @@
                         <Grid Grid.Column="1">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="38"/></Grid.ColumnDefinitions>
                             <ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
-                                      Background="#FF172638" Foreground="White" Height="34" BorderBrush="#40FFFFFF"
+                                      Background="#22FFFFFF" Foreground="White" Height="34" BorderBrush="#55FFFFFF"
                                       BorderThickness="1" Padding="8,3">
                                 <ComboBox.Resources>
                                     <Style TargetType="{x:Type ComboBoxItem}">
                                         <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="Background" Value="#FF172638"/>
+                                        <Setter Property="Background" Value="#E8172028"/>
                                         <Setter Property="Padding" Value="10,7"/>
                                         <Setter Property="Template">
                                             <Setter.Value>
@@ -729,8 +729,8 @@
                                                         <ContentPresenter/>
                                                     </Border>
                                                     <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#334F6B88"/></Trigger>
-                                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#446A91B8"/></Trigger>
+                                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#30FFFFFF"/></Trigger>
+                                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#48FFFFFF"/></Trigger>
                                                     </ControlTemplate.Triggers>
                                                 </ControlTemplate>
                                             </Setter.Value>
@@ -742,6 +742,7 @@
                                 <ComboBoxItem Content="Amethyst" Tag="Amethyst"/>
                                 <ComboBoxItem Content="Emerald" Tag="Emerald"/>
                                 <ComboBoxItem Content="Rose" Tag="Rose"/>
+                                <ComboBoxItem Content="Custom color" Tag="Custom"/>
                             </ComboBox>
                             <Button Grid.Column="1" Style="{StaticResource IconBtn}" Margin="6,0,0,0"
                                     Content="&#xE70F;" ToolTip="Custom theme color" Click="ThemeColor_Click"/>
@@ -753,7 +754,7 @@
                     <Button x:Name="SupportBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                             HorizontalAlignment="Left" Margin="0,8,0,0" Click="SupportAuthor_Click"/>
 
-                    <TextBlock x:Name="AccentDescription" Text="The island stays black — color appears only when music is playing or an event occurs."
+                    <TextBlock x:Name="AccentDescription" Text="Glass appearance with subtle white highlights and adjustable color."
                                Foreground="#66FFFFFF" FontSize="11" Margin="2,12,0,0" TextWrapping="Wrap"/>
                   </StackPanel>
                 </ScrollViewer>
