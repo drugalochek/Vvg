@@ -1289,25 +1289,23 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
-                double overflow = TitleText.ActualWidth - TitleViewport.ActualWidth;
-                // A tiny overflow is visually irrelevant. If roughly two glyphs
-                // do not fit, gently nudge left/right; only genuinely long titles travel.
-                if (overflow <= 24) return;
+                double textWidth = TitleText.ActualWidth;
+                double laneWidth = TitleViewport.ActualWidth;
+                // A true marquee loop: enter from the right, pass completely
+                // through the viewport, leave on the left, then restart on the right.
+                if (textWidth <= laneWidth + 12) return;
 
-                bool longTitle = overflow > 64;
-                double travel = longTitle ? overflow : Math.Min(overflow, 34);
-                double legMs = longTitle ? Math.Clamp(travel * 18, 850, 2200) : 900;
-                double pauseMs = longTitle ? 900 : 2200;
-                var scroll = new DoubleAnimationUsingKeyFrames
+                double travel = laneWidth + textWidth;
+                double durationMs = Math.Clamp(travel * 24, 2600, 9000);
+                var scroll = new DoubleAnimation
                 {
-                    Duration = TimeSpan.FromMilliseconds(legMs * 2 + pauseMs),
+                    From = laneWidth,
+                    To = -textWidth,
+                    Duration = TimeSpan.FromMilliseconds(durationMs),
                     RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromMilliseconds(500)
+                    BeginTime = TimeSpan.FromMilliseconds(350),
+                    EasingFunction = null
                 };
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(-travel, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(legMs))));
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(legMs * 2))));
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(legMs * 2 + pauseMs))));
                 MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
             }), DispatcherPriority.Loaded);
         }
