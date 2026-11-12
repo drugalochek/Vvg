@@ -1189,7 +1189,6 @@ public partial class MainWindow : Window
     Color _accentColor = Colors.White;
     double _wavePhase, _waveAmp, _waveBeatPulse, _open = 1, _blinkT = -1;
     double _lLx, _lLy, _lRx, _lRy, _eyeFollow = 0.2;
-    double _glX, _glY;                       // «случайный взгляд», когда мышь стоит
     DateTime _nextGlance = DateTime.Now;
     bool _lastWave;
     DateTime _nextBlink = DateTime.Now.AddSeconds(3), _lastMove = DateTime.Now, _lastEyeUpdate = DateTime.Now, _lastBlinkUpdate = DateTime.Now;
@@ -1335,8 +1334,8 @@ public partial class MainWindow : Window
 
         // Keep following the pointer even when it is stationary. Random idle glances
         // used to override the pointer target after three seconds, making tracking appear broken.
-        Look(EyeL, p, sleepy, false, playing, ref _lLx, ref _lLy);
-        Look(EyeR, p, sleepy, false, playing, ref _lRx, ref _lRy);
+        Look(EyeL, p, sleepy, playing, ref _lLx, ref _lLy);
+        Look(EyeR, p, sleepy, playing, ref _lRx, ref _lRy);
         if (excited) { _lLy += Math.Sin(now.TimeOfDay.TotalSeconds * 11) * 0.65; _lRy += Math.Sin(now.TimeOfDay.TotalSeconds * 11 + 0.45) * 0.65; }
         if (_eyeMood == EyeMood.Happy) { _lLy += 0.35; _lRy += 0.35; }
         EyeLShift.X = _lLx; EyeLShift.Y = _lLy;
@@ -1363,32 +1362,25 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Овал целиком смещается в сторону курсора (до ±3 px), плавно догоняя цель.</summary>
-    void Look(FrameworkElement eye, POINT cur, bool sleepy, bool idle, bool playing, ref double lx, ref double ly)
+    void Look(FrameworkElement eye, POINT cur, bool sleepy, bool playing, ref double lx, ref double ly)
     {
         double tx = 0, ty = sleepy ? 2.2 : 0;
         if (!sleepy)
         {
-            if (idle)
+            try
             {
-                tx = _glX; ty = _glY;
-            }
-            else
-            {
-                try
+                var c = eye.PointToScreen(new Point(eye.ActualWidth / 2, eye.ActualHeight / 2));
+                double dx = cur.X - c.X, dy = cur.Y - c.Y, d = Math.Sqrt(dx * dx + dy * dy);
+                // Ignore a distant cursor. Otherwise the first frame after
+                // startup can pull both eyes hard to one side of the pill.
+                if (d > 1)
                 {
-                    var c = eye.PointToScreen(new Point(eye.ActualWidth / 2, eye.ActualHeight / 2));
-                    double dx = cur.X - c.X, dy = cur.Y - c.Y, d = Math.Sqrt(dx * dx + dy * dy);
-                    // Ignore a distant cursor. Otherwise the first frame after
-                    // startup can pull both eyes hard to one side of the pill.
-                    if (d > 1)
-                    {
-                        double k = Smooth(Math.Min(1.0, d / 90.0));
-                        tx = dx / d * 2.35 * k;
-                        ty = dy / d * 2.15 * k;
-                    }
+                    double k = Smooth(Math.Min(1.0, d / 90.0));
+                    tx = dx / d * 2.35 * k;
+                    ty = dy / d * 2.15 * k;
                 }
-                catch (InvalidOperationException) { }   // окно скрыто/ещё не отрисовано — глаз остаётся на месте
             }
+            catch (InvalidOperationException) { }   // окно скрыто/ещё не отрисовано — глаз остаётся на месте
             // Tiny continuous sway keeps the eyes alive without sudden direction changes.
             double dance = Math.Sin(_wavePhase * (playing ? 1.35 : 0.72));
             tx += dance * (playing ? 0.24 : 0.12);
@@ -1475,7 +1467,7 @@ public partial class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            var iconView = new Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
+            var iconView = new System.Windows.Controls.Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
             try
             {
                 using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
@@ -1523,7 +1515,7 @@ public partial class MainWindow : Window
             {
                 Text = _s.Language == "ru" ? "Пока пусто. Нажми «Добавить», чтобы выбрать программу."
                                           : "No apps yet. Select Add app to get started.",
-                Foreground = (Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
+                Foreground = (System.Windows.Media.Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
                 FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
                 TextWrapping = TextWrapping.Wrap, MaxWidth = 440
             });
@@ -1532,7 +1524,7 @@ public partial class MainWindow : Window
 
     void AddApp_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = _s.Language == "ru" ? "Выбери приложение или ярлык" : "Choose an app or shortcut",
             Filter = _s.Language == "ru"
