@@ -1147,16 +1147,21 @@ public partial class MainWindow : Window
             {
                 if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
                 double overflow = TitleText.ActualWidth - TitleViewport.ActualWidth;
-                if (overflow <= 8) return;
+                // A tiny overflow is visually irrelevant. If roughly two glyphs
+                // do not fit, gently nudge left/right; only genuinely long titles travel.
+                if (overflow <= 24) return;
 
+                bool longTitle = overflow > 64;
+                double travel = longTitle ? overflow : Math.Min(overflow, 34);
                 var scroll = new DoubleAnimation
                 {
                     From = 0,
-                    To = -overflow,
-                    Duration = TimeSpan.FromMilliseconds(Math.Clamp(overflow * 42, 1800, 9000)),
+                    To = -travel,
+                    Duration = TimeSpan.FromMilliseconds(longTitle
+                        ? Math.Clamp(travel * 22, 900, 4200) : 1250),
                     AutoReverse = true,
                     RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromMilliseconds(650)
+                    BeginTime = TimeSpan.FromMilliseconds(longTitle ? 450 : 1700)
                 };
                 MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
             }), DispatcherPriority.Loaded);
@@ -1189,8 +1194,6 @@ public partial class MainWindow : Window
     Color _accentColor = Colors.White;
     double _wavePhase, _waveAmp, _waveBeatPulse, _open = 1, _blinkT = -1;
     double _lLx, _lLy, _lRx, _lRy, _eyeFollow = 0.2;
-    double _glX, _glY;                       // «случайный взгляд», когда мышь стоит
-    DateTime _nextGlance = DateTime.Now;
     bool _lastWave;
     DateTime _nextBlink = DateTime.Now.AddSeconds(3), _lastMove = DateTime.Now, _lastEyeUpdate = DateTime.Now, _lastBlinkUpdate = DateTime.Now;
     int _lastCx = int.MinValue, _lastCy;
@@ -1226,16 +1229,15 @@ public partial class MainWindow : Window
         if (playing && _audio.ConsumeBeat())
             _waveBeatPulse = Math.Min(1.0, _waveBeatPulse + 0.82);
 
-        // Bass energy controls the continuous movement; detected low-frequency
-        // transients add a short, sharp swell on actual kick/snare hits.
-        _waveBeatPulse *= Math.Exp(-7.2 * dt);
-        double bass = playing ? _audio.BassLevel : 0;
-        double target = playing ? Math.Clamp(0.9 + bass * 2.3 + _waveBeatPulse * 4.4, 0, 7.2) : 0;
+        // All three frequency bands move the liquid; kick transients add a separate accent.
+        _waveBeatPulse *= Math.Exp(-6.4 * dt);
+        double activity = playing ? _audio.ActivityLevel : 0;
+        double target = playing ? Math.Clamp(0.35 + activity * 6.0 + _waveBeatPulse * 3.8, 0, 7.2) : 0;
         double response = target > _waveAmp ? 23.0 : 7.5; // fast attack, softer release
         double follow = 1 - Math.Exp(-response * dt);
         _waveAmp += (target - _waveAmp) * follow;
         if (Math.Abs(target - _waveAmp) < 0.025) _waveAmp = target;
-        _wavePhase += (2.1 + bass * 5.0 + _waveBeatPulse * 1.8) * dt;
+        _wavePhase += (1.8 + activity * 8.0 + _waveBeatPulse * 1.8) * dt;
 
         bool wave = _waveAmp > 0.01;
         bool eyes = !_welcomeRunning && IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
@@ -1335,8 +1337,8 @@ public partial class MainWindow : Window
 
         // Keep following the pointer even when it is stationary. Random idle glances
         // used to override the pointer target after three seconds, making tracking appear broken.
-        Look(EyeL, p, sleepy, false, playing, ref _lLx, ref _lLy);
-        Look(EyeR, p, sleepy, false, playing, ref _lRx, ref _lRy);
+        Look(EyeL, p, sleepy, playing, ref _lLx, ref _lLy);
+        Look(EyeR, p, sleepy, playing, ref _lRx, ref _lRy);
         if (excited) { _lLy += Math.Sin(now.TimeOfDay.TotalSeconds * 11) * 0.65; _lRy += Math.Sin(now.TimeOfDay.TotalSeconds * 11 + 0.45) * 0.65; }
         if (_eyeMood == EyeMood.Happy) { _lLy += 0.35; _lRy += 0.35; }
         EyeLShift.X = _lLx; EyeLShift.Y = _lLy;
@@ -1363,19 +1365,13 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Овал целиком смещается в сторону курсора (до ±3 px), плавно догоняя цель.</summary>
-    void Look(FrameworkElement eye, POINT cur, bool sleepy, bool idle, bool playing, ref double lx, ref double ly)
+    void Look(FrameworkElement eye, POINT cur, bool sleepy, bool playing, ref double lx, ref double ly)
     {
         double tx = 0, ty = sleepy ? 2.2 : 0;
         if (!sleepy)
         {
-            if (idle)
+            try
             {
-                tx = _glX; ty = _glY;
-            }
-            else
-            {
-                try
-                {
                     var c = eye.PointToScreen(new Point(eye.ActualWidth / 2, eye.ActualHeight / 2));
                     double dx = cur.X - c.X, dy = cur.Y - c.Y, d = Math.Sqrt(dx * dx + dy * dy);
                     // Ignore a distant cursor. Otherwise the first frame after
@@ -1387,8 +1383,7 @@ public partial class MainWindow : Window
                         ty = dy / d * 2.15 * k;
                     }
                 }
-                catch (InvalidOperationException) { }   // окно скрыто/ещё не отрисовано — глаз остаётся на месте
-            }
+            catch (InvalidOperationException) { }   // окно скрыто/ещё не отрисовано — глаз остаётся на месте
             // Tiny continuous sway keeps the eyes alive without sudden direction changes.
             double dance = Math.Sin(_wavePhase * (playing ? 1.35 : 0.72));
             tx += dance * (playing ? 0.24 : 0.12);
@@ -1461,7 +1456,8 @@ public partial class MainWindow : Window
         AppsGrid.Children.Clear();
         foreach (var app in _s.Apps.ToList())
         {
-            if (!File.Exists(app.Path)) continue;
+            bool steamLink = app.Path.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
+            if (!steamLink && !File.Exists(app.Path)) continue;
             var button = new Button
             {
                 Style = (Style)FindResource("TileBtn"),
@@ -1475,16 +1471,19 @@ public partial class MainWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            var iconView = new Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
+            var iconView = new System.Windows.Controls.Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
             try
             {
-                using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
-                if (icon != null)
+                if (!steamLink)
                 {
-                    var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
-                        BitmapSizeOptions.FromWidthAndHeight(48, 48));
-                    source.Freeze();
-                    iconView.Source = source;
+                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
+                    if (icon != null)
+                    {
+                        var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
+                            BitmapSizeOptions.FromWidthAndHeight(48, 48));
+                        source.Freeze();
+                        iconView.Source = source;
+                    }
                 }
             }
             catch (Exception ex) { Log.Warn("Не удалось получить иконку " + app.Path + ": " + ex.Message); }
@@ -1523,7 +1522,7 @@ public partial class MainWindow : Window
             {
                 Text = _s.Language == "ru" ? "Пока пусто. Нажми «Добавить», чтобы выбрать программу."
                                           : "No apps yet. Select Add app to get started.",
-                Foreground = (Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
+                Foreground = (System.Windows.Media.Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
                 FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
                 TextWrapping = TextWrapping.Wrap, MaxWidth = 440
             });
@@ -1532,28 +1531,87 @@ public partial class MainWindow : Window
 
     void AddApp_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
+        var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = _s.Language == "ru" ? "Выбери приложение или ярлык" : "Choose an app or shortcut",
             Filter = _s.Language == "ru"
-                ? "Приложения и ярлыки (*.exe;*.lnk)|*.exe;*.lnk|Все файлы (*.*)|*.*"
-                : "Applications and shortcuts (*.exe;*.lnk)|*.exe;*.lnk|All files (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false
+                ? "Приложения и ярлыки (*.exe;*.lnk;*.url)|*.exe;*.lnk;*.url|Все файлы (*.*)|*.*"
+                : "Applications and shortcuts (*.exe;*.lnk;*.url)|*.exe;*.lnk;*.url|All files (*.*)|*.*",
+            CheckFileExists = true, Multiselect = false
         };
         if (dialog.ShowDialog(this) != true) return;
 
-        string path = dialog.FileName;
+        string selected = dialog.FileName;
+        string path = selected;
+        string name = System.IO.Path.GetFileNameWithoutExtension(selected);
+        if (System.IO.Path.GetExtension(selected).Equals(".url", StringComparison.OrdinalIgnoreCase))
+        {
+            string? urlLine = File.ReadLines(selected).FirstOrDefault(line =>
+                line.TrimStart().StartsWith("URL=", StringComparison.OrdinalIgnoreCase));
+            path = urlLine?.Trim().Substring(4).Trim() ?? "";
+            if (!IsSteamLink(path))
+            {
+                ShowToast("Moku", _s.Language == "ru"
+                    ? "Поддерживаются интернет-ярлыки Steam (steam://)"
+                    : "Only Steam internet shortcuts (steam://) are supported", ColorError);
+                return;
+            }
+        }
+        AddSavedApp(path, name);
+    }
+
+    void AddSteamLink_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Window
+        {
+            Title = _s.Language == "ru" ? "Добавить игру Steam" : "Add Steam game",
+            Owner = this, Width = 420, Height = 176, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize, WindowStyle = WindowStyle.ToolWindow,
+            Background = new SolidColorBrush(Color.FromRgb(30, 30, 36)), Foreground = Brushes.White
+        };
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock {
+            Text = _s.Language == "ru" ? "Вставь ссылку steam://rungameid/..." : "Paste a steam://rungameid/... link",
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        var input = new System.Windows.Controls.TextBox {
+            Height = 30, Padding = new Thickness(7), Text = Clipboard.ContainsText() ? Clipboard.GetText().Trim() : ""
+        };
+        panel.Children.Add(input);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        var add = new Button { Content = _s.Language == "ru" ? "Добавить" : "Add", Width = 88, Padding = new Thickness(8, 5, 8, 5), IsDefault = true };
+        var cancel = new Button { Content = _s.Language == "ru" ? "Отмена" : "Cancel", Width = 88, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(8, 5, 8, 5), IsCancel = true };
+        add.Click += (_, _) => { dialog.DialogResult = true; dialog.Close(); };
+        cancel.Click += (_, _) => { dialog.DialogResult = false; dialog.Close(); };
+        buttons.Children.Add(add); buttons.Children.Add(cancel); panel.Children.Add(buttons);
+        dialog.Content = panel;
+        input.Focus();
+        if (dialog.ShowDialog() != true) return;
+
+        string link = input.Text.Trim();
+        if (!IsSteamLink(link))
+        {
+            ShowToast("Moku", _s.Language == "ru" ? "Нужна ссылка Steam вида steam://rungameid/ID" : "Enter a Steam link like steam://rungameid/ID", ColorError);
+            return;
+        }
+        string id = link.Split('/').LastOrDefault() ?? "";
+        AddSavedApp(link, "Steam " + id);
+    }
+
+    static bool IsSteamLink(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        uri.Scheme.Equals("steam", StringComparison.OrdinalIgnoreCase);
+
+    void AddSavedApp(string path, string name)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
         if (_s.Apps.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase)))
         {
             ShowToast("Moku", _s.Language == "ru" ? "Это приложение уже добавлено" : "This app is already added");
             return;
         }
-
-        string name = System.IO.Path.GetFileNameWithoutExtension(path);
         _s.Apps.Add(new AppShortcut { Path = path, Name = name });
-        _s.Save();
-        BuildApps();
+        _s.Save(); BuildApps();
         ShowToast("Moku", _s.Language == "ru" ? "Приложение добавлено" : "App added");
     }
 
@@ -1561,12 +1619,12 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (!File.Exists(path))
+            bool steamLink = IsSteamLink(path);
+            if (!steamLink && !File.Exists(path))
             {
                 ShowToast("Moku", _s.Language == "ru" ? "Файл не найден. Удали ярлык и добавь его снова."
                                                        : "File not found. Remove this shortcut and add it again.", ColorError);
-                BuildApps();
-                return;
+                BuildApps(); return;
             }
             Collapse();
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
