@@ -1625,7 +1625,7 @@ public partial class MainWindow : Window
             {
                 var vdf = Path.Combine(root, "steamapps", "libraryfolders.vdf");
                 if (!File.Exists(vdf)) continue;
-                foreach (Match match in Regex.Matches(File.ReadAllText(vdf), "\"path\"\s+\"([^\"]+)\""))
+                foreach (Match match in Regex.Matches(File.ReadAllText(vdf), @"""path""\s+""([^""]+)"""))
                 {
                     var library = match.Groups[1].Value.Replace("\\\\", "\\");
                     if (Directory.Exists(library)) libraries.Add(library);
@@ -1642,8 +1642,8 @@ public partial class MainWindow : Window
                     try
                     {
                         var data = File.ReadAllText(manifest);
-                        var id = Regex.Match(data, "\"appid\"\s+\"(\d+)\"").Groups[1].Value;
-                        var name = Regex.Match(data, "\"name\"\s+\"([^\"]+)\"").Groups[1].Value;
+                        var id = Regex.Match(data, @"""appid""\s+""(\d+)""").Groups[1].Value;
+                        var name = Regex.Match(data, @"""name""\s+""([^""]+)""").Groups[1].Value;
                         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
                         var link = "steam://rungameid/" + id;
                         if (_s.Apps.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
