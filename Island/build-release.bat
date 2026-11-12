@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
-set "APP_VERSION=2.5.0"
+set "APP_VERSION=2.5.4"
 set "RUNTIME=win-x64"
 
 echo [1/3] Publishing Moku application...
