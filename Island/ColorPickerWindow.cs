@@ -31,7 +31,7 @@ public sealed class ColorPickerWindow : Window
     bool syncing;
     public Color SelectedColor { get; private set; }
 
-    public ColorPickerWindow(Color initial)
+    public ColorPickerWindow(Color initial, bool russian = false)
     {
         SelectedColor=initial; (h,s,v)=ToHsv(initial);
         Width=430; Height=410; ResizeMode=ResizeMode.NoResize; WindowStyle=WindowStyle.None;
@@ -52,7 +52,7 @@ public sealed class ColorPickerWindow : Window
         shell.Child=root;
         var header=new DockPanel { Margin=new Thickness(0,0,0,14) };
         var close=MakeButton("×",32,false); close.Click+=(_,_)=>{ DialogResult=false; Close(); }; DockPanel.SetDock(close,Dock.Right); header.Children.Add(close);
-        header.Children.Add(new TextBlock { Text="THEME COLOR", Foreground=Brushes.White, FontSize=13, FontWeight=FontWeights.SemiBold, VerticalAlignment=VerticalAlignment.Center });
+        header.Children.Add(new TextBlock { Text=russian ? "ЦВЕТ ТЕМЫ" : "THEME COLOR", Foreground=Brushes.White, FontSize=13, FontWeight=FontWeights.SemiBold, VerticalAlignment=VerticalAlignment.Center });
         root.Children.Add(header);
         var picker=new Grid { Margin=new Thickness(0,0,0,14) };
         picker.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });
@@ -81,10 +81,10 @@ public sealed class ColorPickerWindow : Window
         hex.LostFocus+=(_,_)=>ReadHex(); hex.KeyDown+=(_,e)=>{ if(e.Key==Key.Enter){ReadHex();e.Handled=true;} };
         hexRow.Children.Add(hex); Grid.SetRow(hexRow,2); root.Children.Add(hexRow);
         var actions=new StackPanel { Orientation=Orientation.Horizontal, HorizontalAlignment=HorizontalAlignment.Right };
-        var cancel=MakeButton("Отмена",92,false); cancel.Margin=new Thickness(0,0,8,0); cancel.Click+=(_,_)=>{DialogResult=false;Close();};
-        var apply=MakeButton("Применить",112,true); apply.Click+=(_,_)=>{ReadHex();SelectedColor=Current();DialogResult=true;Close();};
+        var cancel=MakeButton(russian ? "Отмена" : "Cancel",92,false); cancel.Margin=new Thickness(0,0,8,0); cancel.Click+=(_,_)=>{DialogResult=false;Close();};
+        var apply=MakeButton(russian ? "Применить" : "Apply",112,true); apply.Click+=(_,_)=>{ReadHex();SelectedColor=Current();DialogResult=true;Close();};
         var alphaRow = new DockPanel { Margin = new Thickness(0, 0, 0, 12), LastChildFill = true };
-        alphaRow.Children.Add(new TextBlock { Text = "COLOR TRANSPARENCY", Foreground = new SolidColorBrush(Color.FromRgb(160,165,180)), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,12,0) });
+        alphaRow.Children.Add(new TextBlock { Text = russian ? "ПРОЗРАЧНОСТЬ ЦВЕТА" : "COLOR OPACITY", Foreground = new SolidColorBrush(Color.FromRgb(160,165,180)), FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0,0,12,0) });
         alphaText.Text = "255";
         DockPanel.SetDock(alphaText, Dock.Right);
         alphaRow.Children.Add(alphaText);
