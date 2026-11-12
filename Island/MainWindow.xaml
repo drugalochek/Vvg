@@ -804,6 +804,24 @@
                                     Content="&#xE70F;" ToolTip="Custom theme color" Click="ThemeColor_Click"/>
                         </Grid>
                     </Grid>
+                    <StackPanel Margin="0,2,0,12">
+                        <TextBlock x:Name="GradientColorsLabel" Text="Island gradient colors" Foreground="White" FontSize="13" Margin="0,0,0,7"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button x:Name="TopGradientColorButton" Style="{StaticResource TileBtn}" Height="36" Width="154"
+                                    Margin="0,0,8,0" Click="TopGradientColor_Click" Content="Upper color"/>
+                            <Button x:Name="BottomGradientColorButton" Style="{StaticResource TileBtn}" Height="36" Width="154"
+                                    Margin="0" Click="BottomGradientColor_Click" Content="Lower color"/>
+                        </StackPanel>
+                        <DockPanel Margin="0,8,0,0">
+                            <TextBlock x:Name="GradientBalanceText" Text="70%" Foreground="#CCFFFFFF" FontSize="12"
+                                       DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                            <TextBlock x:Name="GradientBalanceLabel" Text="Color balance" Foreground="#BFFFFFFF"
+                                       FontSize="11" VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <Slider x:Name="GradientBalanceSlider" Style="{StaticResource MokuSlider}"
+                                Minimum="10" Maximum="90" TickFrequency="5"
+                                ValueChanged="GradientBalanceSlider_Changed"/>
+                    </StackPanel>
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                             HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
 
