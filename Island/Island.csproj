@@ -7,10 +7,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Moku</AssemblyName>
-    <Version>2.6.11</Version>
-    <AssemblyVersion>2.6.11.0</AssemblyVersion>
-    <FileVersion>2.6.11.0</FileVersion>
-    <InformationalVersion>2.6.11</InformationalVersion>
+    <Version>2.6.12</Version>
+    <AssemblyVersion>2.6.12.0</AssemblyVersion>
+    <FileVersion>2.6.12.0</FileVersion>
+    <InformationalVersion>2.6.12</InformationalVersion>
     <ApplicationIcon>Moku.ico</ApplicationIcon>
     <RootNamespace>Island</RootNamespace>
 
