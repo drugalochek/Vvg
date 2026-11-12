@@ -167,14 +167,12 @@ public partial class MainWindow : Window
         // применить сохранённые настройки
         startupStage = "applying saved settings";
         (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
-        OffsetText.Text = _s.OffsetY + " px";
+        OffsetYInput.Text = _s.OffsetY.ToString();
         ScaleText.Text = _s.Scale + "%";
         if (ScaleSlider != null && (int)ScaleSlider.Value != _s.Scale) ScaleSlider.Value = _s.Scale;
         if (OpacitySlider != null && (int)OpacitySlider.Value != _s.GlassOpacity) OpacitySlider.Value = _s.GlassOpacity;
         if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius;
-        if (OffsetXSlider != null && (int)OffsetXSlider.Value != _s.OffsetX) OffsetXSlider.Value = _s.OffsetX;
-        if (OffsetYSlider != null && (int)OffsetYSlider.Value != _s.OffsetY) OffsetYSlider.Value = _s.OffsetY;
-        OffsetXText.Text = _s.OffsetX + " px"; RadiusText.Text = _s.CornerRadius + " px";
+        OffsetXInput.Text = _s.OffsetX.ToString(); RadiusText.Text = _s.CornerRadius + " px";
         AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B;
         ( _s.VerticalAlign switch { "Bottom" => VerticalBottom, "Center" => VerticalCenter, _ => VerticalTop }).IsChecked = true;
         ThemeCombo.SelectedValue = _s.Theme;
@@ -439,11 +437,11 @@ public partial class MainWindow : Window
     void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
     void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
     void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
-    void SetOffsetX(int v) { _s.OffsetX = Math.Clamp(v, -500, 500); OffsetXText.Text = _s.OffsetX + " px"; if (OffsetXSlider != null && (int)OffsetXSlider.Value != _s.OffsetX) OffsetXSlider.Value = _s.OffsetX; ApplyPosition(); _s.Save(); }
-    void OffsetX_Minus(object sender, RoutedEventArgs e) => SetOffsetX(_s.OffsetX - 10);
-    void OffsetX_Plus(object sender, RoutedEventArgs e) => SetOffsetX(_s.OffsetX + 10);
-    void OffsetXSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetOffsetX((int)e.NewValue); }
-    void OffsetYSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetOffset((int)e.NewValue); }
+    void SetOffsetX(int v) { _s.OffsetX = Math.Clamp(v, -500, 500); OffsetXInput.Text = _s.OffsetX.ToString(); ApplyPosition(); _s.Save(); }
+    void OffsetXInput_LostFocus(object sender, RoutedEventArgs e) => CommitOffsetInput(OffsetXInput, true);
+    void OffsetYInput_LostFocus(object sender, RoutedEventArgs e) => CommitOffsetInput(OffsetYInput, false);
+    void OffsetInput_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { CommitOffsetInput((TextBox)sender, ReferenceEquals(sender, OffsetXInput)); Keyboard.ClearFocus(); e.Handled = true; } }
+    void CommitOffsetInput(TextBox input, bool horizontal) { if (!int.TryParse(input.Text, out int value)) value = horizontal ? _s.OffsetX : _s.OffsetY; if (horizontal) SetOffsetX(value); else SetOffset(value); }
     void ScaleSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetScale((int)e.NewValue); }
     void OpacitySlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetGlassOpacity((int)e.NewValue); }
     void RadiusSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetRadius((int)e.NewValue); }
@@ -507,30 +505,6 @@ public partial class MainWindow : Window
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(color);
         ApplyAccent();
     }
-    [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr hdc, int x, int y);
-    async void Eyedropper_Click(object sender, RoutedEventArgs e)
-    {
-        if (!GetCursorPos(out var p)) return;
-        bool wasVisible = IsVisible;
-        double oldOpacity = Opacity;
-        try
-        {
-            Opacity = 0;
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-            await Task.Delay(90);
-            IntPtr dc = GetDC(IntPtr.Zero);
-            try
-            {
-                uint pixel = GetPixel(dc, p.X, p.Y);
-                if (pixel == 0xFFFFFFFF) return;
-                var color = Color.FromRgb((byte)(pixel & 0xFF), (byte)((pixel >> 8) & 0xFF), (byte)((pixel >> 16) & 0xFF));
-                _s.Accent = color.ToString(); _s.Save(); ApplyAccent();
-            }
-            finally { ReleaseDC(IntPtr.Zero, dc); }
-        }
-        finally { Opacity = oldOpacity; if (wasVisible) Activate(); }
-    }
-
     void Align_Checked(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
@@ -542,8 +516,7 @@ public partial class MainWindow : Window
     void SetOffset(int v)
     {
         _s.OffsetY = Math.Clamp(v, -500, 500);
-        if (OffsetYSlider != null && (int)OffsetYSlider.Value != _s.OffsetY) OffsetYSlider.Value = _s.OffsetY;
-        OffsetText.Text = _s.OffsetY + " px";
+        if (OffsetYInput != null) OffsetYInput.Text = _s.OffsetY.ToString();
         ApplyPosition();
         _s.Save();
     }
@@ -557,8 +530,6 @@ public partial class MainWindow : Window
         _s.Save();
     }
 
-    void Offset_Minus(object s, RoutedEventArgs e) => SetOffset(_s.OffsetY - 4);
-    void Offset_Plus(object s, RoutedEventArgs e) => SetOffset(_s.OffsetY + 4);
     void Scale_Minus(object s, RoutedEventArgs e) => SetScale(_s.Scale - 10);
     void Scale_Plus(object s, RoutedEventArgs e) => SetScale(_s.Scale + 10);
 
@@ -724,7 +695,6 @@ public partial class MainWindow : Window
         if (CornerRadiusLabel != null) CornerRadiusLabel.Text = ru ? "Скругление" : "Corner rounding";
         if (ThemeLabel != null) ThemeLabel.Text = ru ? "Тема" : "Theme";
         if (RgbLabel != null) RgbLabel.Text = ru ? "Цвет RGB" : "Custom RGB";
-        if (EyedropperButton != null) EyedropperButton.Content = ru ? "Пипетка" : "Eyedropper";
         if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
