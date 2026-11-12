@@ -910,6 +910,10 @@ public partial class MainWindow : Window
         TimeText.Visibility = Visibility.Collapsed;
         WeatherHost.Visibility = Visibility.Collapsed;
         TempText.Visibility = Visibility.Collapsed;
+        TimeText.Opacity = 0;
+        WeatherHost.Opacity = 0;
+        TempText.Opacity = 0;
+        TitlePanel.Opacity = 0;
         ToastPanel.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Collapsed;
         ApplyPosition();
@@ -975,16 +979,18 @@ public partial class MainWindow : Window
     void FadeWelcomeInfo()
     {
         foreach (UIElement element in new UIElement[] { TimeText, WeatherHost, TempText, TitlePanel })
+            FadeInWelcomeElement(element);
+    }
+
+    void FadeInWelcomeElement(UIElement element)
+    {
+        if (element.Visibility != Visibility.Visible || element.Opacity >= 0.99) return;
+        var fade = new DoubleAnimation(1, TimeSpan.FromMilliseconds(520))
         {
-            if (element.Visibility != Visibility.Visible) continue;
-            element.Opacity = 0;
-            var fade = new DoubleAnimation(1, TimeSpan.FromMilliseconds(520))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            fade.Completed += (_, _) => { element.BeginAnimation(OpacityProperty, null); element.Opacity = 1; };
-            element.BeginAnimation(OpacityProperty, fade);
-        }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        fade.Completed += (_, _) => { element.BeginAnimation(OpacityProperty, null); element.Opacity = 1; };
+        element.BeginAnimation(OpacityProperty, fade);
     }
 
     void Collapse()
@@ -1341,6 +1347,7 @@ public partial class MainWindow : Window
             bool showFallback = !_welcomeRunning && _now?.Playing != true;
             WeatherHost.Visibility = Visibility.Collapsed;
             TempText.Visibility = showFallback ? Visibility.Visible : Visibility.Collapsed;
+            if (showFallback) FadeInWelcomeElement(TempText);
             return;
         }
         WeatherHost.Child = WeatherIcons.Build(w.Kind, w.IsDay);
@@ -1348,6 +1355,7 @@ public partial class MainWindow : Window
         bool showWeather = !_welcomeRunning && _now?.Playing != true;
         WeatherHost.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
         TempText.Visibility = showWeather ? Visibility.Visible : Visibility.Collapsed;
+        if (showWeather) { FadeInWelcomeElement(WeatherHost); FadeInWelcomeElement(TempText); }
     }
 
     // ================= Обработчики окна =================
