@@ -56,6 +56,7 @@ public partial class MainWindow : Window
     // Эмоции меняют только форму и движение двух исходных белых овалов. Никаких зрачков/новых деталей.
     void SetEyeMood(EyeMood mood, double seconds = 2.0)
     {
+        if (_welcomeRunning) return;
         _eyeMood = mood;
         _moodUntil = seconds > 0 ? DateTime.Now.AddSeconds(seconds) : DateTime.MaxValue;
         EnsureFx();
@@ -953,8 +954,37 @@ public partial class MainWindow : Window
         Pill.CornerRadius = new CornerRadius(18);
         RebuildBody();
         _welcomeRunning = false;
+        if (_now == null)
+        {
+            NowTitle.Text = _s.Language == "ru" ? "Ничего не воспроизводится" : "Nothing playing";
+            NowArtist.Text = "";
+            PlayBtn.Content = "\uE768";
+        }
+        else
+        {
+            NowTitle.Text = _now.Title;
+            NowArtist.Text = _now.Artist;
+            PlayBtn.Content = _now.Playing ? "\uE769" : "\uE768";
+        }
+        UpdatePlayButton();
         UpdateMini();
+        FadeWelcomeInfo();
         EnsureFx();
+    }
+
+    void FadeWelcomeInfo()
+    {
+        foreach (UIElement element in new UIElement[] { TimeText, WeatherHost, TempText, TitlePanel })
+        {
+            if (element.Visibility != Visibility.Visible) continue;
+            element.Opacity = 0;
+            var fade = new DoubleAnimation(1, TimeSpan.FromMilliseconds(520))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            fade.Completed += (_, _) => { element.BeginAnimation(OpacityProperty, null); element.Opacity = 1; };
+            element.BeginAnimation(OpacityProperty, fade);
+        }
     }
 
     void Collapse()
@@ -1034,7 +1064,7 @@ public partial class MainWindow : Window
     /// <summary>Тост. Цветная точка — единственное, что красит остров (кроме музыки).</summary>
     void ShowToast(string title, string sub, string? colorHex = null)
     {
-        if (_state == IslandState.Expanded) return;
+        if (_welcomeRunning || _state == IslandState.Expanded) return;
         _state = IslandState.Toast;
         ToastTitle.Text = title;
         ToastSub.Text = sub;
@@ -1131,7 +1161,7 @@ public partial class MainWindow : Window
         double dt = _lastRenderTime == TimeSpan.Zero ? 1.0 / 60.0 :
             Math.Clamp((args.RenderingTime - _lastRenderTime).TotalSeconds, 0.001, 0.05);
         _lastRenderTime = args.RenderingTime;
-        bool playing = _now?.Playing == true;
+        bool playing = !_welcomeRunning && _now?.Playing == true;
         double target = playing ? 5.0 : 0.0;
         double follow = 1 - Math.Exp(-11.0 * dt);
         _waveAmp += (target - _waveAmp) * follow;
@@ -1452,6 +1482,8 @@ public partial class MainWindow : Window
     void OnMediaChanged(NowPlaying? np)
     {
         _now = np;
+        // Cache media state silently until the welcome sequence has finished.
+        if (_welcomeRunning) return;
         if (np == null)
         {
             NowTitle.Text = "Nothing playing";
