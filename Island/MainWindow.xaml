@@ -263,10 +263,10 @@
                     <ControlTemplate TargetType="{x:Type Slider}">
                         <Grid Height="22" SnapsToDevicePixels="True">
                             <Border Height="5" VerticalAlignment="Center" CornerRadius="3" Background="#28FFFFFF"/>
-                            <Track x:Name="PART_Track" IsDirectionReversed="False">
+                            <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}" Orientation="{TemplateBinding Orientation}" IsDirectionReversed="False">
                                 <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="Slider.DecreaseLarge" IsTabStop="False" Opacity="0">
-                                        <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                                    <RepeatButton Command="Slider.DecreaseLarge" IsTabStop="False">
+                                        <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="#FF7C5CFF" CornerRadius="3"/></ControlTemplate></RepeatButton.Template>
                                     </RepeatButton>
                                 </Track.DecreaseRepeatButton>
                                 <Track.Thumb>
