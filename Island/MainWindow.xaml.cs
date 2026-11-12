@@ -1591,7 +1591,7 @@ public partial class MainWindow : Window
         {
             var add = new Button { Style = (Style)FindResource("TileBtn"), Width = 150, Height = 42,
                 Margin = new Thickness(3), ToolTip = game.Path };
-            var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            var panel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             panel.Children.Add(new TextBlock { Text = game.Name, Foreground = Brushes.White, FontSize = 11,
                 Width = 104, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
             panel.Children.Add(new TextBlock { Text = "+", Foreground = Brushes.White, FontSize = 18,
