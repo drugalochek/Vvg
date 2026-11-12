@@ -60,3 +60,12 @@ The application interface and screenshot editor use English labels. The installe
 ## Interface language (English / Русский)
 
 Open **Settings → Language** and choose **English** or **Русский**. The choice is saved in `%APPDATA%\Moku\settings.json` and is also available from the Moku tray icon context menu (**Language / Язык**). The screenshot annotation toolbar follows the same language setting. The installer itself offers English and Russian setup languages.
+
+
+## License
+
+Moku is proprietary software. All rights are reserved by the copyright holder. See the [LICENSE](LICENSE) file for the full terms. No permission to copy, modify, redistribute, sublicense, or create derivative works is granted except where the copyright holder gives prior written permission. Third-party components remain subject to their respective licenses.
+
+## Free positioning
+
+In Settings, uncheck **Lock position** to drag the island with the mouse. Its position is saved and constrained to the virtual desktop bounds. Re-enable the checkbox to prevent accidental movement.
