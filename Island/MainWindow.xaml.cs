@@ -168,6 +168,8 @@ public partial class MainWindow : Window
         (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
         OffsetText.Text = _s.OffsetY + " px";
         ScaleText.Text = _s.Scale + "%";
+        OpacityText.Text = _s.GlassOpacity + "%";
+        ApplyGlassOpacity();
         GlassOpacityText.Text = _s.GlassOpacity + "%";
         UpdateAutoButton();
         ApplyScale();
@@ -405,6 +407,12 @@ public partial class MainWindow : Window
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
 
+    void ApplyGlassOpacity()
+    {
+        if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
+        if (OpacityText != null) OpacityText.Text = _s.GlassOpacity + "%";
+    }
+
     void ApplyAccent()
     {
         var c = (Color)ColorConverter.ConvertFromString(_s.Accent);
@@ -469,10 +477,19 @@ public partial class MainWindow : Window
         _s.Save();
     }
 
+    void SetGlassOpacity(int value)
+    {
+        _s.GlassOpacity = Math.Clamp(value, 55, 100);
+        ApplyGlassOpacity();
+        _s.Save();
+    }
+
     void Offset_Minus(object s, RoutedEventArgs e) => SetOffset(_s.OffsetY - 4);
     void Offset_Plus(object s, RoutedEventArgs e) => SetOffset(_s.OffsetY + 4);
     void Scale_Minus(object s, RoutedEventArgs e) => SetScale(_s.Scale - 10);
     void Scale_Plus(object s, RoutedEventArgs e) => SetScale(_s.Scale + 10);
+    void Opacity_Minus(object s, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
+    void Opacity_Plus(object s, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
 
     void OpenSettings_Click(object sender, RoutedEventArgs e)
     {
@@ -619,6 +636,7 @@ public partial class MainWindow : Window
         if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
         if (ScanSteamText != null) ScanSteamText.Text = ru ? "Найти игры Steam" : "Find Steam games";
         if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
+        if (SteamScanText != null) SteamScanText.Text = ru ? "Найти Steam" : "Find Steam";
         if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
         if (MenuSettings != null) MenuSettings.Header = ru ? "Настройки" : "Settings";
         if (MenuExit != null) MenuExit.Header = ru ? "Выход" : "Exit";
@@ -629,6 +647,7 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
+        if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Непрозрачность основы" : "Island opacity";
         if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Непрозрачность острова" : "Island opacity";
         if (AccentDescription != null) AccentDescription.Text = ru ? "Остров остаётся чёрным — цвет появляется только при воспроизведении музыки или событии." : "The island stays black — color appears only when music is playing or an event occurs.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
