@@ -500,7 +500,7 @@
                                 <Grid Margin="2,5,2,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock x:Name="SeekCurrentText" Text="0:00" Foreground="#88FFFFFF" FontSize="10" VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <Slider x:Name="SeekSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0" IsEnabled="False"
+                                    <Slider Style="{StaticResource MokuSlider}" x:Name="SeekSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0" IsEnabled="False"
                                             PreviewMouseLeftButtonUp="SeekSlider_MouseUp" PreviewKeyUp="SeekSlider_KeyUp"/>
                                     <TextBlock x:Name="SeekDurationText" Grid.Column="2" Text="0:00" Foreground="#88FFFFFF" FontSize="10" VerticalAlignment="Center" Margin="7,0,0,0"/>
                                 </Grid>
@@ -663,7 +663,7 @@
                                 <TextBlock x:Name="ScaleText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
                                 <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Scale_Plus"/>
                             </DockPanel>
-                            <Slider x:Name="ScaleSlider" Minimum="70" Maximum="150" TickFrequency="5" ValueChanged="ScaleSlider_Changed"/>
+                            <Slider Style="{StaticResource MokuSlider}" x:Name="ScaleSlider" Minimum="70" Maximum="150" TickFrequency="5" ValueChanged="ScaleSlider_Changed"/>
                         </StackPanel>
                     </Grid>
 
@@ -686,7 +686,7 @@
                                 <TextBlock x:Name="GlassOpacityText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
                                 <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="GlassOpacity_Plus"/>
                             </DockPanel>
-                            <Slider x:Name="OpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="OpacitySlider_Changed"/>
+                            <Slider Style="{StaticResource MokuSlider}" x:Name="OpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="OpacitySlider_Changed"/>
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,10">
@@ -694,7 +694,7 @@
                         <TextBlock x:Name="FullscreenOpacityLabel" Text="Fullscreen opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
                             <TextBlock x:Name="FullscreenOpacityText" Foreground="White" FontSize="12" Margin="0,0,0,3"/>
-                            <Slider x:Name="FullscreenOpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="FullscreenOpacitySlider_Changed"/>
+                            <Slider Style="{StaticResource MokuSlider}" x:Name="FullscreenOpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="FullscreenOpacitySlider_Changed"/>
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,10">
@@ -706,29 +706,46 @@
                                 <TextBlock x:Name="RadiusText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
                                 <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Radius_Plus"/>
                             </DockPanel>
-                            <Slider x:Name="RadiusSlider" Minimum="0" Maximum="40" TickFrequency="1" ValueChanged="RadiusSlider_Changed"/>
+                            <Slider Style="{StaticResource MokuSlider}" x:Name="RadiusSlider" Minimum="0" Maximum="40" TickFrequency="1" ValueChanged="RadiusSlider_Changed"/>
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ThemeCombo" Grid.Column="1" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
-                                  Background="#FF24242A" Foreground="White" Height="32">
-                            <ComboBoxItem Content="Midnight" Tag="Midnight"/>
-                            <ComboBoxItem Content="Ocean" Tag="Ocean"/>
-                            <ComboBoxItem Content="Amethyst" Tag="Amethyst"/>
-                            <ComboBoxItem Content="Emerald" Tag="Emerald"/>
-                            <ComboBoxItem Content="Rose" Tag="Rose"/>
-                        </ComboBox>
-                    </Grid>
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="RgbLabel" Text="Custom color" Foreground="White" FontSize="13" VerticalAlignment="Top" Margin="0,4,0,0"/>
-                        <StackPanel Grid.Column="1">
-                            <Border x:Name="RgbPreview" Height="30" CornerRadius="9" Background="#FF7C5CFF" BorderBrush="#30FFFFFF" BorderThickness="1"/>
-                            <TextBlock x:Name="CustomColorHint" Text="Нажмите + в палитре, чтобы открыть выбор цвета"
-                                       Foreground="#88FFFFFF" FontSize="10" Margin="2,6,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
+                        <Grid Grid.Column="1">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="38"/></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
+                                      Background="#FF172638" Foreground="White" Height="34" BorderBrush="#40FFFFFF"
+                                      BorderThickness="1" Padding="8,3">
+                                <ComboBox.Resources>
+                                    <Style TargetType="{x:Type ComboBoxItem}">
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="Background" Value="#FF172638"/>
+                                        <Setter Property="Padding" Value="10,7"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                                                    <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#334F6B88"/></Trigger>
+                                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#446A91B8"/></Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ComboBox.Resources>
+                                <ComboBoxItem Content="Midnight" Tag="Midnight"/>
+                                <ComboBoxItem Content="Ocean" Tag="Ocean"/>
+                                <ComboBoxItem Content="Amethyst" Tag="Amethyst"/>
+                                <ComboBoxItem Content="Emerald" Tag="Emerald"/>
+                                <ComboBoxItem Content="Rose" Tag="Rose"/>
+                            </ComboBox>
+                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Margin="6,0,0,0"
+                                    Content="&#xE70F;" ToolTip="Custom theme color" Click="ThemeColor_Click"/>
+                        </Grid>
                     </Grid>
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                             HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
