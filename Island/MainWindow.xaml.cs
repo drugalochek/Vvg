@@ -355,6 +355,15 @@ public partial class MainWindow : Window
             _ => (sw - w) / 2
         };
         double top = _s.HasCustomPosition ? _s.PositionY : _s.OffsetY;
+        if (_s.HasCustomPosition)
+        {
+            double minX = SystemParameters.VirtualScreenLeft;
+            double minY = SystemParameters.VirtualScreenTop;
+            left = Math.Clamp(left, minX, Math.Max(minX, minX + SystemParameters.VirtualScreenWidth - w));
+            top = Math.Clamp(top, minY, Math.Max(minY, minY + SystemParameters.VirtualScreenHeight - h));
+            _s.PositionX = left;
+            _s.PositionY = top;
+        }
         Pill.HorizontalAlignment = _s.Align switch
         {
             "Left" => HorizontalAlignment.Left,
@@ -372,7 +381,7 @@ public partial class MainWindow : Window
         var m = src.CompositionTarget.TransformToDevice;
         // Размер и позиция одним вызовом — без промежуточного кадра со сдвинутым островом.
         SetWindowPos(hwnd, IntPtr.Zero,
-            (int)Math.Round(left * m.M11), (int)Math.Round(_s.OffsetY * m.M22),
+            (int)Math.Round(left * m.M11), (int)Math.Round(top * m.M22),
             (int)Math.Round(w * m.M11), (int)Math.Round(h * m.M22),
             SWP_NOZORDER | SWP_NOACTIVATE);
         _boxW = pillW;
@@ -452,7 +461,9 @@ public partial class MainWindow : Window
                 source is System.Windows.Controls.Primitives.ScrollBar ||
                 source is ListBoxItem || source is MenuItem)
                 return true;
-            source = VisualTreeHelper.GetParent(source);
+            source = source is Visual || source is System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(source)
+                : LogicalTreeHelper.GetParent(source);
         }
         return false;
     }
@@ -499,7 +510,6 @@ public partial class MainWindow : Window
             _s.PositionX = Left;
             _s.PositionY = Top;
             _s.Save();
-            e.Handled = true;
         }
     }
 
