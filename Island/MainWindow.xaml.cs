@@ -1071,6 +1071,7 @@ public partial class MainWindow : Window
         _state = IslandState.Expanded;
         MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
         MiniTitleShift.X = 0;
+        _miniAnimatedTitle = null; // restart the marquee when the island is collapsed again
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();
@@ -1120,6 +1121,9 @@ public partial class MainWindow : Window
         WeatherDetails.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
         TitleText.Text = hasMedia ? _now!.Title : "";
         MiniPlayBtn.Content = playing ? "\uE769" : "\uE768";
+        MiniPrevBtn.ToolTip = _s.Language == "ru" ? "Предыдущий трек" : "Previous";
+        MiniPlayBtn.ToolTip = _s.Language == "ru" ? "Воспроизведение / пауза" : "Play / pause";
+        MiniNextBtn.ToolTip = _s.Language == "ru" ? "Следующий трек" : "Next";
         TitleText.ToolTip = hasMedia
             ? (string.IsNullOrWhiteSpace(_now!.Artist) ? _now.Title : $"{_now.Title} — {_now.Artist}")
             : null;
