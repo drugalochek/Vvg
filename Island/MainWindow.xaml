@@ -294,7 +294,12 @@
         </Style>
         <Style TargetType="{x:Type Slider}" BasedOn="{StaticResource MokuSlider}"/>
         <Style x:Key="MokuInput" TargetType="{x:Type TextBox}">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
+            <Setter Property="TextElement.Foreground" Value="#FFFFFFFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="CaretBrush" Value="White"/>
             <Setter Property="Background" Value="#1FFFFFFF"/>
             <Setter Property="BorderBrush" Value="#38FFFFFF"/>
@@ -307,7 +312,8 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Border x:Name="surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="surface" Property="BorderBrush" Value="#BFFFFFFF"/><Setter TargetName="surface" Property="Background" Value="#28FFFFFF"/></Trigger>
@@ -713,15 +719,16 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <Grid Grid.Column="1">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="38"/></Grid.ColumnDefinitions>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
                                       Background="Transparent" Foreground="White" Height="38" BorderThickness="0"
                                       Padding="0" IsTextSearchEnabled="False">
                                 <ComboBox.Resources>
                                     <Style TargetType="{x:Type ComboBoxItem}">
-                                        <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="Background" Value="#E8172028"/>
-                                        <Setter Property="Padding" Value="10,7"/>
+                                        <Setter Property="Foreground" Value="#F4F6FA"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Padding" Value="12,9"/>
+                                        <Setter Property="Margin" Value="2"/>
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="{x:Type ComboBoxItem}">
@@ -767,8 +774,8 @@
                                             <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
                                                    Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}"
                                                    PopupAnimation="Fade">
-                                                <Border Background="#E8172635" BorderBrush="#66FFFFFF"
-                                                        BorderThickness="1" CornerRadius="12" Padding="5"
+                                                <Border Background="#F0141B27" BorderBrush="#42FFFFFF"
+                                                        BorderThickness="1" CornerRadius="13" Padding="6"
                                                         MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                                     <ScrollViewer MaxHeight="240" CanContentScroll="True"
                                                                   VerticalScrollBarVisibility="Auto"
@@ -800,8 +807,7 @@
                                 <ComboBoxItem Content="Rose" Tag="Rose"/>
                                 <ComboBoxItem Content="Custom color" Tag="Custom"/>
                             </ComboBox>
-                            <Button Grid.Column="1" Style="{StaticResource IconBtn}" Margin="6,0,0,0"
-                                    Content="&#xE70F;" ToolTip="Custom theme color" Click="ThemeColor_Click"/>
+
                         </Grid>
                     </Grid>
                     <StackPanel Margin="0,2,0,12">
