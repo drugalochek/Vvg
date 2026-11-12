@@ -470,7 +470,11 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid Margin="4,0,4,8">
-                        <StackPanel>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
                             <TextBlock x:Name="AppsHeading" Text="YOUR APPS" Foreground="White"
                                        FontSize="11" FontWeight="SemiBold"/>
                             <TextBlock x:Name="AppsHint" Text="Add your favorite apps for one-click launch."
