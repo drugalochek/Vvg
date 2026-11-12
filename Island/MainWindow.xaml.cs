@@ -1350,19 +1350,19 @@ public partial class MainWindow : Window
                 if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
                 double textWidth = TitleText.ActualWidth;
                 double laneWidth = TitleViewport.ActualWidth;
-                // A true marquee loop: enter from the right, pass completely
-                // through the viewport, leave on the left, then restart on the right.
+                // Full left-to-right marquee cycle: enter beyond the left edge,
+                // cross the entire clipped lane, leave on the right, then repeat.
                 if (textWidth <= laneWidth + 12) return;
 
                 double travel = laneWidth + textWidth;
-                double durationMs = Math.Clamp(travel * 24, 2600, 9000);
+                double durationMs = Math.Clamp(travel * 12, 1400, 4200);
                 var scroll = new DoubleAnimation
                 {
-                    From = laneWidth,
-                    To = -textWidth,
+                    From = -textWidth,
+                    To = laneWidth,
                     Duration = TimeSpan.FromMilliseconds(durationMs),
                     RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromMilliseconds(350),
+                    BeginTime = TimeSpan.FromMilliseconds(120),
                     EasingFunction = null
                 };
                 MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
