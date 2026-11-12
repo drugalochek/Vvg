@@ -319,26 +319,41 @@
                         </Ellipse>
                     </StackPanel>
 
-                    <!-- Что играет (только когда идёт музыка) -->
-                    <Grid x:Name="TitlePanel" Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center"
-                          Visibility="Collapsed">
+                    <!-- Compact media title: clipped to its own lane, never over the eyes or controls -->
+                    <Grid x:Name="TitlePanel" Grid.Column="1" Margin="8,0,5,0" VerticalAlignment="Center"
+                          Visibility="Collapsed" ClipToBounds="True">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="NoteIcon" Text="♪" FontSize="15" Margin="0,0,7,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="TitleText" Grid.Column="1" Foreground="White" FontSize="13"
-                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        <Border x:Name="TitleViewport" Grid.Column="1" ClipToBounds="True" VerticalAlignment="Center">
+                            <TextBlock x:Name="TitleText" Foreground="White" FontSize="13"
+                                       FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <TextBlock.RenderTransform>
+                                    <TranslateTransform x:Name="MiniTitleShift"/>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                        </Border>
                     </Grid>
 
-                    <!-- Right: время и погода -->
+                    <!-- Right lane: compact transport controls or clock/weather -->
                     <TextBlock x:Name="TimeText" Grid.Column="1" HorizontalAlignment="Center" Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,13,0" VerticalAlignment="Center">
-                        
-                        <Border x:Name="WeatherHost" Width="20" Height="20" Margin="8,0,0,0" Visibility="Collapsed"/>
-                        <TextBlock x:Name="TempText" Foreground="{StaticResource Dim}" FontSize="12" FontWeight="SemiBold"
-                                   Margin="3,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
-                    </StackPanel>
+                    <Grid Grid.Column="2" Margin="0,0,9,0" VerticalAlignment="Center">
+                        <StackPanel x:Name="MiniMediaControls" Orientation="Horizontal" Visibility="Collapsed">
+                            <Button x:Name="MiniPrevBtn" Style="{StaticResource IconBtn}" Width="23" Height="23" Margin="0,0,1,0"
+                                    FontSize="10" Content="&#xE892;" ToolTip="Previous" Click="MediaPrev_Click"/>
+                            <Button x:Name="MiniPlayBtn" Style="{StaticResource IconBtn}" Width="23" Height="23" Margin="0,0,1,0"
+                                    FontSize="10" Content="&#xE768;" ToolTip="Play / pause" Click="MediaPlay_Click"/>
+                            <Button x:Name="MiniNextBtn" Style="{StaticResource IconBtn}" Width="23" Height="23" Margin="0"
+                                    FontSize="10" Content="&#xE893;" ToolTip="Next" Click="MediaNext_Click"/>
+                        </StackPanel>
+                        <StackPanel x:Name="WeatherDetails" Orientation="Horizontal" Visibility="Visible">
+                            <Border x:Name="WeatherHost" Width="20" Height="20" Margin="8,0,0,0" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TempText" Foreground="{StaticResource Dim}" FontSize="12" FontWeight="SemiBold"
+                                       Margin="3,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
 
                 <StackPanel x:Name="ToastPanel" Orientation="Horizontal" Visibility="Collapsed"
