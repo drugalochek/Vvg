@@ -117,6 +117,7 @@ public partial class MainWindow : Window
     int _animVer, _fullFadeVer, _totalChars;
     NowPlaying? _now;
     string? _lastTrack;
+    string? _miniAnimatedTitle;
     SolidColorBrush _accent = Brushes.White;
 
     readonly MediaWatcher _media = new();
@@ -980,7 +981,7 @@ public partial class MainWindow : Window
         UpdatePlayButton();
         UpdateMini();
         FadeWelcomeInfo();
-        if (_now?.Playing == true) Animate(PlayW, CollapsedH, 18, spring: false);
+        if (_now != null) Animate(PlayW, CollapsedH, 18, spring: false);
         EnsureFx();
     }
 
@@ -1033,7 +1034,7 @@ public partial class MainWindow : Window
         };
         Full.BeginAnimation(OpacityProperty, fade);
 
-        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: false);
+        Animate(_now != null ? PlayW : IdleW, CollapsedH, 18, spring: false);
         EnsureFx();
     }
 
@@ -1068,6 +1069,8 @@ public partial class MainWindow : Window
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
+        MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+        MiniTitleShift.X = 0;
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();
@@ -1098,27 +1101,65 @@ public partial class MainWindow : Window
 
     void UpdateMini()
     {
-        // Clock/media/weather updates can arrive while the welcome animation is
-        // running. They must never leak into the initial eyes-only circle.
+        // Keep the compact player completely hidden during the welcome animation.
         if (_welcomeRunning)
         {
             TitlePanel.Visibility = Visibility.Collapsed;
+            MiniMediaControls.Visibility = Visibility.Collapsed;
+            WeatherDetails.Visibility = Visibility.Collapsed;
             TimeText.Visibility = Visibility.Collapsed;
-            WeatherHost.Visibility = Visibility.Collapsed;
-            TempText.Visibility = Visibility.Collapsed;
             return;
         }
 
+        bool hasMedia = _now != null;
         bool playing = _now?.Playing == true;
         var now = DateTime.Now;
-        TitlePanel.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
-        TitleText.Text = playing ? _now!.Title : "";
 
-        // In music mode the title owns the whole compact row. Hide the clock and
-        // weather completely instead of letting their text overlap the track name.
-        TimeText.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
-        WeatherHost.Visibility = !playing && WeatherHost.Child != null ? Visibility.Visible : Visibility.Collapsed;
-        TempText.Visibility = !playing && !string.IsNullOrEmpty(TempText.Text) ? Visibility.Visible : Visibility.Collapsed;
+        TitlePanel.Visibility = hasMedia ? Visibility.Visible : Visibility.Collapsed;
+        MiniMediaControls.Visibility = hasMedia ? Visibility.Visible : Visibility.Collapsed;
+        WeatherDetails.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
+        TitleText.Text = hasMedia ? _now!.Title : "";
+        MiniPlayBtn.Content = playing ? "\uE769" : "\uE768";
+        TitleText.ToolTip = hasMedia
+            ? (string.IsNullOrWhiteSpace(_now!.Artist) ? _now.Title : $"{_now.Title} — {_now.Artist}")
+            : null;
+
+        // Animate only inside the clipped title lane. The eyes and transport buttons
+        // occupy separate grid columns and can never be covered by the moving text.
+        if (!hasMedia)
+        {
+            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+            MiniTitleShift.X = 0;
+            _miniAnimatedTitle = null;
+        }
+        else if (_miniAnimatedTitle != _now!.Title)
+        {
+            _miniAnimatedTitle = _now.Title;
+            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+            MiniTitleShift.X = 0;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
+                double overflow = TitleText.ActualWidth - TitleViewport.ActualWidth;
+                if (overflow <= 8) return;
+
+                var scroll = new DoubleAnimation
+                {
+                    From = 0,
+                    To = -overflow,
+                    Duration = TimeSpan.FromMilliseconds(Math.Clamp(overflow * 42, 1800, 9000)),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    BeginTime = TimeSpan.FromMilliseconds(650)
+                };
+                MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
+            }), DispatcherPriority.Loaded);
+        }
+
+        // In media mode the title and controls own the row. Otherwise show clock/weather.
+        TimeText.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
+        WeatherHost.Visibility = !hasMedia && WeatherHost.Child != null ? Visibility.Visible : Visibility.Collapsed;
+        TempText.Visibility = !hasMedia && !string.IsNullOrEmpty(TempText.Text) ? Visibility.Visible : Visibility.Collapsed;
 
         TimeText.Text = now.ToString("HH:mm");
         TimeText.HorizontalAlignment = HorizontalAlignment.Center;
