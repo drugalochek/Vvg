@@ -1580,7 +1580,7 @@ public partial class MainWindow : Window
             Height = 30, Padding = new Thickness(7), Text = Clipboard.ContainsText() ? Clipboard.GetText().Trim() : ""
         };
         panel.Children.Add(input);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        var buttons = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
         var add = new Button { Content = _s.Language == "ru" ? "Добавить" : "Add", Width = 88, Padding = new Thickness(8, 5, 8, 5), IsDefault = true };
         var cancel = new Button { Content = _s.Language == "ru" ? "Отмена" : "Cancel", Width = 88, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(8, 5, 8, 5), IsCancel = true };
         add.Click += (_, _) => { dialog.DialogResult = true; dialog.Close(); };
