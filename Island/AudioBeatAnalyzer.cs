@@ -11,12 +11,14 @@ internal sealed class AudioBeatAnalyzer : IDisposable
     Biquad? _lowPass, _midHighPass, _midLowPass, _highPass;
     int _channels, _bits, _sampleRate;
     bool _isFloat, _disposed;
-    float _bassLevel, _activityLevel;
+    float _bassLevel, _midLevel, _highLevel, _activityLevel;
     int _beatPending;
     long _lastBeatTicks;
     double _bassFloor;
 
     public float BassLevel => Volatile.Read(ref _bassLevel);
+    public float MidLevel => Volatile.Read(ref _midLevel);
+    public float HighLevel => Volatile.Read(ref _highLevel);
     public float ActivityLevel => Volatile.Read(ref _activityLevel);
 
     public AudioBeatAnalyzer()
@@ -80,11 +82,13 @@ internal sealed class AudioBeatAnalyzer : IDisposable
             double seconds = (double)frames / _sampleRate;
 
             // Compress each band independently so quieter instruments remain visible.
-            float bass = (float)Math.Clamp(lowRms * 18.0, 0, 1);
-            float mid = (float)Math.Clamp(midRms * 15.0, 0, 1);
-            float high = (float)Math.Clamp(highRms * 12.0, 0, 1);
-            float activity = Math.Clamp(bass * 0.48f + mid * 0.34f + high * 0.18f, 0, 1);
+            float bass = (float)Math.Clamp(lowRms * 25.0, 0, 1);
+            float mid = (float)Math.Clamp(midRms * 24.0, 0, 1);
+            float high = (float)Math.Clamp(highRms * 22.0, 0, 1);
+            float activity = Math.Clamp(bass * 0.40f + mid * 0.36f + high * 0.24f, 0, 1);
             Volatile.Write(ref _bassLevel, bass);
+            Volatile.Write(ref _midLevel, mid);
+            Volatile.Write(ref _highLevel, high);
             Volatile.Write(ref _activityLevel, activity);
 
             // Kick detection remains low-band and transient-based; the visible wave uses all bands.
