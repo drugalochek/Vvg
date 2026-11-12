@@ -29,6 +29,7 @@ using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using RadioButton = System.Windows.Controls.RadioButton;
 using Size = System.Windows.Size;
 using TextDataFormat = System.Windows.TextDataFormat;
+using Windows.Media.Control;
 
 namespace Island;
 
@@ -125,6 +126,8 @@ public partial class MainWindow : Window
 
     readonly MediaWatcher _media = new();
     readonly AudioBeatAnalyzer _audio = new();
+    GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
+    GlobalSystemMediaTransportControlsSession? _mediaSession;
     readonly DispatcherTimer _clock = new();
     readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     readonly DispatcherTimer _clipboardTimer = new() { Interval = TimeSpan.FromMilliseconds(110) };
@@ -172,6 +175,8 @@ public partial class MainWindow : Window
         if (ScaleSlider != null && (int)ScaleSlider.Value != _s.Scale) ScaleSlider.Value = _s.Scale;
         if (OpacitySlider != null && (int)OpacitySlider.Value != _s.GlassOpacity) OpacitySlider.Value = _s.GlassOpacity;
         if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius;
+        if (FullscreenOpacitySlider != null && (int)FullscreenOpacitySlider.Value != _s.FullscreenOpacity) FullscreenOpacitySlider.Value = _s.FullscreenOpacity;
+        FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         OffsetXInput.Text = _s.OffsetX.ToString(); RadiusText.Text = _s.CornerRadius + " px";
         AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B;
         ( _s.VerticalAlign switch { "Bottom" => VerticalBottom, "Center" => VerticalCenter, _ => VerticalTop }).IsChecked = true;
@@ -183,7 +188,7 @@ public partial class MainWindow : Window
         ApplyAccent();
 
         startupStage = "initializing timers";
-        _clock.Tick += (_, _) => { UpdateMini(); ScheduleClock(); };
+        _clock.Tick += (_, _) => { UpdateMini(); RefreshSeekTimeline(); ScheduleClock(); };
         UpdateMini();
         ScheduleClock();
 
@@ -201,6 +206,7 @@ public partial class MainWindow : Window
         startupStage = "starting media watcher";
         _media.Changed += OnMediaChanged;
         _ = _media.StartAsync();
+        _ = InitializeMediaSessionAsync();
 
         startupStage = "initializing visual effects and weather";
         InitLiquid();
@@ -303,7 +309,7 @@ public partial class MainWindow : Window
                 _gameMode = full;
                 int ex = GetWindowLong(me, GWL_EXSTYLE);
                 SetWindowLong(me, GWL_EXSTYLE, full ? ex | 0x20 | 0x08000000 : ex & ~0x20 & ~0x08000000);
-                Opacity = full ? 0.35 : 1.0;
+                Opacity = full ? _s.FullscreenOpacity / 100.0 : 1.0;
                 if (full && _state == IslandState.Expanded) Collapse();
             }
             if (IsVisible && ++_topTick % 5 == 0)
@@ -418,6 +424,7 @@ public partial class MainWindow : Window
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
         Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
         if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
+        if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
         if (AccentR != null) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
@@ -430,6 +437,16 @@ public partial class MainWindow : Window
         ApplyAppearance();
         _s.Save();
     }
+
+    void SetFullscreenOpacity(int value)
+    {
+        _s.FullscreenOpacity = Math.Clamp(value, 0, 100);
+        if (FullscreenOpacitySlider != null && (int)FullscreenOpacitySlider.Value != _s.FullscreenOpacity) FullscreenOpacitySlider.Value = _s.FullscreenOpacity;
+        if (_gameMode) Opacity = _s.FullscreenOpacity / 100.0;
+        if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
+        _s.Save();
+    }
+    void FullscreenOpacitySlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetFullscreenOpacity((int)e.NewValue); }
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
@@ -688,7 +705,8 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
-        if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Прозрачность" : "Opacity";
+        if (GlassOpacityLabel != null) GlassOpacityLabel.Text = ru ? "Прозрачность острова" : "Island opacity";
+        if (FullscreenOpacityLabel != null) FullscreenOpacityLabel.Text = ru ? "Прозрачность в играх" : "Fullscreen opacity";
         if (VerticalPositionLabel != null) VerticalPositionLabel.Text = ru ? "Вертикально" : "Vertical position";
         if (HorizontalOffsetLabel != null) HorizontalOffsetLabel.Text = ru ? "Сдвиг по X" : "Horizontal offset";
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Сдвиг по Y" : "Vertical offset";
@@ -1360,12 +1378,13 @@ public partial class MainWindow : Window
         // All three frequency bands move the liquid; kick transients add a separate accent.
         _waveBeatPulse *= Math.Exp(-6.4 * dt);
         double activity = playing ? _audio.ActivityLevel : 0;
-        double target = playing ? Math.Clamp(0.35 + activity * 6.0 + _waveBeatPulse * 3.8, 0, 7.2) : 0;
+        double bandMotion = playing ? _audio.MidLevel * 2.0 + _audio.HighLevel * 1.6 : 0;
+        double target = playing ? Math.Clamp(0.25 + activity * 9.0 + bandMotion + _waveBeatPulse * 4.8, 0, 12.5) : 0;
         double response = target > _waveAmp ? 23.0 : 7.5; // fast attack, softer release
         double follow = 1 - Math.Exp(-response * dt);
         _waveAmp += (target - _waveAmp) * follow;
         if (Math.Abs(target - _waveAmp) < 0.025) _waveAmp = target;
-        _wavePhase += (1.8 + activity * 8.0 + _waveBeatPulse * 1.8) * dt;
+        _wavePhase += (2.4 + activity * 12.0 + bandMotion * 2.2 + _waveBeatPulse * 2.8) * dt;
 
         bool wave = _waveAmp > 0.01;
         bool eyes = !_welcomeRunning && IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
@@ -1386,7 +1405,11 @@ public partial class MainWindow : Window
     {
         double edge = Math.Min(x, w - x);
         double env = Smooth((edge - r) / 14.0);   // у скруглённых углов волна затухает
-        double v = 0.62 * Math.Sin(x * 0.37 - _wavePhase) + 0.38 * Math.Sin(x * 0.21 + _wavePhase * 0.7);
+        double mid = _audio.MidLevel;
+        double high = _audio.HighLevel;
+        double v = 0.40 * Math.Sin(x * 0.37 - _wavePhase)
+                 + (0.28 + mid * 0.18) * Math.Sin(x * (0.21 + mid * 0.025) + _wavePhase * 0.7)
+                 + (0.16 + high * 0.30) * Math.Sin(x * (0.58 + high * 0.08) - _wavePhase * 1.55);
         return amp * env * (0.5 + 0.5 * v);
     }
 
@@ -1962,6 +1985,62 @@ public partial class MainWindow : Window
             msg => ShowToast("Screenshot", msg, ColorOk));
         win.Closed += (_, _) => Show();
         win.Show();
+    }
+
+    // ================= Системная перемотка мультимедиа =================
+    async Task InitializeMediaSessionAsync()
+    {
+        try
+        {
+            _mediaSessionManager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            _mediaSessionManager.CurrentSessionChanged += (_, _) => Dispatcher.BeginInvoke(new Action(UpdateMediaSession));
+            UpdateMediaSession();
+        }
+        catch (Exception ex) { Log.Warn("System media timeline unavailable: " + ex.Message); }
+    }
+
+    void UpdateMediaSession()
+    {
+        try { _mediaSession = _mediaSessionManager?.GetCurrentSession(); }
+        catch { _mediaSession = null; }
+        RefreshSeekTimeline();
+    }
+
+    void RefreshSeekTimeline()
+    {
+        try
+        {
+            var timeline = _mediaSession?.GetTimelineProperties();
+            if (timeline == null || timeline.EndTime <= TimeSpan.Zero)
+            {
+                SeekSlider.IsEnabled = false;
+                SeekCurrentText.Text = "0:00";
+                SeekDurationText.Text = "0:00";
+                return;
+            }
+            double duration = timeline.EndTime.TotalSeconds;
+            if (!SeekSlider.IsMouseCaptureWithin && !SeekSlider.IsKeyboardFocusWithin)
+                SeekSlider.Value = Math.Clamp(timeline.Position.TotalSeconds, 0, duration);
+            SeekSlider.Maximum = duration;
+            SeekSlider.IsEnabled = true;
+            SeekCurrentText.Text = FormatMediaTime(timeline.Position);
+            SeekDurationText.Text = FormatMediaTime(timeline.EndTime);
+        }
+        catch (Exception ex) { Log.Warn("Could not read media timeline: " + ex.Message); }
+    }
+
+    static string FormatMediaTime(TimeSpan time) =>
+        time.TotalHours >= 1 ? time.ToString(@"h\:mm\:ss") : time.ToString(@"m\:ss");
+
+    async void SeekSlider_Commit(object sender, RoutedEventArgs e)
+    {
+        if (_mediaSession == null || !SeekSlider.IsEnabled) return;
+        try
+        {
+            bool changed = await _mediaSession.TryChangePlaybackPositionAsync(TimeSpan.FromSeconds(SeekSlider.Value).Ticks);
+            if (!changed) RefreshSeekTimeline();
+        }
+        catch (Exception ex) { Log.Warn("Media seek is not supported by the active player: " + ex.Message); }
     }
 
     // ================= Медиа =================
