@@ -130,6 +130,7 @@ public partial class MainWindow : Window
     GlobalSystemMediaTransportControlsSessionManager? _mediaSessionManager;
     GlobalSystemMediaTransportControlsSession? _mediaSession;
     readonly DispatcherTimer _clock = new();
+    readonly DispatcherTimer _seekTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     readonly DispatcherTimer _clipboardTimer = new() { Interval = TimeSpan.FromMilliseconds(110) };
 
@@ -190,7 +191,9 @@ public partial class MainWindow : Window
         ApplyAccent();
 
         startupStage = "initializing timers";
-        _clock.Tick += (_, _) => { UpdateMini(); RefreshSeekTimeline(); ScheduleClock(); };
+        _clock.Tick += (_, _) => { UpdateMini(); ScheduleClock(); };
+        _seekTimer.Tick += (_, _) => RefreshSeekTimeline();
+        _seekTimer.Start();
         UpdateMini();
         ScheduleClock();
 
@@ -334,6 +337,7 @@ public partial class MainWindow : Window
         _clipboardTimer.Stop();
         _toastTimer.Stop();
         _clock.Stop();
+        _seekTimer.Stop();
         _media.Changed -= OnMediaChanged;
         if (_trayIcon != null) { _trayIcon.Visible = false; _trayIcon.Dispose(); _trayIcon = null; }
         _ownedTrayIcon?.Dispose();
@@ -2090,11 +2094,20 @@ public partial class MainWindow : Window
                 return;
             }
             double duration = timeline.EndTime.TotalSeconds;
+            var position = timeline.Position;
+            var playback = _mediaSession?.GetPlaybackInfo();
+            if (playback?.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
+            {
+                var elapsed = DateTimeOffset.UtcNow - timeline.LastUpdatedTime;
+                if (elapsed > TimeSpan.Zero && elapsed < TimeSpan.FromMinutes(10))
+                    position += elapsed;
+            }
+            position = TimeSpan.FromSeconds(Math.Clamp(position.TotalSeconds, 0, duration));
             SeekSlider.Maximum = duration;
             if (!SeekSlider.IsMouseCaptureWithin)
-                SeekSlider.Value = Math.Clamp(timeline.Position.TotalSeconds, 0, duration);
+                SeekSlider.Value = position.TotalSeconds;
             SeekSlider.IsEnabled = true;
-            SeekCurrentText.Text = FormatMediaTime(timeline.Position);
+            SeekCurrentText.Text = FormatMediaTime(position);
             SeekDurationText.Text = FormatMediaTime(timeline.EndTime);
         }
         catch (Exception ex) { Log.Warn("Could not read media timeline: " + ex.Message); }
