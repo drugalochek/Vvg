@@ -1700,6 +1700,11 @@ public partial class MainWindow : Window
         FadeInWelcomeElement(WeatherHost);
         FadeInWelcomeElement(TempText);
         EnsureFx();
-        if (_state == IslandState.Collapsed) Collapse();
+        if (_state == IslandState.Collapsed)
+        {
+            // Resize the compact island when media metadata appears or disappears.
+            Animate(_now != null ? PlayW : IdleW, CollapsedH, 18, spring: false);
+            Collapse();
+        }
     }
 }
