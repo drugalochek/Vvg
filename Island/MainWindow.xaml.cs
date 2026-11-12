@@ -181,6 +181,8 @@ public partial class MainWindow : Window
         OffsetXInput.Text = _s.OffsetX.ToString(); RadiusText.Text = _s.CornerRadius + " px";
         ( _s.VerticalAlign switch { "Bottom" => VerticalBottom, "Center" => VerticalCenter, _ => VerticalTop }).IsChecked = true;
         ThemeCombo.SelectedValue = _s.Theme;
+        if (GradientBalanceSlider != null) GradientBalanceSlider.Value = _s.GradientBalance;
+        if (GradientBalanceText != null) GradientBalanceText.Text = _s.GradientBalance + "%";
         GlassOpacityText.Text = _s.GlassOpacity + "%";
         UpdateAutoButton();
         ApplyScale();
@@ -424,6 +426,18 @@ public partial class MainWindow : Window
                 catch { }
             }
             _bodyBrush.GradientStops[0].Color = baseColor;
+            var lowerColor = Color.FromRgb(0, 0, 0);
+            try { lowerColor = (Color)ColorConverter.ConvertFromString(_s.ThemeBottomColor); } catch { }
+            _tintMid.Color = lowerColor;
+            _tintEnd.Color = lowerColor;
+            _tintMid.Offset = _s.GradientBalance / 100.0;
+            if (GradientBalanceSlider != null && (int)GradientBalanceSlider.Value != _s.GradientBalance)
+                GradientBalanceSlider.Value = _s.GradientBalance;
+            if (GradientBalanceText != null) GradientBalanceText.Text = _s.GradientBalance + "%";
+            if (TopGradientColorButton != null) TopGradientColorButton.Background =
+                new SolidColorBrush(Color.FromArgb(55, baseColor.R, baseColor.G, baseColor.B));
+            if (BottomGradientColorButton != null) BottomGradientColorButton.Background =
+                new SolidColorBrush(Color.FromArgb(55, lowerColor.R, lowerColor.G, lowerColor.B));
             _bodyBrush.Opacity = 1.0;
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
@@ -470,6 +484,26 @@ public partial class MainWindow : Window
         if (!_ready || ThemeCombo.SelectedValue == null) return;
         _s.Theme = ThemeCombo.SelectedValue.ToString()!;
         if (_s.Theme != "Custom") _s.ThemeColor = "";
+        ApplyAppearance();
+        _s.Save();
+    }
+
+    void BottomGradientColor_Click(object sender, RoutedEventArgs e)
+    {
+        Color initial;
+        try { initial = (Color)ColorConverter.ConvertFromString(_s.ThemeBottomColor); }
+        catch { initial = Colors.Black; }
+        var picker = new ColorPickerWindow(initial) { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        _s.ThemeBottomColor = picker.SelectedColor.ToString();
+        ApplyAppearance();
+        _s.Save();
+    }
+
+    void GradientBalanceSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_ready) return;
+        _s.GradientBalance = Math.Clamp((int)Math.Round(e.NewValue), 10, 90);
         ApplyAppearance();
         _s.Save();
     }
@@ -733,6 +767,10 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Сдвиг по Y" : "Vertical offset";
         if (CornerRadiusLabel != null) CornerRadiusLabel.Text = ru ? "Скругление" : "Corner rounding";
         if (ThemeLabel != null) ThemeLabel.Text = ru ? "Тема" : "Theme";
+        if (GradientColorsLabel != null) GradientColorsLabel.Text = ru ? "Цвета градиента острова" : "Island gradient colors";
+        if (TopGradientColorButton != null) TopGradientColorButton.Content = ru ? "Верхний цвет" : "Upper color";
+        if (BottomGradientColorButton != null) BottomGradientColorButton.Content = ru ? "Нижний цвет" : "Lower color";
+        if (GradientBalanceLabel != null) GradientBalanceLabel.Text = ru ? "Баланс цветов" : "Color balance";
                 if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
