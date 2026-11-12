@@ -42,6 +42,9 @@ public partial class MainWindow : Window
             KeepSettingsCheck.IsChecked = true;
         }
         _en = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName != "ru";
+        AppLanguageEnglish.IsChecked = _en;
+        AppLanguageRussian.IsChecked = !_en;
+        if (_uninstallMode) AppLanguagePanel.Visibility = Visibility.Collapsed;
         CompositionTarget.Rendering += Frame;
         Closed += (_, _) => CompositionTarget.Rendering -= Frame;
         Refresh();
@@ -73,6 +76,7 @@ public partial class MainWindow : Window
             "Moku is a free program provided \"as is\", without warranty.\r\n\r\n1. Moku works locally and needs no account. Clipboard history and settings stay on this computer.\r\n2. The app may contact a weather service for the forecast and uses Windows system data for media.\r\n3. You may use, copy and remove Moku freely. The author is not liable for any damage from its use.\r\n4. To uninstall, exit Moku from the tray and delete the install folder.");
         AgreeCheck.Content = _uninstallMode ? T("Я действительно хочу удалить Moku", "I want to uninstall Moku") : T("Я принимаю условия лицензии", "I accept the license terms");
         FolderLabel.Text = _uninstallMode ? T("ТЕКУЩАЯ ПАПКА ПРОГРАММЫ", "CURRENT INSTALL LOCATION") : T("ПАПКА УСТАНОВКИ", "INSTALL LOCATION");
+        AppLanguageLabel.Text = T("ЯЗЫК ПРИЛОЖЕНИЯ ПРИ ПЕРВОМ ЗАПУСКЕ", "APP LANGUAGE ON FIRST LAUNCH");
         BrowseButton.Content = T("Выбрать", "Choose");
         DesktopCheck.Content = _uninstallMode ? T("Удалить ярлык с рабочего стола", "Remove desktop shortcut") : T("Ярлык на рабочем столе", "Desktop shortcut");
         AutoCheck.Content = _uninstallMode ? T("Отключить запуск вместе с Windows", "Disable startup with Windows") : T("Запускать вместе с Windows", "Start with Windows");
@@ -392,7 +396,7 @@ public partial class MainWindow : Window
             var sp = Path.Combine(dir, "settings.json");
             var settings = new Dictionary<string, object>();
             if (File.Exists(sp)) { try { settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(File.ReadAllText(sp)) ?? new(); } catch { settings = new(); } }
-            settings["Language"] = _en ? "en" : "ru";
+            settings["Language"] = AppLanguageEnglish.IsChecked == true ? "en" : "ru";
             File.WriteAllText(sp, System.Text.Json.JsonSerializer.Serialize(settings, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
             Progress.Value = 100; _installing = false; _done = true;
             GoPage(3);
