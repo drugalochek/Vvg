@@ -245,10 +245,16 @@
         </Style>
 
         <DataTemplate x:Key="HistTemplate">
-            <StackPanel>
-                <TextBlock Text="{Binding Preview}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Text="{Binding Time}" Foreground="{StaticResource Dim}" FontSize="10" Margin="0,2,0,0"/>
-            </StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Preview}" Foreground="White" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Time}" Foreground="{StaticResource Dim}" FontSize="10" Margin="0,2,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1" Style="{StaticResource IconBtn}" Width="30" Height="30" Margin="6,0,0,0"
+                        Content="&#xE8C8;" FontSize="13" ToolTip="Copy"
+                        PreviewMouseLeftButtonUp="HistoryCopyButton_PreviewMouseLeftButtonUp"/>
+            </Grid>
         </DataTemplate>
     </Window.Resources>
 
@@ -494,6 +500,13 @@
                                        FontSize="11" FontWeight="SemiBold"/>
                             <TextBlock x:Name="AppsHint" Text="Add your favorite apps for one-click launch."
                                        Foreground="#88FFFFFF" FontSize="11" Margin="0,3,0,0"/>
+                            <Button x:Name="ScanSteamButton" Style="{StaticResource TileBtn}" Height="30" Width="154"
+                                    HorizontalAlignment="Left" Margin="0,7,0,0" Click="ScanSteam_Click">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE7FC;" FontFamily="{StaticResource Icons}" Margin="0,0,6,0"/>
+                                    <TextBlock x:Name="ScanSteamText" Text="Find Steam games" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button x:Name="AddAppButton" Style="{StaticResource TileBtn}"
@@ -507,7 +520,10 @@
                     </Grid>
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <WrapPanel x:Name="AppsGrid" Margin="0,0,4,4"/>
+                        <StackPanel>
+                            <WrapPanel x:Name="SteamGamesGrid" Margin="0,0,4,6"/>
+                            <WrapPanel x:Name="AppsGrid" Margin="0,0,4,4"/>
+                        </StackPanel>
                     </ScrollViewer>
                 </Grid>
 
@@ -584,6 +600,15 @@
                                     VerticalAlignment="Center"/>
                     </Grid>
 
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="GlassOpacityLabel" Text="Island opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Click="GlassOpacity_Minus"/>
+                            <TextBlock x:Name="GlassOpacityText" Foreground="White" FontSize="13" Width="64" TextAlignment="Center" VerticalAlignment="Center"/>
+                            <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Click="GlassOpacity_Plus"/>
+                        </StackPanel>
+                    </Grid>
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                             HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
 
