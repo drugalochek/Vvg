@@ -255,6 +255,69 @@
                         PreviewMouseLeftButtonUp="HistoryCopyButton_PreviewMouseLeftButtonUp"/>
             </Grid>
         </DataTemplate>
+        <Style x:Key="MokuSlider" TargetType="{x:Type Slider}">
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Foreground" Value="#FF7C5CFF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Slider}">
+                        <Grid Height="22" SnapsToDevicePixels="True">
+                            <Border Height="5" VerticalAlignment="Center" CornerRadius="3" Background="#28FFFFFF"/>
+                            <Track x:Name="PART_Track" IsDirectionReversed="False">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" IsTabStop="False" Opacity="0">
+                                        <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="14" Height="14" IsTabStop="False">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="knob" CornerRadius="7" Background="#FFF4F1FF" BorderBrush="#FF7C5CFF" BorderThickness="2">
+                                                    <Border.Effect><DropShadowEffect Color="#FF7C5CFF" BlurRadius="8" ShadowDepth="0" Opacity="0.55"/></Border.Effect>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsDragging" Value="True"><Setter TargetName="knob" Property="Background" Value="White"/><Setter TargetName="knob" Property="BorderThickness" Value="3"/></Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" IsTabStop="False" Opacity="0">
+                                        <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="{x:Type Slider}" BasedOn="{StaticResource MokuSlider}"/>
+        <Style x:Key="MokuInput" TargetType="{x:Type TextBox}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="Background" Value="#1FFFFFFF"/>
+            <Setter Property="BorderBrush" Value="#38FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Width" Value="92"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="surface" Property="BorderBrush" Value="#FF7C5CFF"/><Setter TargetName="surface" Property="Background" Value="#2A7C5CFF"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- Чисто чёрный остров с жидкой кромкой -->
@@ -576,24 +639,14 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="HorizontalOffsetLabel" Text="Horizontal offset" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <DockPanel>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE974;" Width="28" Height="28" Click="OffsetX_Minus"/>
-                                <TextBlock x:Name="OffsetXText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE975;" Width="28" Height="28" Click="OffsetX_Plus"/>
-                            </DockPanel>
-                            <Slider x:Name="OffsetXSlider" Minimum="-500" Maximum="500" TickFrequency="10" ValueChanged="OffsetXSlider_Changed"/>
+                            <TextBox x:Name="OffsetXInput" Style="{StaticResource MokuInput}" Text="0" ToolTip="Pixels from the selected horizontal position" LostFocus="OffsetXInput_LostFocus" KeyDown="OffsetInput_KeyDown"/>
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="TopOffsetLabel" Text="Vertical offset" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
-                            <DockPanel>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE974;" Width="28" Height="28" Click="Offset_Minus"/>
-                                <TextBlock x:Name="OffsetText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE975;" Width="28" Height="28" Click="Offset_Plus"/>
-                            </DockPanel>
-                            <Slider x:Name="OffsetYSlider" Minimum="-500" Maximum="500" TickFrequency="10" ValueChanged="OffsetYSlider_Changed"/>
+                            <TextBox x:Name="OffsetYInput" Style="{StaticResource MokuInput}" Text="8" ToolTip="Pixels from the selected vertical position" LostFocus="OffsetYInput_LostFocus" KeyDown="OffsetInput_KeyDown"/>
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,10">
@@ -663,7 +716,7 @@
                             <DockPanel><TextBlock Text="R" Width="18" Foreground="#FFFF6B6B"/><Slider x:Name="AccentR" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
                             <DockPanel><TextBlock Text="G" Width="18" Foreground="#FF30D158"/><Slider x:Name="AccentG" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
                             <DockPanel><TextBlock Text="B" Width="18" Foreground="#FF0A84FF"/><Slider x:Name="AccentB" Minimum="0" Maximum="255" ValueChanged="Rgb_ValueChanged"/></DockPanel>
-                            <Button x:Name="EyedropperButton" Style="{StaticResource TileBtn}" Height="30" Width="130" HorizontalAlignment="Left" Click="Eyedropper_Click">Pick screen color</Button>
+                            
                         </StackPanel>
                     </Grid>
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
