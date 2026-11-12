@@ -256,7 +256,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Глаза-овалы: следят за курсором, моргают, засыпают -->
-                    <StackPanel x:Name="Eyes" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center">
+                    <StackPanel x:Name="Eyes" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Margin="14,0,0,0" VerticalAlignment="Center">
                         <Ellipse x:Name="EyeL" Width="6" Height="20" Fill="White" Margin="0,0,12,0"
                                  RenderTransformOrigin="0.5,0.5">
                             <Ellipse.RenderTransform>
@@ -278,7 +278,7 @@
                     </StackPanel>
 
                     <!-- Что играет (только когда идёт музыка) -->
-                    <Grid x:Name="TitlePanel" Grid.Column="1" Margin="12,0,10,0" VerticalAlignment="Center"
+                    <Grid x:Name="TitlePanel" Grid.Column="1" Margin="8,0,8,0" VerticalAlignment="Center"
                           Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -290,7 +290,7 @@
                     </Grid>
 
                     <!-- Right: время и погода -->
-                    <TextBlock x:Name="TimeText" Grid.ColumnSpan="3" HorizontalAlignment="Center" Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TimeText" Grid.Column="1" HorizontalAlignment="Center" Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,13,0" VerticalAlignment="Center">
                         
                         <Border x:Name="WeatherHost" Width="20" Height="20" Margin="8,0,0,0" Visibility="Collapsed"/>
@@ -490,6 +490,9 @@
 
                     <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                             HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
+
+                    <Button x:Name="SupportBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
+                            HorizontalAlignment="Left" Margin="0,8,0,0" Click="SupportAuthor_Click"/>
 
                     <TextBlock x:Name="AccentDescription" Text="The island stays black — color appears only when music is playing or an event occurs."
                                Foreground="#66FFFFFF" FontSize="11" Margin="2,12,0,0" TextWrapping="Wrap"/>
