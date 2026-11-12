@@ -454,7 +454,7 @@ public partial class MainWindow : Window
         var custom = new Button
         {
             Style = (Style)FindResource("IconBtn"), Width = 30, Height = 30, Margin = new Thickness(0),
-            Content = "\\uE790", ToolTip = _s.Language == "ru" ? "Свой цвет" : "Custom color"
+            Content = "\uE790", ToolTip = _s.Language == "ru" ? "Свой цвет" : "Custom color"
         };
         custom.Click += CustomAccent_Click;
         AccentPanel.Children.Add(custom);
