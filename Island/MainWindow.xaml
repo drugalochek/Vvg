@@ -254,9 +254,7 @@
 
     <!-- Чисто чёрный остров с жидкой кромкой -->
     <Border x:Name="Pill" Background="Transparent" CornerRadius="18" Width="184" Height="36"
-            Margin="12,0,12,14" VerticalAlignment="Top" HorizontalAlignment="Center"
-            PreviewMouseLeftButtonDown="Pill_DragStart" PreviewMouseMove="Pill_DragMove"
-            PreviewMouseLeftButtonUp="Pill_DragEnd" MouseLeftButtonUp="Pill_Click">
+            Margin="12,0,12,14" VerticalAlignment="Top" HorizontalAlignment="Center" MouseLeftButtonUp="Pill_Click">
         <Border.ContextMenu>
             <ContextMenu>
                 <MenuItem Header="Settings" x:Name="MenuSettings" Click="OpenSettings_Click"/>
@@ -511,20 +509,6 @@
                         </StackPanel>
                     </Grid>
 
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="200"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="PositionLockLabel" Text="Drag control" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <CheckBox x:Name="LockPositionCheck" Content="Lock position" IsChecked="True"
-                                      Foreground="White" FontSize="12" VerticalAlignment="Center"
-                                      Checked="LockPosition_Changed" Unchecked="LockPosition_Changed"/>
-                            <TextBlock x:Name="DragHintText" Text="Uncheck to drag the island anywhere on the screen."
-                                       Foreground="#88FFFFFF" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Grid>
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>

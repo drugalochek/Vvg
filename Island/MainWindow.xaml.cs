@@ -109,9 +109,6 @@ public partial class MainWindow : Window
     HwndSource? _source;
     bool _ready;
     bool _allowClose;
-    bool _dragging;
-    bool _wasDragged;
-    Point _dragOffset;
     string? _expectedClipboardText;
     System.Windows.Forms.NotifyIcon? _trayIcon;
     System.Drawing.Icon? _ownedTrayIcon;
@@ -166,7 +163,6 @@ public partial class MainWindow : Window
         (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
         OffsetText.Text = _s.OffsetY + " px";
         ScaleText.Text = _s.Scale + "%";
-        LockPositionCheck.IsChecked = _s.LockPosition;
         UpdateAutoButton();
         ApplyScale();
         ApplyAccent();
@@ -348,22 +344,12 @@ public partial class MainWindow : Window
         // запас на «желейное» растяжение и пружинный перелёт + поля Pill (12 по бокам, 14 снизу)
         double w = Math.Ceiling(pillW * k * 1.12) + 24, h = Math.Ceiling(pillH * k * 1.1) + 18;
         double sw = SystemParameters.PrimaryScreenWidth;
-        double left = _s.HasCustomPosition ? _s.PositionX : _s.Align switch
+        double left = _s.Align switch
         {
             "Left" => 16 - GlowPad,
             "Right" => sw - w - 16 + GlowPad,
             _ => (sw - w) / 2
         };
-        double top = _s.HasCustomPosition ? _s.PositionY : _s.OffsetY;
-        if (_s.HasCustomPosition)
-        {
-            double minX = SystemParameters.VirtualScreenLeft;
-            double minY = SystemParameters.VirtualScreenTop;
-            left = Math.Clamp(left, minX, Math.Max(minX, minX + SystemParameters.VirtualScreenWidth - w));
-            top = Math.Clamp(top, minY, Math.Max(minY, minY + SystemParameters.VirtualScreenHeight - h));
-            _s.PositionX = left;
-            _s.PositionY = top;
-        }
         Pill.HorizontalAlignment = _s.Align switch
         {
             "Left" => HorizontalAlignment.Left,
@@ -375,21 +361,20 @@ public partial class MainWindow : Window
         var src = hwnd == IntPtr.Zero ? null : PresentationSource.FromVisual(this);
         if (src?.CompositionTarget == null)
         {
-            Width = w; Height = h; Left = left; Top = top;   // окно ещё не создано
+            Width = w; Height = h; Left = left; Top = _s.OffsetY;   // окно ещё не создано
             return;
         }
         var m = src.CompositionTarget.TransformToDevice;
         // Размер и позиция одним вызовом — без промежуточного кадра со сдвинутым островом.
         SetWindowPos(hwnd, IntPtr.Zero,
-            (int)Math.Round(left * m.M11), (int)Math.Round(top * m.M22),
+            (int)Math.Round(left * m.M11), (int)Math.Round(_s.OffsetY * m.M22),
             (int)Math.Round(w * m.M11), (int)Math.Round(h * m.M22),
             SWP_NOZORDER | SWP_NOACTIVATE);
         _boxW = pillW;
         _boxH = pillH;
-        if (_s.HasCustomPosition) { Left = left; Top = top; }
     }
 
-    void ApplyScale()
+        void ApplyScale()
     {
         double k = _s.Scale / 100.0;
         Pill.LayoutTransform = new ScaleTransform(k, k);
@@ -439,78 +424,9 @@ public partial class MainWindow : Window
     void Align_Checked(object sender, RoutedEventArgs e)
     {
         if (!_ready) return;
-        _s.HasCustomPosition = false;
         _s.Align = (string)((RadioButton)sender).Tag;
         ApplyPosition();
         _s.Save();
-    }
-
-    void LockPosition_Changed(object sender, RoutedEventArgs e)
-    {
-        if (!_ready) return;
-        _s.LockPosition = LockPositionCheck.IsChecked == true;
-        _s.Save();
-    }
-
-    bool IsDragBlocked(DependencyObject? source)
-    {
-        while (source != null && source != Pill)
-        {
-            if (source is System.Windows.Controls.Primitives.ButtonBase ||
-                source is System.Windows.Controls.Primitives.TextBoxBase ||
-                source is System.Windows.Controls.Primitives.ScrollBar ||
-                source is ListBoxItem || source is MenuItem)
-                return true;
-            source = source is Visual || source is System.Windows.Media.Media3D.Visual3D
-                ? VisualTreeHelper.GetParent(source)
-                : LogicalTreeHelper.GetParent(source);
-        }
-        return false;
-    }
-
-    void Pill_DragStart(object sender, MouseButtonEventArgs e)
-    {
-        if (_s.LockPosition || IsDragBlocked(e.OriginalSource as DependencyObject)) return;
-        var physical = PointToScreen(e.GetPosition(this));
-        var src = PresentationSource.FromVisual(this);
-        var screen = src?.CompositionTarget?.TransformFromDevice.Transform(physical) ?? physical;
-        _dragOffset = new Point(screen.X - Left, screen.Y - Top);
-        _dragging = true;
-        _wasDragged = false;
-        Mouse.Capture(Pill, CaptureMode.SubTree);
-        e.Handled = true;
-    }
-
-    void Pill_DragMove(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        if (!_dragging || e.LeftButton != MouseButtonState.Pressed) return;
-        var physical = PointToScreen(e.GetPosition(this));
-        var src = PresentationSource.FromVisual(this);
-        var screen = src?.CompositionTarget?.TransformFromDevice.Transform(physical) ?? physical;
-        double minX = SystemParameters.VirtualScreenLeft;
-        double minY = SystemParameters.VirtualScreenTop;
-        double maxX = minX + SystemParameters.VirtualScreenWidth - Width;
-        double maxY = minY + SystemParameters.VirtualScreenHeight - Height;
-        double nextLeft = Math.Clamp(screen.X - _dragOffset.X, minX, Math.Max(minX, maxX));
-        double nextTop = Math.Clamp(screen.Y - _dragOffset.Y, minY, Math.Max(minY, maxY));
-        if (Math.Abs(nextLeft - Left) > 0.5 || Math.Abs(nextTop - Top) > 0.5)
-            _wasDragged = true;
-        Left = nextLeft;
-        Top = nextTop;
-    }
-
-    void Pill_DragEnd(object sender, MouseButtonEventArgs e)
-    {
-        if (!_dragging) return;
-        _dragging = false;
-        Mouse.Capture(null);
-        if (_wasDragged)
-        {
-            _s.HasCustomPosition = true;
-            _s.PositionX = Left;
-            _s.PositionY = Top;
-            _s.Save();
-        }
     }
 
     void SetOffset(int v)
@@ -681,9 +597,6 @@ public partial class MainWindow : Window
         if (RecentlyCopiedText != null) RecentlyCopiedText.Text = ru ? "НЕДАВНО СКОПИРОВАНО" : "RECENTLY COPIED";
         if (ClearHistoryButton != null) ClearHistoryButton.ToolTip = ru ? "Очистить историю" : "Clear history";
         if (PositionLabel != null) PositionLabel.Text = ru ? "Положение" : "Position";
-        if (PositionLockLabel != null) PositionLockLabel.Text = ru ? "Перемещение" : "Drag control";
-        if (LockPositionCheck != null) LockPositionCheck.Content = ru ? "Закрепить положение" : "Lock position";
-        if (DragHintText != null) DragHintText.Text = ru ? "Сними галочку, чтобы перетаскивать остров мышью по экрану." : "Uncheck to drag the island anywhere on the screen.";
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
         if (IslandSizeLabel != null) IslandSizeLabel.Text = ru ? "Размер острова" : "Island size";
         if (AccentLabel != null) AccentLabel.Text = ru ? "Цвет музыки и событий" : "Music and event color";
@@ -1451,7 +1364,6 @@ public partial class MainWindow : Window
     // ================= Обработчики окна =================
     void Pill_Click(object sender, MouseButtonEventArgs e)
     {
-        if (_wasDragged) { _wasDragged = false; return; }
         if (_state != IslandState.Expanded) Expand();
     }
 

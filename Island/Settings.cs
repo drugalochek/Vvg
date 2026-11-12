@@ -12,10 +12,6 @@ public class Settings
     public int Scale { get; set; } = 100;            // размер острова, %
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
-    public bool LockPosition { get; set; } = true;
-    public bool HasCustomPosition { get; set; }
-    public double PositionX { get; set; }
-    public double PositionY { get; set; }
 
     static string FilePath => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Moku", "settings.json");
@@ -30,8 +26,6 @@ public class Settings
         Scale = Math.Clamp(Scale, 70, 150);
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
-        if (!double.IsFinite(PositionX)) PositionX = 0;
-        if (!double.IsFinite(PositionY)) PositionY = 0;
     }
 
     public static Settings Load()
