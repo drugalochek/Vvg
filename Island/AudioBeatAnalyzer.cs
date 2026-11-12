@@ -10,9 +10,9 @@ namespace Island;
 /// </summary>
 internal sealed class AudioBeatAnalyzer : IDisposable
 {
-    readonly WasapiLoopbackCapture _capture;
-    readonly Biquad _highPass;
-    readonly Biquad _lowPass;
+    WasapiLoopbackCapture? _capture;
+    Biquad? _highPass;
+    Biquad? _lowPass;
     readonly int _channels;
     readonly int _bits;
     readonly bool _isFloat;
@@ -50,7 +50,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable
 
     void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        if (_disposed || e.BytesRecorded <= 0) return;
+        if (_disposed || _capture is null || _highPass is null || _lowPass is null || e.BytesRecorded <= 0) return;
         try
         {
             int bytesPerSample = Math.Max(1, _bits / 8);
@@ -131,10 +131,14 @@ internal sealed class AudioBeatAnalyzer : IDisposable
         _disposed = true;
         try
         {
-            _capture.DataAvailable -= OnDataAvailable;
-            _capture.RecordingStopped -= OnRecordingStopped;
-            _capture.StopRecording();
-            _capture.Dispose();
+            if (_capture != null)
+            {
+                _capture.DataAvailable -= OnDataAvailable;
+                _capture.RecordingStopped -= OnRecordingStopped;
+                _capture.StopRecording();
+                _capture.Dispose();
+                _capture = null;
+            }
         }
         catch (Exception ex) { Log.Warn("Audio analyzer shutdown: " + ex.Message); }
     }
