@@ -47,7 +47,9 @@ public class Settings
         CornerRadius = Math.Clamp(CornerRadius, 0, 40);
         if (Theme is not ("Midnight" or "Ocean" or "Amethyst" or "Emerald" or "Rose" or "Custom")) Theme = "Midnight";
         if (ThemeColor == null || (ThemeColor.Length > 0 && !HexColor.IsMatch(ThemeColor))) ThemeColor = "";
+        else if (ThemeColor.Length == 9) ThemeColor = "#FF" + ThemeColor[3..];
         if (ThemeBottomColor == null || !HexColor.IsMatch(ThemeBottomColor)) ThemeBottomColor = "#FF000000";
+        else if (ThemeBottomColor.Length == 9) ThemeBottomColor = "#FF" + ThemeBottomColor[3..];
         GradientBalance = Math.Clamp(GradientBalance, 10, 90);
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
