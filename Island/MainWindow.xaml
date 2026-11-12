@@ -256,28 +256,26 @@
             </Grid>
         </DataTemplate>
         <Style x:Key="MokuSlider" TargetType="{x:Type Slider}">
-            <Setter Property="Height" Value="22"/>
-            <Setter Property="Foreground" Value="#FF7C5CFF"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Slider}">
-                        <Grid Height="22" SnapsToDevicePixels="True">
-                            <Border Height="5" VerticalAlignment="Center" CornerRadius="3" Background="#28FFFFFF"/>
+                        <Grid Height="18" SnapsToDevicePixels="True">
+                            <Border Height="2" VerticalAlignment="Center" CornerRadius="1" Background="#55FFFFFF"/>
                             <Track x:Name="PART_Track" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{TemplateBinding Value}" Orientation="{TemplateBinding Orientation}" IsDirectionReversed="False">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge" IsTabStop="False">
-                                        <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="#FF7C5CFF" CornerRadius="3"/></ControlTemplate></RepeatButton.Template>
+                                        <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Height="2" VerticalAlignment="Center" Background="#E6FFFFFF" CornerRadius="1"/></ControlTemplate></RepeatButton.Template>
                                     </RepeatButton>
                                 </Track.DecreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb Width="14" Height="14" IsTabStop="False">
+                                    <Thumb Width="10" Height="10" IsTabStop="False">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border x:Name="knob" CornerRadius="7" Background="#FFF4F1FF" BorderBrush="#FF7C5CFF" BorderThickness="2">
-                                                    <Border.Effect><DropShadowEffect Color="#FF7C5CFF" BlurRadius="8" ShadowDepth="0" Opacity="0.55"/></Border.Effect>
-                                                </Border>
+                                                <Border x:Name="knob" CornerRadius="5" Background="White" BorderBrush="#BFFFFFFF" BorderThickness="1"/>
                                                 <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsDragging" Value="True"><Setter TargetName="knob" Property="Background" Value="White"/><Setter TargetName="knob" Property="BorderThickness" Value="3"/></Trigger>
+                                                    <Trigger Property="IsDragging" Value="True"><Setter TargetName="knob" Property="Background" Value="#FFE8E8E8"/></Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
                                         </Thumb.Template>
