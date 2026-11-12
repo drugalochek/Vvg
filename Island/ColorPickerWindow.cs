@@ -23,7 +23,6 @@ public sealed class ColorPickerWindow : Window
     readonly Border hueBar = new() { Cursor = Cursors.Hand };
     readonly Ellipse marker = new() { Width=14, Height=14, Stroke=Brushes.White, StrokeThickness=2, Fill=Brushes.Transparent, IsHitTestVisible=false };
     readonly Ellipse hueMarker = new() { Height=10, Stroke=Brushes.White, StrokeThickness=2, Fill=new SolidColorBrush(Color.FromArgb(80,0,0,0)), IsHitTestVisible=false };
-    readonly Border preview = new();
     readonly TextBox hex = new();
     double h,s,v;
     bool syncing;
@@ -49,7 +48,6 @@ public sealed class ColorPickerWindow : Window
         var picker=new Grid { Margin=new Thickness(0,0,0,14) };
         picker.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });
         picker.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(24) });
-        picker.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(44) });
         Grid.SetRow(picker,1); root.Children.Add(picker);
         var squareBorder=new Border { CornerRadius=new CornerRadius(10), ClipToBounds=true, Child=square, Margin=new Thickness(0,0,12,0) };
         Grid.SetColumn(squareBorder,0); picker.Children.Add(squareBorder);
@@ -68,7 +66,6 @@ public sealed class ColorPickerWindow : Window
         hueBar.MouseMove+=(_,e)=>{ if(e.LeftButton==MouseButtonState.Pressed) SetHue(e.GetPosition(hueBar)); };
         hueBar.MouseLeftButtonUp+=(_,_)=>hueBar.ReleaseMouseCapture();
         Grid.SetColumn(hueBar,1); picker.Children.Add(hueBar);
-        preview.Width=44; preview.CornerRadius=new CornerRadius(9); preview.BorderBrush=new SolidColorBrush(Color.FromArgb(55,255,255,255)); preview.BorderThickness=new Thickness(1); preview.Margin=new Thickness(12,0,0,0); Grid.SetColumn(preview,2); picker.Children.Add(preview);
         var hexRow=new DockPanel { Margin=new Thickness(0,0,0,14) };
         hexRow.Children.Add(new TextBlock { Text="HEX", Foreground=new SolidColorBrush(Color.FromRgb(160,165,180)), FontSize=11, VerticalAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,12,0) });
         hex.Text="#FFFFFF"; hex.Height=32; hex.Padding=new Thickness(9,5,9,5); hex.Background=new SolidColorBrush(Color.FromRgb(30,32,40)); hex.Foreground=Brushes.White; hex.BorderBrush=new SolidColorBrush(Color.FromRgb(60,64,78)); hex.CaretBrush=Brushes.White;
@@ -80,7 +77,7 @@ public sealed class ColorPickerWindow : Window
         actions.Children.Add(cancel); actions.Children.Add(apply); Grid.SetRow(actions,3); root.Children.Add(actions);
         Loaded+=(_,_)=>{LayoutMarkers();UpdateView();};
     }
-    Button MakeButton(string text,double width,bool primary)=>new() { Content=text, Width=width, Height=34, BorderThickness=new Thickness(1), BorderBrush=new SolidColorBrush(Color.FromArgb(45,255,255,255)), Background=primary?new SolidColorBrush(Color.FromRgb(105,83,220)):new SolidColorBrush(Color.FromRgb(38,40,49)), Foreground=Brushes.White, FontSize=12, Cursor=Cursors.Hand };
+    Button MakeButton(string text,double width,bool primary)=>new() { Content=text, Width=width, Height=34, BorderThickness=new Thickness(1), BorderBrush=new SolidColorBrush(Color.FromArgb(75,255,255,255)), Background=primary?new SolidColorBrush(Color.FromArgb(42,255,255,255)):new SolidColorBrush(Color.FromArgb(24,255,255,255)), Foreground=Brushes.White, FontSize=12, Cursor=Cursors.Hand };
     void LayoutMarkers()
     {
         double w=square.ActualWidth,sh=square.ActualHeight;
@@ -90,7 +87,7 @@ public sealed class ColorPickerWindow : Window
     }
     void SetSquare(Point p){s=Math.Clamp(p.X/Math.Max(1,square.ActualWidth),0,1);v=1-Math.Clamp(p.Y/Math.Max(1,square.ActualHeight),0,1);LayoutMarkers();UpdateView();}
     void SetHue(Point p){h=Math.Clamp(p.Y/Math.Max(1,hueBar.ActualHeight),0,1)*360;LayoutMarkers();UpdateView();}
-    void UpdateView(){square.Background=new SolidColorBrush(Hsv(h,1,1));var c=Current();preview.Background=new SolidColorBrush(c);syncing=true;hex.Text=c.ToString();syncing=false;LayoutMarkers();}
+    void UpdateView(){square.Background=new SolidColorBrush(Hsv(h,1,1));var c=Current();syncing=true;hex.Text=c.ToString();syncing=false;LayoutMarkers();}
     void ReadHex(){if(syncing)return;try{var t=hex.Text.Trim();if(t.Length==6)t="#"+t;var c=(Color)ColorConverter.ConvertFromString(t);(h,s,v)=ToHsv(c);UpdateView();}catch{hex.Text=Current().ToString();}}
     Color Current()=>Hsv(h,s,v);
     static Color Hsv(double h,double s,double v){h=(h%360+360)%360;double c=v*s,x=c*(1-Math.Abs(h/60%2-1)),m=v-c;(double r,double g,double b)=h switch{<60=>(c,x,0d),<120=>(x,c,0d),<180=>(0d,c,x),<240=>(0d,x,c),<300=>(x,0d,c),_=>(c,0d,x)};return Color.FromRgb((byte)Math.Round((r+m)*255),(byte)Math.Round((g+m)*255),(byte)Math.Round((b+m)*255));}
