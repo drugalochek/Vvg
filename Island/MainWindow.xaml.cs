@@ -953,7 +953,7 @@ public partial class MainWindow : Window
         UpdateMini();
 
         // 4. Only now unfold the island.
-        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 24, spring: true);
+        Animate(IdleW, CollapsedH, 24, spring: true);
         await Task.Delay(390);
         Pill.CornerRadius = new CornerRadius(18);
         RebuildBody();
@@ -973,6 +973,7 @@ public partial class MainWindow : Window
         UpdatePlayButton();
         UpdateMini();
         FadeWelcomeInfo();
+        if (_now?.Playing == true) Animate(PlayW, CollapsedH, 18, spring: false);
         EnsureFx();
     }
 
@@ -1516,6 +1517,7 @@ public partial class MainWindow : Window
         }
         UpdatePlayButton();
         UpdateMini();
+        FadeInWelcomeElement(TitlePanel);
         EnsureFx();
         if (_state == IslandState.Collapsed) Collapse();
     }
