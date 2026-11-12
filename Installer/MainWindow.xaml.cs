@@ -371,7 +371,7 @@ public partial class MainWindow : Window
                 if (uninstallKey != null)
                 {
                     uninstallKey.SetValue("DisplayName", "Moku");
-                    uninstallKey.SetValue("DisplayVersion", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.0.0");
+                    uninstallKey.SetValue("DisplayVersion", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "2.5.0");
                     uninstallKey.SetValue("InstallLocation", target);
                     uninstallKey.SetValue("DisplayIcon", iconFile);
                     uninstallKey.SetValue("UninstallString", "\"" + uninstaller + "\" --uninstall");
