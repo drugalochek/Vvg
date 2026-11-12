@@ -1518,6 +1518,9 @@ public partial class MainWindow : Window
         UpdatePlayButton();
         UpdateMini();
         FadeInWelcomeElement(TitlePanel);
+        FadeInWelcomeElement(TimeText);
+        FadeInWelcomeElement(WeatherHost);
+        FadeInWelcomeElement(TempText);
         EnsureFx();
         if (_state == IslandState.Collapsed) Collapse();
     }
