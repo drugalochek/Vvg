@@ -418,6 +418,7 @@ public partial class MainWindow : Window
             _bodyBrush.Opacity = _s.GlassOpacity / 100.0;
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
+        if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
         if (AccentR != null) { AccentR.Value = _accentColor.R; AccentG.Value = _accentColor.G; AccentB.Value = _accentColor.B; }
@@ -427,13 +428,14 @@ public partial class MainWindow : Window
     void SetGlassOpacity(int value)
     {
         _s.GlassOpacity = Math.Clamp(value, 0, 100);
+        if (OpacitySlider != null && (int)OpacitySlider.Value != _s.GlassOpacity) OpacitySlider.Value = _s.GlassOpacity;
         ApplyAppearance();
         _s.Save();
     }
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
-    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); Pill.CornerRadius = new CornerRadius(_s.CornerRadius); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); _s.Save(); }
+    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; Pill.CornerRadius = new CornerRadius(_s.CornerRadius); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); _s.Save(); }
     void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
     void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
     void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
@@ -456,6 +458,8 @@ public partial class MainWindow : Window
         Wave.Stroke = _accent;
         Wave.Effect = new DropShadowEffect { Color = c, BlurRadius = 10, ShadowDepth = 0, Opacity = 0.9 };
         UpdatePlayButton();
+        if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(c);
+        if (AccentR != null) { if ((int)AccentR.Value != c.R) AccentR.Value = c.R; if ((int)AccentG.Value != c.G) AccentG.Value = c.G; if ((int)AccentB.Value != c.B) AccentB.Value = c.B; }
         foreach (var b in AccentPanel.Children.OfType<Border>())
             b.BorderBrush = (string)b.Tag == _s.Accent ? Brushes.White : Brushes.Transparent;
     }
@@ -506,18 +510,27 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hwnd);
     [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
     [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr hdc, int x, int y);
-    void Eyedropper_Click(object sender, RoutedEventArgs e)
+    async void Eyedropper_Click(object sender, RoutedEventArgs e)
     {
         if (!GetCursorPos(out var p)) return;
-        IntPtr dc = GetDC(IntPtr.Zero);
+        bool wasVisible = IsVisible;
+        double oldOpacity = Opacity;
         try
         {
-            uint pixel = GetPixel(dc, p.X, p.Y);
-            var color = Color.FromRgb((byte)(pixel & 0xFF), (byte)((pixel >> 8) & 0xFF), (byte)((pixel >> 16) & 0xFF));
-            AccentR.Value = color.R; AccentG.Value = color.G; AccentB.Value = color.B;
-            _s.Accent = color.ToString(); _s.Save(); ApplyAccent();
+            Opacity = 0;
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            await Task.Delay(90);
+            IntPtr dc = GetDC(IntPtr.Zero);
+            try
+            {
+                uint pixel = GetPixel(dc, p.X, p.Y);
+                if (pixel == 0xFFFFFFFF) return;
+                var color = Color.FromRgb((byte)(pixel & 0xFF), (byte)((pixel >> 8) & 0xFF), (byte)((pixel >> 16) & 0xFF));
+                _s.Accent = color.ToString(); _s.Save(); ApplyAccent();
+            }
+            finally { ReleaseDC(IntPtr.Zero, dc); }
         }
-        finally { ReleaseDC(IntPtr.Zero, dc); }
+        finally { Opacity = oldOpacity; if (wasVisible) Activate(); }
     }
 
     void Align_Checked(object sender, RoutedEventArgs e)
@@ -531,9 +544,8 @@ public partial class MainWindow : Window
     void SetOffset(int v)
     {
         _s.OffsetY = Math.Clamp(v, -500, 500);
-        if (OffsetYSlider != null) OffsetYSlider.Value = _s.OffsetY;
+        if (OffsetYSlider != null && (int)OffsetYSlider.Value != _s.OffsetY) OffsetYSlider.Value = _s.OffsetY;
         OffsetText.Text = _s.OffsetY + " px";
-        if (OffsetYSlider != null) OffsetYSlider.Value = _s.OffsetY;
         ApplyPosition();
         _s.Save();
     }
@@ -542,6 +554,7 @@ public partial class MainWindow : Window
     {
         _s.Scale = Math.Clamp(v, 70, 150);
         ScaleText.Text = _s.Scale + "%";
+        if (ScaleSlider != null && (int)ScaleSlider.Value != _s.Scale) ScaleSlider.Value = _s.Scale;
         ApplyScale();
         _s.Save();
     }
@@ -1413,7 +1426,7 @@ public partial class MainWindow : Window
         double amp = _waveAmp;
         double x0 = 0.5, x1 = w - 0.5, y0 = 0.5, yb = h - amp - 0.5;
         double r = Math.Min(Pill.CornerRadius.TopLeft, Math.Min((x1 - x0) / 2, (yb - y0) / 2));
-        if (r < 1) r = 1;
+        if (r < 0.5) r = 0;
         bool wave = amp > 0.01;
 
         var g = new StreamGeometry();
@@ -1681,16 +1694,46 @@ public partial class MainWindow : Window
 
     ImageSource? LoadSteamArtwork(string appId)
     {
-        if (string.IsNullOrWhiteSpace(appId) || !Regex.IsMatch(appId, @"^\\d+$")) return null;
+        if (string.IsNullOrWhiteSpace(appId) || !Regex.IsMatch(appId, @"^\d+$")) return null;
         var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         void Add(string? p) { if (!string.IsNullOrWhiteSpace(p) && Directory.Exists(p)) roots.Add(p); }
-        Add(Registry.GetValue(@"HKEY_CURRENT_USER\\Software\\Valve\\Steam", "SteamPath", null) as string);
-        Add(Registry.GetValue(@"HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Valve\\Steam", "InstallPath", null) as string);
+        Add(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) as string);
+        Add(Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath", null) as string);
         Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
-        var candidates = new List<string>();
+        var libraries = new HashSet<string>(roots, StringComparer.OrdinalIgnoreCase);
         foreach (var root in roots)
         {
-            candidates.AddRange(new[] { Path.Combine(root,"appcache","librarycache",appId+"_icon.jpg"), Path.Combine(root,"appcache","librarycache",appId+"_header.jpg"), Path.Combine(root,"appcache","librarycache",appId+"_library_600x900.jpg"), Path.Combine(root,"steamapps","librarycache",appId+"_icon.jpg"), Path.Combine(root,"steamapps","librarycache",appId+"_header.jpg") });
+            var vdf = Path.Combine(root, "steamapps", "libraryfolders.vdf");
+            try
+            {
+                if (File.Exists(vdf))
+                    foreach (Match match in Regex.Matches(File.ReadAllText(vdf), @"""path""\s+""([^""]+)"""))
+                    {
+                        var library = match.Groups[1].Value.Replace(@"\\", @"\");
+                        if (Directory.Exists(library)) libraries.Add(library);
+                    }
+            }
+            catch { }
+        }
+        var candidates = new List<string>();
+        foreach (var root in libraries)
+        {
+            var manifest = Path.Combine(root, "steamapps", "appmanifest_" + appId + ".acf");
+            try
+            {
+                if (File.Exists(manifest))
+                {
+                    var iconHash = Regex.Match(File.ReadAllText(manifest), @"""icon""\s+""([^""]+)""").Groups[1].Value;
+                    if (!string.IsNullOrWhiteSpace(iconHash))
+                    {
+                        candidates.Add(Path.Combine(root, "steam", "games", iconHash + ".jpg"));
+                        foreach (var steamRoot in roots) candidates.Add(Path.Combine(steamRoot, "steam", "games", iconHash + ".jpg"));
+                    }
+                }
+            }
+            catch { }
+            foreach (var cache in new[] { Path.Combine(root,"appcache","librarycache"), Path.Combine(root,"steamapps","librarycache") })
+                candidates.AddRange(new[] { appId+"_icon.jpg", appId+"_header.jpg", appId+"_library_600x900.jpg", appId+"_hero.jpg" }.Select(n => Path.Combine(cache,n)));
             var games = Path.Combine(root,"steam","games");
             try { if (Directory.Exists(games)) candidates.AddRange(Directory.EnumerateFiles(games, "*.jpg").Where(p => Path.GetFileName(p).StartsWith(appId, StringComparison.OrdinalIgnoreCase))); } catch { }
         }
