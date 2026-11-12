@@ -22,7 +22,9 @@ public class Settings
     public int FullscreenOpacity { get; set; } = 35;
     public int CornerRadius { get; set; } = 18;
     public string Theme { get; set; } = "Midnight";
-    public string ThemeColor { get; set; } = ""; // пользовательский цвет темы (#AARRGGBB или #RRGGBB)
+    public string ThemeColor { get; set; } = ""; // верхний цвет градиента
+    public string ThemeBottomColor { get; set; } = "#FF000000"; // нижний цвет градиента
+    public int GradientBalance { get; set; } = 70; // положение перехода: 0..100
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
     public List<AppShortcut> Apps { get; set; } = new();
@@ -45,6 +47,8 @@ public class Settings
         CornerRadius = Math.Clamp(CornerRadius, 0, 40);
         if (Theme is not ("Midnight" or "Ocean" or "Amethyst" or "Emerald" or "Rose" or "Custom")) Theme = "Midnight";
         if (ThemeColor == null || (ThemeColor.Length > 0 && !HexColor.IsMatch(ThemeColor))) ThemeColor = "";
+        if (ThemeBottomColor == null || !HexColor.IsMatch(ThemeBottomColor)) ThemeBottomColor = "#FF000000";
+        GradientBalance = Math.Clamp(GradientBalance, 10, 90);
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
         Apps ??= new();
