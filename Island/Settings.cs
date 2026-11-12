@@ -14,9 +14,13 @@ public class AppShortcut
 public class Settings
 {
     public string Align { get; set; } = "Center";   // Left | Center | Right
+    public string VerticalAlign { get; set; } = "Top"; // Top | Center | Bottom
+    public int OffsetX { get; set; } = 0;
     public int OffsetY { get; set; } = 8;            // отступ сверху, px
     public int Scale { get; set; } = 100;            // размер острова, %
     public int GlassOpacity { get; set; } = 100;
+    public int CornerRadius { get; set; } = 18;
+    public string Theme { get; set; } = "Midnight";
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
     public List<AppShortcut> Apps { get; set; } = new();
@@ -30,9 +34,13 @@ public class Settings
     public void Normalize()
     {
         if (Align is not ("Left" or "Center" or "Right")) Align = "Center";
-        OffsetY = Math.Clamp(OffsetY, 0, 200);
+        if (VerticalAlign is not ("Top" or "Center" or "Bottom")) VerticalAlign = "Top";
+        OffsetX = Math.Clamp(OffsetX, -500, 500);
+        OffsetY = Math.Clamp(OffsetY, -500, 500);
         Scale = Math.Clamp(Scale, 70, 150);
-        GlassOpacity = Math.Clamp(GlassOpacity, 55, 100);
+        GlassOpacity = Math.Clamp(GlassOpacity, 0, 100);
+        CornerRadius = Math.Clamp(CornerRadius, 0, 40);
+        if (Theme is not ("Midnight" or "Ocean" or "Amethyst" or "Emerald" or "Rose")) Theme = "Midnight";
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
         Apps ??= new();
