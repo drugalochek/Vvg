@@ -499,6 +499,13 @@
                                     <Button Style="{StaticResource IconBtn}" Content="&#xE993;" Click="VolDown_Click"/>
                                     <Button Style="{StaticResource IconBtn}" Content="&#xE995;" Click="VolUp_Click"/>
                                 </StackPanel>
+                                <Grid Margin="2,5,2,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="SeekCurrentText" Text="0:00" Foreground="#88FFFFFF" FontSize="10" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <Slider x:Name="SeekSlider" Grid.Column="1" Minimum="0" Maximum="1" Value="0" IsEnabled="False"
+                                            PreviewMouseLeftButtonUp="SeekSlider_Commit" PreviewKeyUp="SeekSlider_Commit"/>
+                                    <TextBlock x:Name="SeekDurationText" Grid.Column="2" Text="0:00" Foreground="#88FFFFFF" FontSize="10" VerticalAlignment="Center" Margin="7,0,0,0"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 
@@ -682,6 +689,14 @@
                                 <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="GlassOpacity_Plus"/>
                             </DockPanel>
                             <Slider x:Name="OpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="OpacitySlider_Changed"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock x:Name="FullscreenOpacityLabel" Text="Fullscreen opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock x:Name="FullscreenOpacityText" Foreground="White" FontSize="12" Margin="0,0,0,3"/>
+                            <Slider x:Name="FullscreenOpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="FullscreenOpacitySlider_Changed"/>
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,10">
