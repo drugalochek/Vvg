@@ -418,6 +418,11 @@ public partial class MainWindow : Window
                 "Emerald" => Color.FromRgb(8, 31, 24), "Rose" => Color.FromRgb(42, 15, 26),
                 _ => Color.FromRgb(0, 0, 0)
             };
+            if (!string.IsNullOrWhiteSpace(_s.ThemeColor))
+            {
+                try { baseColor = (Color)ColorConverter.ConvertFromString(_s.ThemeColor); }
+                catch { }
+            }
             _bodyBrush.GradientStops[0].Color = baseColor;
             _bodyBrush.Opacity = 1.0;
         }
@@ -425,7 +430,6 @@ public partial class MainWindow : Window
         Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
         if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
-        if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
     }
 
@@ -463,6 +467,18 @@ public partial class MainWindow : Window
     void RadiusSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetRadius((int)e.NewValue); }
     void Theme_Changed(object sender, SelectionChangedEventArgs e) { if (!_ready || ThemeCombo.SelectedValue == null) return; _s.Theme = ThemeCombo.SelectedValue.ToString()!; ApplyAppearance(); _s.Save(); }
 
+    void ThemeColor_Click(object sender, RoutedEventArgs e)
+    {
+        var initial = string.IsNullOrWhiteSpace(_s.ThemeColor)
+            ? (_bodyBrush?.GradientStops[0].Color ?? Color.FromRgb(0, 0, 0))
+            : (Color)ColorConverter.ConvertFromString(_s.ThemeColor);
+        var picker = new ColorPickerWindow(initial) { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        _s.ThemeColor = picker.SelectedColor.ToString();
+        ApplyAppearance();
+        _s.Save();
+    }
+
     void ApplyAccent()
     {
         var c = (Color)ColorConverter.ConvertFromString(_s.Accent);
@@ -472,7 +488,6 @@ public partial class MainWindow : Window
         Wave.Stroke = _accent;
         Wave.Effect = new DropShadowEffect { Color = c, BlurRadius = 10, ShadowDepth = 0, Opacity = 0.9 };
         UpdatePlayButton();
-        if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(c);
         foreach (var b in AccentPanel.Children.OfType<Border>())
             b.BorderBrush = (string)b.Tag == _s.Accent ? Brushes.White : Brushes.Transparent;
     }
