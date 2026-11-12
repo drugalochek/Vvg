@@ -488,6 +488,11 @@ public partial class MainWindow : Window
         _s.Save();
     }
 
+    void TopGradientColor_Click(object sender, RoutedEventArgs e)
+    {
+        ThemeColor_Click(sender, e);
+    }
+
     void BottomGradientColor_Click(object sender, RoutedEventArgs e)
     {
         Color initial;
