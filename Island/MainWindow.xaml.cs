@@ -425,9 +425,12 @@ public partial class MainWindow : Window
                 try { baseColor = (Color)ColorConverter.ConvertFromString(_s.ThemeColor); }
                 catch { }
             }
+            // Theme colors are always fully opaque; island opacity remains a separate setting.
+            baseColor = Color.FromRgb(baseColor.R, baseColor.G, baseColor.B);
             _bodyBrush.GradientStops[0].Color = baseColor;
             var lowerColor = Color.FromRgb(0, 0, 0);
             try { lowerColor = (Color)ColorConverter.ConvertFromString(_s.ThemeBottomColor); } catch { }
+            lowerColor = Color.FromRgb(lowerColor.R, lowerColor.G, lowerColor.B);
             _tintMid.Color = lowerColor;
             _tintEnd.Color = lowerColor;
             _tintMid.Offset = _s.GradientBalance / 100.0;
@@ -1368,15 +1371,16 @@ public partial class MainWindow : Window
                 // complete clipped lane, and finish only after leaving the left edge.
                 double travel = laneWidth + textWidth;
                 double durationMs = Math.Clamp(travel * 12, 1400, 4200);
-                var scroll = new DoubleAnimation
+                // Hold the title off-screen before every pass, including after each loop.
+                const double pauseMs = 1400;
+                var scroll = new DoubleAnimationUsingKeyFrames
                 {
-                    From = laneWidth,
-                    To = -textWidth,
-                    Duration = TimeSpan.FromMilliseconds(durationMs),
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromMilliseconds(120),
-                    EasingFunction = null
+                    Duration = TimeSpan.FromMilliseconds(pauseMs + durationMs),
+                    RepeatBehavior = RepeatBehavior.Forever
                 };
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(laneWidth, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(laneWidth, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs))));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(-textWidth, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs + durationMs))));
                 MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
             }), DispatcherPriority.Loaded);
         }
