@@ -1153,16 +1153,18 @@ public partial class MainWindow : Window
 
                 bool longTitle = overflow > 64;
                 double travel = longTitle ? overflow : Math.Min(overflow, 34);
-                var scroll = new DoubleAnimation
+                double legMs = longTitle ? Math.Clamp(travel * 18, 850, 2200) : 900;
+                double pauseMs = longTitle ? 900 : 2200;
+                var scroll = new DoubleAnimationUsingKeyFrames
                 {
-                    From = 0,
-                    To = -travel,
-                    Duration = TimeSpan.FromMilliseconds(longTitle
-                        ? Math.Clamp(travel * 22, 900, 4200) : 1250),
-                    AutoReverse = true,
+                    Duration = TimeSpan.FromMilliseconds(legMs * 2 + pauseMs),
                     RepeatBehavior = RepeatBehavior.Forever,
-                    BeginTime = TimeSpan.FromMilliseconds(longTitle ? 450 : 1700)
+                    BeginTime = TimeSpan.FromMilliseconds(500)
                 };
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(-travel, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(legMs))));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(legMs * 2))));
+                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(legMs * 2 + pauseMs))));
                 MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
             }), DispatcherPriority.Loaded);
         }
