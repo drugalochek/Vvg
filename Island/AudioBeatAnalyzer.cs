@@ -67,11 +67,11 @@ internal sealed class AudioBeatAnalyzer : IDisposable
                 mono /= _channels;
 
                 double low = _lowPass.Process(mono);
-                double mid = _midLowPass.Process(_midHighPass.Process(mono));
-                double high = _highPass.Process(mono);
+                double midSample = _midLowPass.Process(_midHighPass.Process(mono));
+                double highSample = _highPass.Process(mono);
                 lowSquares += low * low;
-                midSquares += mid * mid;
-                highSquares += high * high;
+                midSquares += midSample * midSample;
+                highSquares += highSample * highSample;
             }
 
             double lowRms = Math.Sqrt(lowSquares / frames);
