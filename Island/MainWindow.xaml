@@ -420,7 +420,10 @@
                 </Grid>
 
                 <!-- Settings -->
-                <StackPanel x:Name="SettingsPage" Grid.Row="1" Visibility="Collapsed">
+                <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="True">
+                  <StackPanel>
                     <Grid Margin="0,2,0,14">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="LanguageLabel" Text="Language" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
@@ -496,7 +499,8 @@
 
                     <TextBlock x:Name="AccentDescription" Text="The island stays black — color appears only when music is playing or an event occurs."
                                Foreground="#66FFFFFF" FontSize="11" Margin="2,12,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
+                  </StackPanel>
+                </ScrollViewer>
             </Grid>
 
             </Grid>
