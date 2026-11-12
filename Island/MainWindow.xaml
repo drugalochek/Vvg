@@ -401,11 +401,8 @@
                         <TextBlock x:Name="NoteIcon" Text="♪" FontSize="15" Margin="0,0,7,0" VerticalAlignment="Center"/>
                         <Border x:Name="TitleViewport" Grid.Column="1" ClipToBounds="True" VerticalAlignment="Center">
                             <TextBlock x:Name="TitleText" Foreground="White" FontSize="13"
-                                       FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                <TextBlock.RenderTransform>
-                                    <TranslateTransform x:Name="MiniTitleShift"/>
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
+                                       FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                         </Border>
                     </Grid>
 
