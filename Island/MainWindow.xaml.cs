@@ -117,9 +117,11 @@ public partial class MainWindow : Window
     int _animVer, _fullFadeVer, _totalChars;
     NowPlaying? _now;
     string? _lastTrack;
+    string? _miniAnimatedTitle;
     SolidColorBrush _accent = Brushes.White;
 
     readonly MediaWatcher _media = new();
+    readonly AudioBeatAnalyzer _audio = new();
     readonly DispatcherTimer _clock = new();
     readonly DispatcherTimer _toastTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
     readonly DispatcherTimer _clipboardTimer = new() { Interval = TimeSpan.FromMilliseconds(110) };
@@ -151,6 +153,7 @@ public partial class MainWindow : Window
 
         startupStage = "building tiles";
         BuildTiles();
+        BuildApps();
         startupStage = "building accent swatches";
         BuildAccentSwatches();
         // Language selector is now the native WPF English/Russian segmented control.
@@ -305,6 +308,7 @@ public partial class MainWindow : Window
         _source?.RemoveHook(WndProc);
         _weather.Dispose();
         _media.Dispose();
+        _audio.Dispose();
         if (_fxAttached) CompositionTarget.Rendering -= FxRendering;
         _gameTimer?.Stop();
         _clipboardTimer.Stop();
@@ -590,6 +594,10 @@ public partial class MainWindow : Window
         if (LanguageLabel != null) LanguageLabel.Text = ru ? "Язык интерфейса" : "Language";
         if (TabHome != null) TabHome.Content = ru ? "Главная" : "Home";
         if (TabClip != null) TabClip.Content = ru ? "Буфер" : "Clipboard";
+        if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
+        if (AppsHeading != null) AppsHeading.Text = ru ? "ВАШИ ПРИЛОЖЕНИЯ" : "YOUR APPS";
+        if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
+        if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
         if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
         if (MenuSettings != null) MenuSettings.Header = ru ? "Настройки" : "Settings";
         if (MenuExit != null) MenuExit.Header = ru ? "Выход" : "Exit";
@@ -975,7 +983,7 @@ public partial class MainWindow : Window
         UpdatePlayButton();
         UpdateMini();
         FadeWelcomeInfo();
-        if (_now?.Playing == true) Animate(PlayW, CollapsedH, 18, spring: false);
+        if (_now != null) Animate(PlayW, CollapsedH, 18, spring: false);
         EnsureFx();
     }
 
@@ -1028,7 +1036,7 @@ public partial class MainWindow : Window
         };
         Full.BeginAnimation(OpacityProperty, fade);
 
-        Animate(_now?.Playing == true ? PlayW : IdleW, CollapsedH, 18, spring: false);
+        Animate(_now != null ? PlayW : IdleW, CollapsedH, 18, spring: false);
         EnsureFx();
     }
 
@@ -1063,6 +1071,9 @@ public partial class MainWindow : Window
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
+        MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+        MiniTitleShift.X = 0;
+        _miniAnimatedTitle = null; // restart the marquee when the island is collapsed again
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();
@@ -1093,27 +1104,68 @@ public partial class MainWindow : Window
 
     void UpdateMini()
     {
-        // Clock/media/weather updates can arrive while the welcome animation is
-        // running. They must never leak into the initial eyes-only circle.
+        // Keep the compact player completely hidden during the welcome animation.
         if (_welcomeRunning)
         {
             TitlePanel.Visibility = Visibility.Collapsed;
+            MiniMediaControls.Visibility = Visibility.Collapsed;
+            WeatherDetails.Visibility = Visibility.Collapsed;
             TimeText.Visibility = Visibility.Collapsed;
-            WeatherHost.Visibility = Visibility.Collapsed;
-            TempText.Visibility = Visibility.Collapsed;
             return;
         }
 
+        bool hasMedia = _now != null;
         bool playing = _now?.Playing == true;
         var now = DateTime.Now;
-        TitlePanel.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
-        TitleText.Text = playing ? _now!.Title : "";
 
-        // In music mode the title owns the whole compact row. Hide the clock and
-        // weather completely instead of letting their text overlap the track name.
-        TimeText.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
-        WeatherHost.Visibility = !playing && WeatherHost.Child != null ? Visibility.Visible : Visibility.Collapsed;
-        TempText.Visibility = !playing && !string.IsNullOrEmpty(TempText.Text) ? Visibility.Visible : Visibility.Collapsed;
+        TitlePanel.Visibility = hasMedia ? Visibility.Visible : Visibility.Collapsed;
+        MiniMediaControls.Visibility = hasMedia ? Visibility.Visible : Visibility.Collapsed;
+        WeatherDetails.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
+        TitleText.Text = hasMedia ? _now!.Title : "";
+        MiniPlayBtn.Content = playing ? "\uE769" : "\uE768";
+        MiniPrevBtn.ToolTip = _s.Language == "ru" ? "Предыдущий трек" : "Previous";
+        MiniPlayBtn.ToolTip = _s.Language == "ru" ? "Воспроизведение / пауза" : "Play / pause";
+        MiniNextBtn.ToolTip = _s.Language == "ru" ? "Следующий трек" : "Next";
+        TitleText.ToolTip = hasMedia
+            ? (string.IsNullOrWhiteSpace(_now!.Artist) ? _now.Title : $"{_now.Title} — {_now.Artist}")
+            : null;
+
+        // Animate only inside the clipped title lane. The eyes and transport buttons
+        // occupy separate grid columns and can never be covered by the moving text.
+        if (!hasMedia)
+        {
+            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+            MiniTitleShift.X = 0;
+            _miniAnimatedTitle = null;
+        }
+        else if (_miniAnimatedTitle != _now!.Title)
+        {
+            _miniAnimatedTitle = _now.Title;
+            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
+            MiniTitleShift.X = 0;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
+                double overflow = TitleText.ActualWidth - TitleViewport.ActualWidth;
+                if (overflow <= 8) return;
+
+                var scroll = new DoubleAnimation
+                {
+                    From = 0,
+                    To = -overflow,
+                    Duration = TimeSpan.FromMilliseconds(Math.Clamp(overflow * 42, 1800, 9000)),
+                    AutoReverse = true,
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    BeginTime = TimeSpan.FromMilliseconds(650)
+                };
+                MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
+            }), DispatcherPriority.Loaded);
+        }
+
+        // In media mode the title and controls own the row. Otherwise show clock/weather.
+        TimeText.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
+        WeatherHost.Visibility = !hasMedia && WeatherHost.Child != null ? Visibility.Visible : Visibility.Collapsed;
+        TempText.Visibility = !hasMedia && !string.IsNullOrEmpty(TempText.Text) ? Visibility.Visible : Visibility.Collapsed;
 
         TimeText.Text = now.ToString("HH:mm");
         TimeText.HorizontalAlignment = HorizontalAlignment.Center;
@@ -1135,7 +1187,7 @@ public partial class MainWindow : Window
     readonly GradientStop _tintEnd = new(Color.FromRgb(0, 0, 0), 1.0);
     LinearGradientBrush? _bodyBrush;
     Color _accentColor = Colors.White;
-    double _wavePhase, _waveAmp, _open = 1, _blinkT = -1;
+    double _wavePhase, _waveAmp, _waveBeatPulse, _open = 1, _blinkT = -1;
     double _lLx, _lLy, _lRx, _lRy, _eyeFollow = 0.2;
     double _glX, _glY;                       // «случайный взгляд», когда мышь стоит
     DateTime _nextGlance = DateTime.Now;
@@ -1171,11 +1223,19 @@ public partial class MainWindow : Window
             Math.Clamp((args.RenderingTime - _lastRenderTime).TotalSeconds, 0.001, 0.05);
         _lastRenderTime = args.RenderingTime;
         bool playing = !_welcomeRunning && _now?.Playing == true;
-        double target = playing ? 5.0 : 0.0;
-        double follow = 1 - Math.Exp(-11.0 * dt);
+        if (playing && _audio.ConsumeBeat())
+            _waveBeatPulse = Math.Min(1.0, _waveBeatPulse + 0.82);
+
+        // Bass energy controls the continuous movement; detected low-frequency
+        // transients add a short, sharp swell on actual kick/snare hits.
+        _waveBeatPulse *= Math.Exp(-7.2 * dt);
+        double bass = playing ? _audio.BassLevel : 0;
+        double target = playing ? Math.Clamp(0.9 + bass * 2.3 + _waveBeatPulse * 4.4, 0, 7.2) : 0;
+        double response = target > _waveAmp ? 23.0 : 7.5; // fast attack, softer release
+        double follow = 1 - Math.Exp(-response * dt);
         _waveAmp += (target - _waveAmp) * follow;
-        if (Math.Abs(target - _waveAmp) < 0.03) _waveAmp = target;
-        _wavePhase += 3.25 * dt;
+        if (Math.Abs(target - _waveAmp) < 0.025) _waveAmp = target;
+        _wavePhase += (2.1 + bass * 5.0 + _waveBeatPulse * 1.8) * dt;
 
         bool wave = _waveAmp > 0.01;
         bool eyes = !_welcomeRunning && IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
@@ -1385,13 +1445,139 @@ public partial class MainWindow : Window
         var tag = (sender as RadioButton)?.Tag as string;
         HomePage.Visibility = tag == "Home" ? Visibility.Visible : Visibility.Collapsed;
         ClipPage.Visibility = tag == "Clip" ? Visibility.Visible : Visibility.Collapsed;
+        AppsPage.Visibility = tag == "Apps" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = tag == "Set" ? Visibility.Visible : Visibility.Collapsed;
-        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : SettingsPage);
+        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") UpdateAutoButton();
+        if (tag == "Apps") BuildApps();
     }
 
     // ================= Плитки =================
+    // ================= Быстрый запуск приложений =================
+    void BuildApps()
+    {
+        if (AppsGrid == null) return;
+        AppsGrid.Children.Clear();
+        foreach (var app in _s.Apps.ToList())
+        {
+            if (!File.Exists(app.Path)) continue;
+            var button = new Button
+            {
+                Style = (Style)FindResource("TileBtn"),
+                Width = 112,
+                Height = 88,
+                Margin = new Thickness(4),
+                ToolTip = app.Path
+            };
+            var content = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var iconView = new Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
+            try
+            {
+                using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
+                if (icon != null)
+                {
+                    var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
+                        BitmapSizeOptions.FromWidthAndHeight(48, 48));
+                    source.Freeze();
+                    iconView.Source = source;
+                }
+            }
+            catch (Exception ex) { Log.Warn("Не удалось получить иконку " + app.Path + ": " + ex.Message); }
+
+            if (iconView.Source != null) content.Children.Add(iconView);
+            else content.Children.Add(new TextBlock
+            {
+                Text = "\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
+                FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 7)
+            });
+            content.Children.Add(new TextBlock
+            {
+                Text = app.Name, FontSize = 11, Foreground = Brushes.White,
+                TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 98,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            button.Content = content;
+            var path = app.Path;
+            button.Click += (_, _) => LaunchApp(path);
+            var menu = new ContextMenu();
+            var remove = new MenuItem { Header = _s.Language == "ru" ? "Удалить из списка" : "Remove from list" };
+            remove.Click += (_, _) =>
+            {
+                _s.Apps.RemoveAll(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase));
+                _s.Save();
+                BuildApps();
+            };
+            menu.Items.Add(remove);
+            button.ContextMenu = menu;
+            AppsGrid.Children.Add(button);
+        }
+
+        if (AppsGrid.Children.Count == 0)
+        {
+            AppsGrid.Children.Add(new TextBlock
+            {
+                Text = _s.Language == "ru" ? "Пока пусто. Нажми «Добавить», чтобы выбрать программу."
+                                          : "No apps yet. Select Add app to get started.",
+                Foreground = (Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
+                FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
+                TextWrapping = TextWrapping.Wrap, MaxWidth = 440
+            });
+        }
+    }
+
+    void AddApp_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = _s.Language == "ru" ? "Выбери приложение или ярлык" : "Choose an app or shortcut",
+            Filter = _s.Language == "ru"
+                ? "Приложения и ярлыки (*.exe;*.lnk)|*.exe;*.lnk|Все файлы (*.*)|*.*"
+                : "Applications and shortcuts (*.exe;*.lnk)|*.exe;*.lnk|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        string path = dialog.FileName;
+        if (_s.Apps.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            ShowToast("Moku", _s.Language == "ru" ? "Это приложение уже добавлено" : "This app is already added");
+            return;
+        }
+
+        string name = System.IO.Path.GetFileNameWithoutExtension(path);
+        _s.Apps.Add(new AppShortcut { Path = path, Name = name });
+        _s.Save();
+        BuildApps();
+        ShowToast("Moku", _s.Language == "ru" ? "Приложение добавлено" : "App added");
+    }
+
+    void LaunchApp(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                ShowToast("Moku", _s.Language == "ru" ? "Файл не найден. Удали ярлык и добавь его снова."
+                                                       : "File not found. Remove this shortcut and add it again.", ColorError);
+                BuildApps();
+                return;
+            }
+            Collapse();
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Не удалось запустить приложение " + path, ex);
+            ShowToast("Moku", _s.Language == "ru" ? "Не удалось запустить приложение" : "Could not launch app", ColorError);
+        }
+    }
+
     void BuildTiles()
     {
         var tiles = new (string Glyph, string Label, Action Act)[]
@@ -1524,6 +1710,11 @@ public partial class MainWindow : Window
         FadeInWelcomeElement(WeatherHost);
         FadeInWelcomeElement(TempText);
         EnsureFx();
-        if (_state == IslandState.Collapsed) Collapse();
+        if (_state == IslandState.Collapsed)
+        {
+            // Resize the compact island when media metadata appears or disappears.
+            Animate(_now != null ? PlayW : IdleW, CollapsedH, 18, spring: false);
+            Collapse();
+        }
     }
 }

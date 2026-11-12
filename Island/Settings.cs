@@ -4,6 +4,12 @@ using System.Text.RegularExpressions;
 
 namespace Island;
 
+public class AppShortcut
+{
+    public string Path { get; set; } = "";
+    public string Name { get; set; } = "";
+}
+
 /// <summary>Настройки хранятся в %APPDATA%\Moku\settings.json</summary>
 public class Settings
 {
@@ -12,6 +18,7 @@ public class Settings
     public int Scale { get; set; } = 100;            // размер острова, %
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
+    public List<AppShortcut> Apps { get; set; } = new();
 
     static string FilePath => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Moku", "settings.json");
@@ -26,6 +33,9 @@ public class Settings
         Scale = Math.Clamp(Scale, 70, 150);
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
+        Apps ??= new();
+        Apps = Apps.Where(a => a != null && !string.IsNullOrWhiteSpace(a.Path) &&
+            !string.IsNullOrWhiteSpace(a.Name)).Take(60).ToList();
     }
 
     public static Settings Load()
