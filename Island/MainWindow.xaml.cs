@@ -29,6 +29,7 @@ using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using RadioButton = System.Windows.Controls.RadioButton;
 using Size = System.Windows.Size;
 using TextDataFormat = System.Windows.TextDataFormat;
+using TextBox = System.Windows.Controls.TextBox;
 using Windows.Media.Control;
 
 namespace Island;
