@@ -563,8 +563,7 @@
                         </StackPanel>
                     </Grid>
 
-                    <Grid Margin="0,0,0,10">
-                        <Grid Margin="0,0,0,8">
+                    <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="VerticalPositionLabel" Text="Vertical position" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
@@ -598,7 +597,6 @@
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,0,0,10">
-                        <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <TextBlock x:Name="IslandSizeLabel" Text="Island size" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="1">
