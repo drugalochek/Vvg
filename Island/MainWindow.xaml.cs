@@ -733,6 +733,17 @@ public partial class MainWindow : Window
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
         if (AlignCenter != null) AlignCenter.Content = ru ? "По центру" : "Center";
         if (AlignRight != null) AlignRight.Content = ru ? "Справа" : "Right";
+        if (VerticalTop != null) VerticalTop.Content = ru ? "Сверху" : "Top";
+        if (VerticalCenter != null) VerticalCenter.Content = ru ? "По центру" : "Center";
+        if (VerticalBottom != null) VerticalBottom.Content = ru ? "Снизу" : "Bottom";
+        if (ThemeCombo != null && ThemeCombo.Items.Count >= 5)
+        {
+            ((ComboBoxItem)ThemeCombo.Items[0]).Content = ru ? "Полночь" : "Midnight";
+            ((ComboBoxItem)ThemeCombo.Items[1]).Content = ru ? "Океан" : "Ocean";
+            ((ComboBoxItem)ThemeCombo.Items[2]).Content = ru ? "Аметист" : "Amethyst";
+            ((ComboBoxItem)ThemeCombo.Items[3]).Content = ru ? "Изумруд" : "Emerald";
+            ((ComboBoxItem)ThemeCombo.Items[4]).Content = ru ? "Роза" : "Rose";
+        }
         UpdateAutoButton();
         if (TileGrid != null)
         {
