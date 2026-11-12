@@ -151,6 +151,7 @@ public partial class MainWindow : Window
 
         startupStage = "building tiles";
         BuildTiles();
+        BuildApps();
         startupStage = "building accent swatches";
         BuildAccentSwatches();
         // Language selector is now the native WPF English/Russian segmented control.
@@ -590,6 +591,10 @@ public partial class MainWindow : Window
         if (LanguageLabel != null) LanguageLabel.Text = ru ? "Язык интерфейса" : "Language";
         if (TabHome != null) TabHome.Content = ru ? "Главная" : "Home";
         if (TabClip != null) TabClip.Content = ru ? "Буфер" : "Clipboard";
+        if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
+        if (AppsHeading != null) AppsHeading.Text = ru ? "ВАШИ ПРИЛОЖЕНИЯ" : "YOUR APPS";
+        if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
+        if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
         if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
         if (MenuSettings != null) MenuSettings.Header = ru ? "Настройки" : "Settings";
         if (MenuExit != null) MenuExit.Header = ru ? "Выход" : "Exit";
@@ -1385,13 +1390,139 @@ public partial class MainWindow : Window
         var tag = (sender as RadioButton)?.Tag as string;
         HomePage.Visibility = tag == "Home" ? Visibility.Visible : Visibility.Collapsed;
         ClipPage.Visibility = tag == "Clip" ? Visibility.Visible : Visibility.Collapsed;
+        AppsPage.Visibility = tag == "Apps" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = tag == "Set" ? Visibility.Visible : Visibility.Collapsed;
-        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : SettingsPage);
+        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") UpdateAutoButton();
+        if (tag == "Apps") BuildApps();
     }
 
     // ================= Плитки =================
+    // ================= Быстрый запуск приложений =================
+    void BuildApps()
+    {
+        if (AppsGrid == null) return;
+        AppsGrid.Children.Clear();
+        foreach (var app in _s.Apps.ToList())
+        {
+            if (!File.Exists(app.Path)) continue;
+            var button = new Button
+            {
+                Style = (Style)FindResource("TileBtn"),
+                Width = 112,
+                Height = 88,
+                Margin = new Thickness(4),
+                ToolTip = app.Path
+            };
+            var content = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var iconView = new Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
+            try
+            {
+                using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
+                if (icon != null)
+                {
+                    var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
+                        BitmapSizeOptions.FromWidthAndHeight(48, 48));
+                    source.Freeze();
+                    iconView.Source = source;
+                }
+            }
+            catch (Exception ex) { Log.Warn("Не удалось получить иконку " + app.Path + ": " + ex.Message); }
+
+            if (iconView.Source != null) content.Children.Add(iconView);
+            else content.Children.Add(new TextBlock
+            {
+                Text = "\\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
+                FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 7)
+            });
+            content.Children.Add(new TextBlock
+            {
+                Text = app.Name, FontSize = 11, Foreground = Brushes.White,
+                TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 98,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            button.Content = content;
+            var path = app.Path;
+            button.Click += (_, _) => LaunchApp(path);
+            var menu = new ContextMenu();
+            var remove = new MenuItem { Header = _s.Language == "ru" ? "Удалить из списка" : "Remove from list" };
+            remove.Click += (_, _) =>
+            {
+                _s.Apps.RemoveAll(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase));
+                _s.Save();
+                BuildApps();
+            };
+            menu.Items.Add(remove);
+            button.ContextMenu = menu;
+            AppsGrid.Children.Add(button);
+        }
+
+        if (AppsGrid.Children.Count == 0)
+        {
+            AppsGrid.Children.Add(new TextBlock
+            {
+                Text = _s.Language == "ru" ? "Пока пусто. Нажми «Добавить», чтобы выбрать программу."
+                                          : "No apps yet. Select Add app to get started.",
+                Foreground = (Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
+                FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
+                TextWrapping = TextWrapping.Wrap, MaxWidth = 440
+            });
+        }
+    }
+
+    void AddApp_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = _s.Language == "ru" ? "Выбери приложение или ярлык" : "Choose an app or shortcut",
+            Filter = _s.Language == "ru"
+                ? "Приложения и ярлыки (*.exe;*.lnk)|*.exe;*.lnk|Все файлы (*.*)|*.*"
+                : "Applications and shortcuts (*.exe;*.lnk)|*.exe;*.lnk|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        string path = dialog.FileName;
+        if (_s.Apps.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            ShowToast("Moku", _s.Language == "ru" ? "Это приложение уже добавлено" : "This app is already added");
+            return;
+        }
+
+        string name = System.IO.Path.GetFileNameWithoutExtension(path);
+        _s.Apps.Add(new AppShortcut { Path = path, Name = name });
+        _s.Save();
+        BuildApps();
+        ShowToast("Moku", _s.Language == "ru" ? "Приложение добавлено" : "App added");
+    }
+
+    void LaunchApp(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                ShowToast("Moku", _s.Language == "ru" ? "Файл не найден. Удали ярлык и добавь его снова."
+                                                       : "File not found. Remove this shortcut and add it again.", ColorError);
+                BuildApps();
+                return;
+            }
+            Collapse();
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Не удалось запустить приложение " + path, ex);
+            ShowToast("Moku", _s.Language == "ru" ? "Не удалось запустить приложение" : "Could not launch app", ColorError);
+        }
+    }
+
     void BuildTiles()
     {
         var tiles = new (string Glyph, string Label, Action Act)[]
