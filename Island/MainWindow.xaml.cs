@@ -498,7 +498,7 @@ public partial class MainWindow : Window
         Color initial;
         try { initial = (Color)ColorConverter.ConvertFromString(_s.ThemeBottomColor); }
         catch { initial = Colors.Black; }
-        var picker = new ColorPickerWindow(initial) { Owner = this };
+        var picker = new ColorPickerWindow(initial, _s.Language == "ru") { Owner = this };
         if (picker.ShowDialog() != true) return;
         _s.ThemeBottomColor = picker.SelectedColor.ToString();
         ApplyAppearance();
@@ -518,7 +518,7 @@ public partial class MainWindow : Window
         var initial = string.IsNullOrWhiteSpace(_s.ThemeColor)
             ? (_bodyBrush?.GradientStops[0].Color ?? Color.FromRgb(0, 0, 0))
             : (Color)ColorConverter.ConvertFromString(_s.ThemeColor);
-        var picker = new ColorPickerWindow(initial) { Owner = this };
+        var picker = new ColorPickerWindow(initial, _s.Language == "ru") { Owner = this };
         if (picker.ShowDialog() != true) return;
         _s.Theme = "Custom";
         _s.ThemeColor = picker.SelectedColor.ToString();
