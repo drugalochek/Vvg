@@ -801,8 +801,21 @@ public partial class MainWindow : Window
         else ShowToast("Clipboard busy", "Could not write text. Please try again.", ColorError);
     }
 
+    static bool IsInsideButton(DependencyObject? element)
+    {
+        while (element != null)
+        {
+            if (element is Button) return true;
+            try { element = VisualTreeHelper.GetParent(element); }
+            catch { element = LogicalTreeHelper.GetParent(element); }
+        }
+        return false;
+    }
+
     async void HistoryItem_Click(object sender, MouseButtonEventArgs e)
     {
+        // The small copy control handles its own click; don't also trigger the row action.
+        if (IsInsideButton(e.OriginalSource as DependencyObject)) return;
         try
         {
             if (sender is FrameworkElement { DataContext: ClipItem item })
