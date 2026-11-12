@@ -708,7 +708,8 @@ public partial class MainWindow : Window
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Сдвиг по Y" : "Vertical offset";
         if (CornerRadiusLabel != null) CornerRadiusLabel.Text = ru ? "Скругление" : "Corner rounding";
         if (ThemeLabel != null) ThemeLabel.Text = ru ? "Тема" : "Theme";
-        if (RgbLabel != null) RgbLabel.Text = ru ? "Цвет RGB" : "Custom RGB";
+        if (RgbLabel != null) RgbLabel.Text = ru ? "Свой цвет" : "Custom color";
+        if (CustomColorHint != null) CustomColorHint.Text = ru ? "Нажмите + в палитре, чтобы открыть выбор цвета" : "Press + in the palette to choose a color";
         if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
