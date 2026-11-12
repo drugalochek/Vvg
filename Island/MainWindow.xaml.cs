@@ -107,6 +107,7 @@ public partial class MainWindow : Window
 
     readonly Settings _s = Settings.Load();
     readonly List<AppShortcut> _steamCandidates = new();
+    bool _steamScanned;
     IslandState _state = IslandState.Collapsed;
     HwndSource? _source;
     bool _ready;
@@ -1538,7 +1539,11 @@ public partial class MainWindow : Window
         FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") UpdateAutoButton();
-        if (tag == "Apps") BuildApps();
+        if (tag == "Apps")
+        {
+            BuildApps();
+            if (!_steamScanned) ScanSteam_Click(this, new RoutedEventArgs());
+        }
     }
 
     // ================= Плитки =================
@@ -1646,6 +1651,8 @@ public partial class MainWindow : Window
 
     void ScanSteam_Click(object sender, RoutedEventArgs e)
     {
+        _steamScanned = true;
+        bool showResult = sender is Button;
         try
         {
             var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1699,13 +1706,13 @@ public partial class MainWindow : Window
                 ? (_s.Language == "ru" ? "Установленные игры Steam не найдены" : "No installed Steam games found")
                 : (_s.Language == "ru" ? $"Найдено игр: {_steamCandidates.Count}. Нажми на игру, чтобы добавить её."
                                        : $"Found {_steamCandidates.Count} games. Select a game to add it.");
-            ShowToast("Steam", message, _steamCandidates.Count == 0 ? ColorError : ColorOk);
+            if (showResult) ShowToast("Steam", message, _steamCandidates.Count == 0 ? ColorError : ColorOk);
         }
         catch (Exception ex)
         {
             Log.Error("Steam game discovery failed", ex);
-            ShowToast("Steam", _s.Language == "ru" ? "Не удалось просканировать библиотеки Steam"
-                                                   : "Could not scan Steam libraries", ColorError);
+            if (showResult) ShowToast("Steam", _s.Language == "ru" ? "Не удалось просканировать библиотеки Steam"
+                                                                    : "Could not scan Steam libraries", ColorError);
         }
     }
 
