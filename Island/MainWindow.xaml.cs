@@ -418,7 +418,6 @@ public partial class MainWindow : Window
             _bodyBrush.Opacity = 1.0;
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
-        if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
         if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         if (RgbPreview != null) RgbPreview.Background = new SolidColorBrush(_accentColor);
