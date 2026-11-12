@@ -122,7 +122,6 @@ public partial class MainWindow : Window
     int _animVer, _fullFadeVer, _totalChars;
     NowPlaying? _now;
     string? _lastTrack;
-    string? _miniAnimatedTitle;
     SolidColorBrush _accent = Brushes.White;
 
     readonly MediaWatcher _media = new();
@@ -1285,9 +1284,6 @@ public partial class MainWindow : Window
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
-        MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
-        MiniTitleShift.X = 0;
-        _miniAnimatedTitle = null; // restart the marquee when the island is collapsed again
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();
@@ -1344,50 +1340,7 @@ public partial class MainWindow : Window
             ? (string.IsNullOrWhiteSpace(_now!.Artist) ? _now.Title : $"{_now.Title} — {_now.Artist}")
             : null;
 
-        // Animate only inside the clipped title lane. The eyes and transport buttons
-        // occupy separate grid columns and can never be covered by the moving text.
-        if (!hasMedia)
-        {
-            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
-            MiniTitleShift.X = 0;
-            _miniAnimatedTitle = null;
-        }
-        else if (_state == IslandState.Expanded)
-        {
-            // Do not mark the title as animated while the compact title lane is hidden.
-            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
-            MiniTitleShift.X = 0;
-            _miniAnimatedTitle = null;
-        }
-        else if (_miniAnimatedTitle != _now!.Title)
-        {
-            _miniAnimatedTitle = _now.Title;
-            MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, null);
-            MiniTitleShift.X = 0;
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (_state == IslandState.Expanded || _now == null || _now.Title != _miniAnimatedTitle) return;
-                double textWidth = TitleText.ActualWidth;
-                double laneWidth = TitleViewport.ActualWidth;
-                if (textWidth <= laneWidth + 12) return;
-
-                // Keep the title centered during the pause, then scroll it fully
-                // out to the left. The next loop returns it to the centered position.
-                double centeredX = (laneWidth - textWidth) / 2.0;
-                double travel = centeredX + textWidth;
-                double durationMs = Math.Clamp(travel * 12, 1400, 4200);
-                const double pauseMs = 1400;
-                var scroll = new DoubleAnimationUsingKeyFrames
-                {
-                    Duration = TimeSpan.FromMilliseconds(pauseMs + durationMs),
-                    RepeatBehavior = RepeatBehavior.Forever
-                };
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(centeredX, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(centeredX, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs))));
-                scroll.KeyFrames.Add(new LinearDoubleKeyFrame(-textWidth, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(pauseMs + durationMs))));
-                MiniTitleShift.BeginAnimation(TranslateTransform.XProperty, scroll);
-            }), DispatcherPriority.Loaded);
-        }
+        // Keep the title fixed. TextTrimming in XAML displays an ellipsis when it exceeds the lane.
 
         // In media mode the title and controls own the row. Otherwise show clock/weather.
         TimeText.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
