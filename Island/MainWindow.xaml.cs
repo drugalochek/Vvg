@@ -1437,7 +1437,7 @@ public partial class MainWindow : Window
             if (iconView.Source != null) content.Children.Add(iconView);
             else content.Children.Add(new TextBlock
             {
-                Text = "\\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
+                Text = "\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
                 FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 7)
             });
             content.Children.Add(new TextBlock
