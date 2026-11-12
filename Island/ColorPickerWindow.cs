@@ -4,6 +4,10 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Color = System.Windows.Media.Color;
+using Point = System.Windows.Point;
+using Button = System.Windows.Controls.Button;
+using TextBox = System.Windows.Controls.TextBox;
 
 namespace Island;
 
