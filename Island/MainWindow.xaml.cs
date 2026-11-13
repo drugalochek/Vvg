@@ -1670,6 +1670,8 @@ public partial class MainWindow : Window
             : exe.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase)
                 ? Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", exe)
                 : Path.Combine(Environment.SystemDirectory, exe);
+        // Resolve the visible app/host first, before checking the launcher stub or its PID.
+        if (TryActivateHomeQuickAction(exe, path)) return;
         LaunchApp(path);
     }
 

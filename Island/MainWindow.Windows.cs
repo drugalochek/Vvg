@@ -24,8 +24,6 @@ public partial class MainWindow
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hwnd);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hwnd);
-    [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd, int command);
-    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr hwnd, uint command);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
@@ -33,8 +31,7 @@ public partial class MainWindow
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
     [DllImport("user32.dll")] static extern bool GetWindowDisplayAffinity(IntPtr hwnd, out uint affinity);
     readonly System.Threading.SemaphoreSlim _previewSlots = new(2);
-    const int SW_RESTORE = 9;
-    sealed record OpenWindow(IntPtr Handle, int ProcessId, string Title, string ProcessName, string? Executable);
+    sealed record OpenWindow(IntPtr Handle, int ProcessId, string Title, string ProcessName, string? Executable, string WindowClass);
     DispatcherTimer? _windowsRefreshTimer;
     bool _homeShowsWindows;
     string _windowListSignature = "";
@@ -81,9 +78,12 @@ public partial class MainWindow
             if (GetWindowText(hwnd, title, title.Capacity) <= 0 || string.IsNullOrWhiteSpace(title.ToString())) return true;
             try
             {
-                using var p = Process.GetProcessById((int)pid);
+                int appPid = (int)pid;
+                // Windows 10 Calculator and other UWP apps may be owned by ApplicationFrameHost.
+                if (cls.ToString() == "ApplicationFrameWindow") appPid = WindowActivation.HostedAppProcessId(hwnd, appPid);
+                using var p = Process.GetProcessById(appPid);
                 string? executable = null; try { executable = p.MainModule?.FileName; } catch { }
-                result.Add(new OpenWindow(hwnd, (int)pid, title.ToString(), p.ProcessName, executable));
+                result.Add(new OpenWindow(hwnd, appPid, title.ToString(), p.ProcessName, executable, cls.ToString()));
             }
             catch { }
             return true;
@@ -203,7 +203,32 @@ public partial class MainWindow
     void ActivateWindow(IntPtr hwnd)
     {
         if (!IsWindow(hwnd)) return;
-        Collapse(); if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE); SetForegroundWindow(hwnd);
+        Collapse(); WindowActivation.RestoreAndActivate(hwnd);
     }
+    bool TryActivateHomeQuickAction(string command, string launchPath)
+    {
+        var window = GetOpenWindows().FirstOrDefault(w => QuickAccessPolicy.MatchesWindow(command, w.ProcessName, w.WindowClass));
+        if (window != null)
+        {
+            _pendingAppLaunches.Remove(launchPath); ActivateWindow(window.Handle); return true;
+        }
+        if (!QuickAccessPolicy.IsTerminal(command)) return false;
+        using var current = Process.GetCurrentProcess();
+        foreach (string name in new[] { "powershell", "pwsh" })
+            foreach (var process in Process.GetProcessesByName(name))
+                using (process)
+                {
+                    try
+                    {
+                        if (process.HasExited || process.SessionId != current.SessionId) continue;
+                        var hwnd = WindowActivation.ConsoleWindowForProcess(process.Id);
+                        if (hwnd == IntPtr.Zero) continue;
+                        _pendingAppLaunches.Remove(launchPath); ActivateWindow(hwnd); return true;
+                    }
+                    catch (Exception ex) { Log.Warn("Quick-access console lookup: " + ex.Message); }
+                }
+        return false;
+    }
+
     static long ProcessStarted(int pid) { try { using var p = Process.GetProcessById(pid); return p.StartTime.ToUniversalTime().Ticks; } catch { return 0; } }
 }

@@ -128,4 +128,18 @@ Check(popups.Descendants(ui+"Style").Any(e=>(string?)e.Attribute("TargetType")==
 var previewStyle=popups.Descendants(ui+"Style").Single(e=>(string?)e.Attribute(xns+"Key")=="MokuWindowTooltip");
 Check(previewStyle.Descendants(ui+"Border").Any(e=>(string?)e.Attribute("CornerRadius")=="{DynamicResource MokuPopupRadius}"),"window previews retain themed roundable popup");
 
+// Home quick actions must resolve visible apps even when the OS uses a different host.
+Check(QuickAccessPolicy.MatchesWindow("notepad.exe","Notepad","Notepad"),"Home Notepad, including packaged Windows 11 app");
+Check(QuickAccessPolicy.MatchesWindow("calc.exe","CalculatorApp","ApplicationFrameWindow"),"Home Calculator resolved behind application frame host");
+Check(QuickAccessPolicy.MatchesWindow("calc.exe","Calculator","WinUIDesktopWin32WindowClass"),"Home modern Calculator alias");
+Check(!QuickAccessPolicy.MatchesWindow("calc.exe","ApplicationFrameHost","ApplicationFrameWindow"),"do not confuse unrelated UWP frame with Calculator");
+Check(QuickAccessPolicy.MatchesWindow("powershell.exe","WindowsTerminal","CASCADIA_HOSTING_WINDOW_CLASS"),"Home reuses Windows Terminal host");
+Check(QuickAccessPolicy.MatchesWindow("powershell.exe","pwsh","ConsoleWindowClass"),"Home recognizes PowerShell 7");
+Check(!QuickAccessPolicy.MatchesWindow("powershell.exe","conhost","ConsoleWindowClass"),"unmapped console host cannot steal another app console");
+Check(QuickAccessPolicy.MatchesWindow("explorer.exe","explorer","CabinetWClass"),"Home restores real Explorer folder");
+Check(!QuickAccessPolicy.MatchesWindow("explorer.exe","explorer","Progman"),"desktop shell is not an open folder");
+Check(QuickAccessPolicy.MatchesWindow("taskmgr.exe","Taskmgr","TaskManagerWindow"),"Home Task Manager case-insensitive process");
+Check(QuickAccessPolicy.IsTerminal(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"),"Windows command paths normalize in portable tests");
+Check(!QuickAccessPolicy.MatchesWindow("other.exe","Notepad","Notepad"),"unrelated quick command does not activate arbitrary app");
+
 Console.WriteLine($"PASS: {checks} checks (folders, file launch plans, Home/Steam/button UI contracts, settings and 400 randomized packing cases). Windows integration still requires Windows.");

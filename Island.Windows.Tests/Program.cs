@@ -1,3 +1,5 @@
+using Island;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -19,9 +21,48 @@ internal static class Program
         timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
         timer.Start(); Dispatcher.PushFrame(frame);
     }
-    [STAThread]
-    static int Main()
+    static int RunWindowProbe()
     {
+        var app = new Application();
+        var window = new Window { Title = "Moku external restoration probe", Width = 320, Height = 180 };
+        window.Loaded += (_, _) => window.WindowState = WindowState.Minimized;
+        return app.Run(window);
+    }
+    static void TestExternalWindowRestore()
+    {
+        var info = new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+        if (System.IO.Path.GetFileNameWithoutExtension(info.FileName).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+            info.ArgumentList.Add(typeof(Program).Assembly.Location);
+        info.ArgumentList.Add("--window-probe");
+        using var child = Process.Start(info)!;
+        try
+        {
+            IntPtr hwnd = IntPtr.Zero;
+            for (int i = 0; i < 80 && !child.HasExited; i++)
+            {
+                child.Refresh(); hwnd = child.MainWindowHandle;
+                if (hwnd != IntPtr.Zero && WindowActivation.IsMinimized(hwnd)) break;
+                Pump();
+            }
+            Check(hwnd != IntPtr.Zero, "external app window found");
+            Check(WindowActivation.IsMinimized(hwnd), "external app initially minimized");
+            Check(WindowActivation.RestoreAndActivate(hwnd), "restore request targets existing external window");
+            for (int i = 0; i < 30 && WindowActivation.IsMinimized(hwnd); i++) Pump();
+            Check(!WindowActivation.IsMinimized(hwnd), "minimized external window really restored through Win32");
+            child.Refresh();
+            Check(!child.HasExited && child.MainWindowHandle == hwnd, "restoration retains the same external window and process");
+            Check(WindowActivation.RestoreAndActivate(hwnd) && !child.HasExited, "repeat activation reuses existing external app");
+        }
+        finally
+        {
+            if (!child.HasExited) { child.Kill(entireProcessTree: true); child.WaitForExit(5000); }
+        }
+    }
+
+    [STAThread]
+    static int Main(string[] args)
+    {
+        if (args.Length == 1 && args[0] == "--window-probe") return RunWindowProbe();
         try
         {
             // Load the production compiled resources, without invoking Moku's OnStartup,
@@ -69,8 +110,10 @@ internal static class Program
             nested.Click += (_, _) => clicked = true;
             nested.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, nested));
             Check(clicked, "custom menu preserves click routing");
-            tip.IsOpen = false; menu.IsOpen = false; window.Close(); app.Shutdown();
-            Console.WriteLine($"PASS: {checks} Windows WPF popup checks. Full application manual testing is separate.");
+            tip.IsOpen = false; menu.IsOpen = false;
+            TestExternalWindowRestore();
+            window.Close(); app.Shutdown();
+            Console.WriteLine($"PASS: {checks} Windows window-restoration and WPF popup checks. Full application manual testing is separate.");
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
