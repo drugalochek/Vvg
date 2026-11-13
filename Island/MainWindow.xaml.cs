@@ -234,6 +234,7 @@ public partial class MainWindow : Window
         TempText.Visibility = Visibility.Collapsed;
         ApplyPosition();
         _ready = true;
+        SetHomeView(_s.HomeStartupView, false);
         Log.Info("MainWindow: initialization complete");
         }
         catch (Exception ex)
@@ -338,6 +339,8 @@ public partial class MainWindow : Window
         _audio.Dispose();
         if (_fxAttached) CompositionTarget.Rendering -= FxRendering;
         _gameTimer?.Stop();
+        StopWindowsRefresh();
+        StopAppsScanWatch();
         _clipboardTimer.Stop();
         _toastTimer.Stop();
         _clock.Stop();
@@ -1225,6 +1228,16 @@ public partial class MainWindow : Window
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
+        if (_s.RememberLastTab)
+        {
+            switch (_s.LastTab)
+            {
+                case "Clip": TabClip.IsChecked = true; break;
+                case "Apps": TabApps.IsChecked = true; break;
+                case "Set": TabSet.IsChecked = true; break;
+                default: TabHome.IsChecked = true; break;
+            }
+        }
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();

@@ -164,6 +164,11 @@ public partial class MainWindow
             new[] { ("CtrlAltSpace", "Ctrl+Alt+Space"), ("CtrlShiftSpace", "Ctrl+Shift+Space"), ("WinAltI", "Win+Alt+I"), ("Off", L("Выкл", "Off")) },
             () => _s.Hotkey, v => { _s.Hotkey = v; RegisterIslandHotkey(true); UpdateHotkeyHint(); });
         // v2.8: плавный ползунок вместо четырёх кнопок; лишние записи убираются, только когда ползунок отпустили
+        ChoiceRow(p, L("При открытии показывать", "Show on open"), "homeview",
+            new[] { ("Clipboard", L("Буфер обмена", "Clipboard")), ("Windows", L("Запущенные окна", "Running windows")) },
+            () => _s.HomeStartupView, v => { _s.HomeStartupView = v; SetHomeView(v); });
+        ToggleRow(p, L("Запоминать последнюю открытую вкладку", "Remember last opened tab"),
+            () => _s.RememberLastTab, v => { _s.RememberLastTab = v; _s.Save(); });
         SliderRow(p, L("История буфера", "Clipboard history"), 5, 200, () => _s.ClipboardLimit, v => _s.ClipboardLimit = v,
             v => ru ? $"{v} {Plural(v, "запись", "записи", "записей")}" : $"{v} {(v == 1 ? "item" : "items")}", commit: TrimHistory);
         Section(p, L("ИГРЫ", "GAMES"));
