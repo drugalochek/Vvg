@@ -1670,9 +1670,13 @@ public partial class MainWindow : Window
 
     void Launch(string exe)
     {
-        Collapse();
-        try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true }); }
-        catch (Exception ex) { ShowToast(Tr("Не удалось запустить", "Could not launch"), ex.Message, ColorError); }
+        // The Home quick actions use the same activation and debounce policy as saved apps.
+        string path = exe.Equals("explorer.exe", StringComparison.OrdinalIgnoreCase)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), exe)
+            : exe.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase)
+                ? Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", exe)
+                : Path.Combine(Environment.SystemDirectory, exe);
+        LaunchApp(path);
     }
 
     // ================= Скриншоты =================

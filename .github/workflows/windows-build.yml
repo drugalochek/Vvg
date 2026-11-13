@@ -3,6 +3,9 @@ on:
   push:
     branches: [main, update/moku-2.12.0]
   workflow_dispatch:
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

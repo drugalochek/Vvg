@@ -107,6 +107,13 @@ public partial class MainWindow
             return executable != null && _steamInstallPaths.TryGetValue(SteamId(target), out var folder)
                 && executable.StartsWith(folder.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
         }
+        string file = Path.GetFileName(target).ToLowerInvariant();
+        string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (windows.Length > 0 && target.StartsWith(windows + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            if (file == "notepad.exe" && processName.Equals("notepad", StringComparison.OrdinalIgnoreCase)) return true;
+            if (file == "calc.exe" && (processName.Equals("CalculatorApp", StringComparison.OrdinalIgnoreCase) || processName.Equals("Calculator", StringComparison.OrdinalIgnoreCase) || processName.Equals("calc", StringComparison.OrdinalIgnoreCase))) return true;
+        }
         if (executable != null) return string.Equals(target, executable, StringComparison.OrdinalIgnoreCase);
         return string.Equals(Path.GetFileNameWithoutExtension(target), processName, StringComparison.OrdinalIgnoreCase);
     }
@@ -115,6 +122,8 @@ public partial class MainWindow
         var open = GetOpenWindows().FirstOrDefault(w => MatchesAppTarget(target, w.Executable, w.ProcessName));
         if (open != null) { running = true; _pendingAppLaunches.Remove(target); ActivateWindow(open.Handle); return true; }
         running = false;
+        // Explorer is also the desktop shell: that background process alone is not a folder window.
+        if (string.Equals(target, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), StringComparison.OrdinalIgnoreCase)) return false;
         foreach (var process in Process.GetProcesses())
         {
             using (process)
@@ -143,7 +152,8 @@ public partial class MainWindow
         if (_state == IslandState.Expanded)
         {
             if (AppsPage.Visibility == Visibility.Visible) AppsHint.Text = text;
-            else if (HomeWindowsStatus != null) HomeWindowsStatus.Text = text;
+            else if (_homeShowsWindows && HomeWindowsStatus != null) HomeWindowsStatus.Text = text;
+            else if (RecentlyCopiedText != null) RecentlyCopiedText.Text = text;
         }
         else ShowToast("Moku", text, ColorError);
     }
