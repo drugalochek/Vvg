@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -35,14 +35,15 @@ public class Settings
     public bool EyesFollowCursor { get; set; } = true;
     public bool EyeEmotions { get; set; } = true;
     public bool SleepAtNight { get; set; } = true;
-    public bool BeatBounce { get; set; } = true;     // глаза подпрыгивают в такт
+    public bool BeatBounce { get; set; } = true;     // глаза танцуют под музыку (в такт и под темп)
+    public int DanceStrength { get; set; } = 100;    // v2.8: размах танца, 0..200 %
     public bool MusicWave { get; set; } = true;
     public int WaveHeight { get; set; } = 100;       // 30..150 %
     public bool ToastOnCopy { get; set; } = true;
     public bool ToastOnTrack { get; set; } = true;
     public bool GameMode { get; set; } = true;       // полупрозрачность и «сквозные» клики в полноэкранных играх
     public string Hotkey { get; set; } = "CtrlAltSpace"; // CtrlAltSpace | CtrlShiftSpace | AltSpace | WinAltI | Off
-    public int ClipboardLimit { get; set; } = 50;    // 10..100 записей
+    public int ClipboardLimit { get; set; } = 50;    // 5..200 записей
     public List<AppShortcut> Apps { get; set; } = new();
 
     static string FilePath => System.IO.Path.Combine(
@@ -73,7 +74,8 @@ public class Settings
         AnimationSpeed = Math.Clamp(AnimationSpeed, 50, 200);
         GazeRange = Math.Clamp(GazeRange, 50, 150);
         WaveHeight = Math.Clamp(WaveHeight, 30, 150);
-        ClipboardLimit = Math.Clamp(ClipboardLimit, 10, 100);
+        ClipboardLimit = Math.Clamp(ClipboardLimit, 5, 200);
+        DanceStrength = Math.Clamp(DanceStrength, 0, 200);
         if (Hotkey is not ("CtrlAltSpace" or "CtrlShiftSpace" or "AltSpace" or "WinAltI" or "Off")) Hotkey = "CtrlAltSpace";
         Apps ??= new();
         Apps = Apps.Where(a => a != null && !string.IsNullOrWhiteSpace(a.Path) &&

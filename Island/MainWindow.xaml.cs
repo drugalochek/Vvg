@@ -52,7 +52,7 @@ public class ClipItem
 public partial class MainWindow : Window
 {
     enum IslandState { Collapsed, Toast, Expanded }
-    enum EyeMood { Neutral, Happy, Excited, Calm, Sleepy, Focused, Surprised }
+    enum EyeMood { Neutral, Happy, Excited, Calm, Sleepy, Focused, Surprised, Blissful, Curious, Bored, Sad }
     EyeMood _eyeMood = EyeMood.Neutral;
 
     // ---- Win32 ----
@@ -83,7 +83,7 @@ public partial class MainWindow : Window
     const byte VK_MEDIA_NEXT = 0xB0, VK_MEDIA_PREV = 0xB1, VK_MEDIA_PLAY = 0xB3;
 
     // ---- Ограничения памяти ----
-    int MaxItems => _s.ClipboardLimit;   // настраивается: 10–100 записей
+    int MaxItems => _s.ClipboardLimit;   // настраивается: 5–200 записей
     const int MaxItemChars = 200_000;
     const int MaxTotalChars = 1_500_000;
 
@@ -315,6 +315,7 @@ public partial class MainWindow : Window
 
     void OnClosed(object? sender, EventArgs e)
     {
+        FlushSave();
         var hwnd = new WindowInteropHelper(this).Handle;
         RemoveClipboardFormatListener(hwnd);
         UnregisterHotKey(hwnd, HotkeyId);
@@ -451,7 +452,7 @@ public partial class MainWindow : Window
         _s.GlassOpacity = Math.Clamp(value, 0, 100);
         if (OpacitySlider != null && (int)OpacitySlider.Value != _s.GlassOpacity) OpacitySlider.Value = _s.GlassOpacity;
         ApplyAppearance();
-        _s.Save();
+        SaveSoon();
     }
 
     void SetFullscreenOpacity(int value)
@@ -460,17 +461,17 @@ public partial class MainWindow : Window
         if (FullscreenOpacitySlider != null && (int)FullscreenOpacitySlider.Value != _s.FullscreenOpacity) FullscreenOpacitySlider.Value = _s.FullscreenOpacity;
         if (_gameMode) Opacity = _s.FullscreenOpacity / 100.0;
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
-        _s.Save();
+        SaveSoon();
     }
     void FullscreenOpacitySlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) { if (_ready) SetFullscreenOpacity((int)e.NewValue); }
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
-    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); _s.Save(); }
+    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); SaveSoon(); }
     void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
     void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
     void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
-    void SetOffsetX(int v) { _s.OffsetX = Math.Clamp(v, -500, 500); OffsetXInput.Text = _s.OffsetX.ToString(); ApplyPosition(); _s.Save(); }
+    void SetOffsetX(int v) { _s.OffsetX = Math.Clamp(v, -500, 500); OffsetXInput.Text = _s.OffsetX.ToString(); ApplyPosition(); SaveSoon(); }
     void OffsetXInput_LostFocus(object sender, RoutedEventArgs e) => CommitOffsetInput(OffsetXInput, true);
     void OffsetYInput_LostFocus(object sender, RoutedEventArgs e) => CommitOffsetInput(OffsetYInput, false);
     void OffsetInput_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { CommitOffsetInput((TextBox)sender, ReferenceEquals(sender, OffsetXInput)); Keyboard.ClearFocus(); e.Handled = true; } }
@@ -509,7 +510,7 @@ public partial class MainWindow : Window
         if (!_ready) return;
         _s.GradientBalance = Math.Clamp((int)Math.Round(e.NewValue), 10, 90);
         ApplyAppearance();
-        _s.Save();
+        SaveSoon();
     }
 
     void ThemeColor_Click(object sender, RoutedEventArgs e)
@@ -594,7 +595,7 @@ public partial class MainWindow : Window
         _s.OffsetY = Math.Clamp(v, -500, 500);
         if (OffsetYInput != null) OffsetYInput.Text = _s.OffsetY.ToString();
         ApplyPosition();
-        _s.Save();
+        SaveSoon();
     }
 
     void SetScale(int v)
@@ -603,7 +604,7 @@ public partial class MainWindow : Window
         ScaleText.Text = _s.Scale + "%";
         if (ScaleSlider != null && (int)ScaleSlider.Value != _s.Scale) ScaleSlider.Value = _s.Scale;
         ApplyScale();
-        _s.Save();
+        SaveSoon();
     }
 
     void Scale_Minus(object s, RoutedEventArgs e) => SetScale(_s.Scale - 10);
@@ -918,6 +919,7 @@ public partial class MainWindow : Window
         SyncRecent();
         if (_s.ToastOnCopy) ShowToast("Copied", text.Replace('\r', ' ').Replace('\n', ' '), ColorOk);
         SetEyeMood(EyeMood.Happy, 1.6);
+        Wink();
     }
 
     async Task<bool> SetClipboardTextAsync(string text)
@@ -996,7 +998,9 @@ public partial class MainWindow : Window
 
     void ClearHistory_Click(object sender, RoutedEventArgs e)
     {
+        bool had = History.Count > 0;
         History.Clear(); Recent.Clear(); _totalChars = 0;
+        if (had) SetEyeMood(EyeMood.Sad, 1.6);   // жалко историю :(
     }
 
     void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => HistoryView?.Refresh();
@@ -1112,6 +1116,7 @@ public partial class MainWindow : Window
             NowArtist.Text = _now.Artist;
             PlayBtn.Content = _now.Playing ? "\uE769" : "\uE768";
         }
+        UpdateArt(_now?.Art);
         UpdatePlayButton();
         UpdateMini();
         FadeWelcomeInfo();
@@ -1191,7 +1196,7 @@ public partial class MainWindow : Window
     void ShowToast(string title, string sub, string? colorHex = null)
     {
         if (_welcomeRunning || _state == IslandState.Expanded) return;
-        if (colorHex == ColorError) SetEyeMood(EyeMood.Surprised, 1.2);
+        if (colorHex == ColorError) SetEyeMood(EyeMood.Sad, 2.2);   // ошибка — немного грустит, а не пугается
         _state = IslandState.Toast;
         ToastTitle.Text = title;
         ToastSub.Text = sub;
@@ -1298,6 +1303,7 @@ public partial class MainWindow : Window
         _lastRenderTime = args.RenderingTime;
         bool playing = !_welcomeRunning && _now?.Playing == true;
         bool beat = playing && _audio.ConsumeBeat();
+        TrackTempo(dt, playing, beat);
         if (beat)
             _waveBeatPulse = Math.Min(1.0, _waveBeatPulse + 0.82);
 
@@ -1942,7 +1948,7 @@ public partial class MainWindow : Window
         if (_welcomeRunning) return;
         if (np == null)
         {
-            NowTitle.Text = "Nothing playing";
+            NowTitle.Text = _s.Language == "ru" ? "Ничего не воспроизводится" : "Nothing playing";
             NowArtist.Text = "";
             PlayBtn.Content = "\uE768";
         }
@@ -1962,6 +1968,7 @@ public partial class MainWindow : Window
                     string.IsNullOrEmpty(np.Artist) ? np.Title : $"{np.Artist} — {np.Title}");
             }
         }
+        UpdateArt(np?.Art);
         UpdatePlayButton();
         UpdateMini();
         FadeInWelcomeElement(TitlePanel);

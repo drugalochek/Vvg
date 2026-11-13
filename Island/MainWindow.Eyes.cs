@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Media;
 using Point = System.Windows.Point;
 
@@ -14,6 +14,8 @@ namespace Island;
 ///    правый глаз — на долю секунды позже, иногда двойное моргание.
 ///  • Эмоции меняют форму и поведение и включаются с «толчком», чтобы переход был заметен.
 ///  • Время эмоции тикает только пока глаза видны — тост больше не «съедает» эмоцию.
+///  • v2.8: «танец» под музыку по темпу трека; умиление с румянцем, когда глаза «гладят» курсором;
+///    любопытство при наведении, скука и зевота без дела, грусть при ошибке. Испуга от резкой мыши больше нет.
 /// </summary>
 public partial class MainWindow
 {
@@ -41,6 +43,10 @@ public partial class MainWindow
         EyeMood.Sleepy => new(1.22, 0.18, 0, 3.0),       // почти закрыты, опущены
         EyeMood.Focused => new(0.90, 0.74, -10, 0.2),    // серьёзный прищур «\ /»
         EyeMood.Surprised => new(1.18, 1.30, 0, -1.8),   // распахнутые
+        EyeMood.Blissful => new(1.34, 0.30, 18, -1.4),   // умиление: блаженные дужки «^ ^», сильнее прищур
+        EyeMood.Curious => new(1.06, 1.10, 0, -0.6),     // любопытство: чуть шире, голова набок (наклон — в UpdateEyes)
+        EyeMood.Bored => new(1.12, 0.52, 0, 1.4),        // скука: веки наполовину, взгляд ленивый
+        EyeMood.Sad => new(0.92, 0.70, 9, 2.4),          // грусть: поменьше, опущены
         _ => new(1.0, 1.0, 0, 0)
     };
 
@@ -52,7 +58,11 @@ public partial class MainWindow
     double _eyeTime;                          // часы глаз, секунды
     double _lastMouseMoveAt, _nextGlanceAt = 4, _glanceX, _glanceY;
     double _gazeX, _gazeY, _saccadeUntil = -1, _gazeFreezeUntil;
-    double _nextBlinkAt = 2.2, _lastStartleAt = -100;
+    double _nextBlinkAt = 2.2, _nextYawnAt;
+    // «поглаживание»: курсор быстро ходит туда-сюда прямо по глазам
+    double _petLevel, _petLastX = double.NaN, _petLastY;
+    int _petDirX, _petDirY;
+    double _blush;
     int _blinkRepeat;
     double _lastCursorX = double.NaN, _lastCursorY, _cursorSpeed;
     bool _eyeScript;                          // сценарий (приветствие) управляет взглядом сам
@@ -143,6 +153,10 @@ public partial class MainWindow
                 case EyeMood.Happy: rig.SY.Velocity -= 4; rig.Y.Velocity -= 28; break;
                 case EyeMood.Focused: rig.SX.Velocity -= 3; break;
                 case EyeMood.Neutral: rig.SY.Velocity += 3; break;
+                case EyeMood.Blissful: rig.SY.Velocity -= 6; rig.SX.Velocity += 3; rig.Y.Velocity -= 20; break;
+                case EyeMood.Curious: rig.SY.Velocity += 4; rig.Y.Velocity -= 18; break;
+                case EyeMood.Sad: rig.Y.Velocity += 30; rig.SY.Velocity -= 2; break;
+                case EyeMood.Bored: rig.SY.Velocity -= 2; break;
             }
         }
     }
@@ -193,24 +207,28 @@ public partial class MainWindow
             catch (InvalidOperationException) { }
         }
 
+        // ---- «гладят» по глазам → умиление ----
+        double px = 1;
+        try { px = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
+        UpdatePetting(dt, t, haveCenter, cdx, cdy, p.X, p.Y, px);
+
         // ---- эффективная эмоция ----
         var mood = _eyeMood;
+        bool danceOn = playing && _s.BeatBounce && !_eyeScript;
         if (!_eyeScript && _s.EyeEmotions)
         {
-            if (haveCenter && cd < 260 && _cursorSpeed > 5200 && t - _lastStartleAt > 6 && mood == EyeMood.Neutral)
-            {
-                _lastStartleAt = t;                     // мышь резко пронеслась рядом — испугался
-                SetEyeMood(EyeMood.Surprised, 1.1);
-                mood = EyeMood.Surprised;
-            }
-            if (mood == EyeMood.Neutral && Pill.IsMouseOver) mood = EyeMood.Focused;               // разглядывает курсор
+            if (mood == EyeMood.Neutral && Pill.IsMouseOver) mood = EyeMood.Curious;               // разглядывает курсор
             if (mood == EyeMood.Neutral && idle > 90 && _s.SleepAtNight && DateTime.Now.Hour < 6) mood = EyeMood.Sleepy; // глубокая ночь
+            if (mood == EyeMood.Neutral && idle > 45 && !playing) mood = EyeMood.Bored;            // долго ничего не происходит
+            if (mood == EyeMood.Neutral && danceOn && _danceEnergy > 0.55 && _tempoConf > 0.4)
+                mood = Bpm < 92 ? EyeMood.Calm : Bpm > 132 ? EyeMood.Excited : EyeMood.Neutral;   // настроение под темп
         }
         else mood = EyeMood.Neutral;
 
         if (mood != _shownMood)
         {
             MoodPop(mood);
+            if (mood == EyeMood.Bored) _nextYawnAt = t + 2.5 + _rng.NextDouble() * 3;
             _shownMood = mood;
         }
         var shape = ShapeOf(mood);
@@ -221,7 +239,24 @@ public partial class MainWindow
         if (t < _gazeFreezeUntil) { gx = 0; gy = 0; }
         else if (_eyeScript) { gx = _scriptGazeX; gy = _scriptGazeY; }
         else if (sleepy) { gx = 0; gy = 0.6; }
-        else if ((idle > 3.5 || !_s.EyesFollowCursor) && mood != EyeMood.Focused)
+        else if (mood == EyeMood.Blissful && haveCenter && cd > 1)
+        {
+            // жмурится и тянется за «рукой», но совсем чуть-чуть
+            double k = Smooth(Math.Min(1.0, cd / 160.0));
+            gx = cdx / cd * MaxGazeX * 0.45 * k;
+            gy = -0.6;
+        }
+        else if (mood == EyeMood.Bored)
+        {
+            if (t >= _nextGlanceAt)
+            {
+                _glanceX = GlanceX[_rng.Next(GlanceX.Length)] * 0.7 * _s.GazeRange / 100.0;
+                _glanceY = 1.2 + _rng.NextDouble();              // скучает — смотрит вниз-в-сторону
+                _nextGlanceAt = t + 2.2 + _rng.NextDouble() * 3.0;
+            }
+            gx = _glanceX; gy = _glanceY;
+        }
+        else if ((idle > 3.5 || !_s.EyesFollowCursor) && mood is not (EyeMood.Focused or EyeMood.Curious))
         {
             // Мышь давно стоит — осматривается сам: короткие заметные взгляды по сторонам.
             if (t >= _nextGlanceAt)
@@ -250,29 +285,80 @@ public partial class MainWindow
         _gazeX = gx; _gazeY = gy;
 
         // ---- ритм, музыка, характер ----
-        double swayX = 0, bobY = 0;
+        double swayX = 0, bobY = 0, headTilt = 0, hopL = 0, hopR = 0, squash = 0;
+        double dance = 0;
         if (playing)
         {
-            swayX += Math.Sin(t * 2.4) * 1.1;
-            bobY += Math.Sin(t * 4.8) * 0.5;
+            if (danceOn && !sleepy)
+            {
+                // Танец по темпу: фаза берётся из оценки BPM, поэтому движения попадают в долю, а не просто
+                // дёргаются на каждый найденный удар. Стиль зависит от темпа трека.
+                dance = _danceEnergy * Math.Clamp(_tempoConf * 1.4, 0.35, 1) * _s.DanceStrength / 100.0;
+                double pos = BeatPosition, n = Math.Floor(pos), ph = pos - n;
+                double kick = Math.Exp(-ph * 7);           // толчок на ударе, быстро затухает
+                double swing = Math.Sin(Math.PI * pos);     // туда-сюда за два удара
+                double bpm = Bpm;
+                if (bpm < 96)
+                {   // медленно: плавно качает «головой» из стороны в сторону
+                    swayX += swing * 2.4 * dance;
+                    headTilt += swing * 10 * dance;
+                    bobY += (1 - Math.Cos(2 * Math.PI * ph)) * 0.45 * dance;
+                }
+                else if (bpm < 128)
+                {   // средне: кивает на каждую долю и пританцовывает шагом в сторону
+                    swayX += swing * 1.7 * dance;
+                    headTilt += swing * 5 * dance;
+                    bobY -= kick * 2.4 * dance;
+                    squash = kick * 0.12 * dance;
+                }
+                else
+                {   // быстро: глаза прыгают по очереди, как ноги в танце
+                    double hop = kick * 3.0 * dance;
+                    if (((long)n & 1) == 0) hopL = hop; else hopR = hop;
+                    swayX += Math.Sin(Math.PI * pos / 2) * 1.2 * dance;
+                    squash = kick * 0.16 * dance;
+                }
+            }
+            double calmSway = 1 - Math.Min(1, dance);
+            swayX += Math.Sin(t * 2.4) * 1.1 * calmSway;
+            bobY += Math.Sin(t * 4.8) * 0.5 * calmSway;
             if (beat && _s.BeatBounce)
                 foreach (var rig in new[] { _eyeL, _eyeR })
                 {
-                    rig.Y.Velocity -= 60;            // подпрыгивают на каждый удар бочки
-                    rig.SY.Velocity -= 3.5;
-                    rig.SX.Velocity += 1.8;
+                    double k = 1 - 0.6 * Math.Min(1, dance);   // при танце толчок слабее — его заменяет движение по фазе
+                    rig.Y.Velocity -= 60 * k;                  // кивок на каждый удар бочки
+                    rig.SY.Velocity -= 3.5 * k;
+                    rig.SX.Velocity += 1.8 * k;
                 }
         }
         switch (mood)
         {
-            case EyeMood.Excited: { double s = Math.Sin(t * 6.5); bobY -= s * s * 2.2; break; }
+            case EyeMood.Excited when dance < 0.2: { double s = Math.Sin(t * 6.5); bobY -= s * s * 2.2; break; }
             case EyeMood.Happy: bobY += Math.Sin(t * 5.2) * 0.7; break;
             case EyeMood.Sleepy: bobY += Math.Sin(t * 0.8) * 0.8; break;
-            case EyeMood.Calm: swayX += Math.Sin(t * 1.1) * 0.8; break;
+            case EyeMood.Calm when dance < 0.2: swayX += Math.Sin(t * 1.1) * 0.8; break;
+            case EyeMood.Blissful:
+                swayX += Math.Sin(t * 3.1) * 0.9;              // млеет: покачивается
+                headTilt += Math.Sin(t * 3.1) * 5;
+                bobY += Math.Sin(t * 41) * 0.18;              // «мурчит» — лёгкая дрожь
+                break;
+            case EyeMood.Curious:
+                headTilt += (cdx >= 0 ? 1 : -1) * 9;          // голова набок, в сторону курсора
+                break;
+            case EyeMood.Sad: bobY += Math.Sin(t * 1.4) * 0.35; break;
+        }
+        if (mood == EyeMood.Bored && t >= _nextYawnAt && _eyeL.BlinkPhase == 0)
+        {
+            // зевок: глаза вытягиваются вверх, потом медленно закрываются
+            foreach (var rig in new[] { _eyeL, _eyeR }) { rig.SY.Velocity += 9; rig.SX.Velocity -= 3; rig.Y.Velocity -= 25; }
+            StartBlink(_eyeL, 0.42, 0.55);
+            StartBlink(_eyeR, 0.45, 0.55);
+            _nextYawnAt = t + 9 + _rng.NextDouble() * 7;
+            _nextBlinkAt = Math.Max(_nextBlinkAt, t + 2);
         }
 
         // ---- моргание ----
-        if (!_eyeScript && mood != EyeMood.Surprised && t >= _nextBlinkAt && _eyeL.BlinkPhase == 0 && _eyeR.BlinkPhase == 0)
+        if (!_eyeScript && mood is not (EyeMood.Surprised or EyeMood.Blissful) && t >= _nextBlinkAt && _eyeL.BlinkPhase == 0 && _eyeR.BlinkPhase == 0)
         {
             BlinkBoth(sleepy);
             if (_blinkRepeat > 0) { _blinkRepeat--; _nextBlinkAt = t + 0.26; }
@@ -285,18 +371,19 @@ public partial class MainWindow
 
         // ---- параметры пружин ----
         bool saccade = t < _saccadeUntil;
-        (double posK, double posZ) = sleepy ? (40.0, 1.0) : saccade ? (480.0, 0.5) : (150.0, 0.85);
-        (double shapeK, double shapeZ) = sleepy || mood == EyeMood.Calm ? (60.0, 0.95) : (230.0, 0.42);
+        (double posK, double posZ) = sleepy ? (40.0, 1.0) : saccade ? (480.0, 0.5) : dance > 0.1 ? (330.0, 0.6) : (150.0, 0.85);
+        (double shapeK, double shapeZ) = sleepy || mood is EyeMood.Calm or EyeMood.Bored ? (60.0, 0.95) : (230.0, 0.42);
 
         var room = BodyRoom();
 
         foreach (var rig in new[] { _eyeL, _eyeR })
         {
+            double curious = mood == EyeMood.Curious ? ((cdx >= 0) == (rig.Side > 0) ? 1.08 : 0.94) : 1;   // ближний к курсору глаз шире
             rig.X.Target = gx + swayX;
-            rig.Y.Target = gy + shape.Lift + bobY;
-            rig.SX.Target = shape.SX;
-            rig.SY.Target = shape.SY;
-            rig.Rot.Target = -rig.Side * shape.Tilt + (_eyeScript ? _scriptTilt : 0);
+            rig.Y.Target = gy + shape.Lift + bobY - (rig.Side < 0 ? hopL : hopR);
+            rig.SX.Target = shape.SX * (1 + squash * 0.6);
+            rig.SY.Target = shape.SY * (1 - squash) * curious;
+            rig.Rot.Target = -rig.Side * shape.Tilt + headTilt + (_eyeScript ? _scriptTilt : 0);
 
             rig.X.Step(dt, posK * rig.Stiff, posZ);
             rig.Y.Step(dt, posK * rig.Stiff, posZ);
@@ -325,6 +412,78 @@ public partial class MainWindow
             rig.Scale.ScaleX = sx;
             rig.Scale.ScaleY = sy;
             rig.Rotate.Angle = rot;
+        }
+
+        UpdateBlush(dt, mood == EyeMood.Blissful ? 0.9 : 0);
+    }
+
+    /// <summary>
+    /// Курсор быстро водят туда-сюда прямо по глазам — их «гладят». Считаем развороты движения
+    /// над глазами; несколько разворотов подряд — умиление (и продлеваем его, пока гладят).
+    /// </summary>
+    void UpdatePetting(double dt, double t, bool haveCenter, double cdx, double cdy, double x, double y, double px)
+    {
+        _petLevel = Math.Max(0, _petLevel - dt * 0.6);
+        bool over = haveCenter && Math.Abs(cdx) < (Eyes.ActualWidth / 2 + 20) * px && Math.Abs(cdy) < 24 * px;
+        if (!over || _eyeScript || !_s.EyeEmotions || _state != IslandState.Collapsed)
+        {
+            _petLastX = double.NaN;
+            return;
+        }
+        if (double.IsNaN(_petLastX)) { _petLastX = x; _petLastY = y; return; }
+        double dx = x - _petLastX, dy = y - _petLastY;
+        double minStep = 1.5 * px;
+        bool fast = _cursorSpeed > 220 * px;
+        if (Math.Abs(dx) > minStep)
+        {
+            int d = Math.Sign(dx);
+            if (d != _petDirX && _petDirX != 0 && fast) OnPetStroke(d, 0);
+            _petDirX = d;
+            _petLastX = x;
+        }
+        if (Math.Abs(dy) > minStep)
+        {
+            int d = Math.Sign(dy);
+            if (d != _petDirY && _petDirY != 0 && fast) OnPetStroke(0, d);
+            _petDirY = d;
+            _petLastY = y;
+        }
+
+        void OnPetStroke(int sx, int sy)
+        {
+            _petLevel = Math.Min(1.8, _petLevel + 0.34);
+            if (_petLevel < 0.9) return;
+            if (_eyeMood != EyeMood.Blissful) SetEyeMood(EyeMood.Blissful, 1.8);
+            else _moodLeft = Math.Max(_moodLeft, 1.8);     // гладят дальше — блаженство не кончается
+            foreach (var rig in new[] { _eyeL, _eyeR }) { rig.X.Velocity += sx * 14; rig.SX.Velocity += 1.2; }
+            JellyPoke(0.35 * Math.Abs(sx) + 0.15, -0.25 - 0.2 * Math.Abs(sy));   // остров тоже чуть «тает»
+            _nextBlinkAt = Math.Max(_nextBlinkAt, t + 1.5);
+        }
+    }
+
+    /// <summary>Румянец под глазами: плавно проявляется и следует за глазами.</summary>
+    void UpdateBlush(double dt, double target)
+    {
+        _blush += (target - _blush) * (1 - Math.Exp(-(target > _blush ? 6.0 : 3.5) * dt));
+        if (_blush < 0.01)
+        {
+            if (BlushL.Opacity != 0) { BlushL.Opacity = 0; BlushR.Opacity = 0; }
+            _blush = Math.Max(0, _blush);
+            return;
+        }
+        var room = BodyRoom();
+        foreach (var (rig, el) in new[] { (_eyeL, BlushL), (_eyeR, BlushR) })
+        {
+            var home = EyeHome(rig);
+            if (double.IsNaN(home.X)) continue;
+            double cx = home.X + rig.Shift.X + rig.Side * 4.5;
+            double cy = Math.Min(home.Y + rig.Shift.Y + 6.5, room.Bottom - 3.5);
+            Point pt;
+            try { pt = Pill.TranslatePoint(new Point(cx, cy), BlushLayer); }
+            catch (InvalidOperationException) { continue; }
+            System.Windows.Controls.Canvas.SetLeft(el, pt.X - el.Width / 2);
+            System.Windows.Controls.Canvas.SetTop(el, pt.Y - el.Height / 2);
+            el.Opacity = _blush * Math.Clamp(_s.GlassOpacity / 100.0 + 0.4, 0.5, 1);
         }
     }
 
