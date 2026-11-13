@@ -50,7 +50,7 @@
      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
       <Button x:Name="RuButton" Content="RU" Style="{StaticResource Quiet}" Click="Ru_Click" Margin="0,0,6,0"/>
       <Button x:Name="EnButton" Content="EN" Style="{StaticResource Quiet}" Click="En_Click" Margin="0,0,10,0"/>
-      <Button Content="×" Style="{StaticResource Quiet}" Click="Close_Click"/>
+      <Button x:Name="CloseButton" Content="×" Style="{StaticResource Quiet}" Click="Close_Click"/>
      </StackPanel>
     </Grid>
     <Grid Grid.Row="1" Margin="0,14,0,12">
@@ -106,12 +106,21 @@
      <Button x:Name="NextButton" Style="{StaticResource Primary}" HorizontalAlignment="Right" Click="Next_Click"/>
     </Grid>
    </Grid>
-   <!-- глазки: перелетают к текущему пункту -->
+   <!-- глазки: перелетают к текущему пункту, показывают эмоции и подсказки -->
    <Canvas x:Name="EyeLayer" IsHitTestVisible="False">
+    <Ellipse x:Name="Spark" Width="8" Height="8" Fill="White" Visibility="Collapsed" Canvas.Left="-100" Canvas.Top="-100">
+     <Ellipse.Effect><DropShadowEffect Color="White" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/></Ellipse.Effect>
+    </Ellipse>
     <StackPanel x:Name="Eyes" Orientation="Horizontal" Canvas.Left="-100" Canvas.Top="-100">
-     <Ellipse Width="5" Height="16" Fill="White" Margin="0,0,9,0" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><ScaleTransform x:Name="EyeLScale"/></Ellipse.RenderTransform></Ellipse>
-     <Ellipse Width="5" Height="16" Fill="White" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><ScaleTransform x:Name="EyeRScale"/></Ellipse.RenderTransform></Ellipse>
+     <Ellipse x:Name="EyeL" Width="5" Height="16" Fill="White" Margin="0,0,9,0" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><TransformGroup><ScaleTransform x:Name="EyeLScale"/><RotateTransform x:Name="EyeLRot"/><TranslateTransform x:Name="EyeLShift"/></TransformGroup></Ellipse.RenderTransform></Ellipse>
+     <Ellipse x:Name="EyeR" Width="5" Height="16" Fill="White" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><TransformGroup><ScaleTransform x:Name="EyeRScale"/><RotateTransform x:Name="EyeRRot"/><TranslateTransform x:Name="EyeRShift"/></TransformGroup></Ellipse.RenderTransform></Ellipse>
     </StackPanel>
+    <!-- пузырь-подсказка: выпрыгивает рядом с глазками и мягко покачивается -->
+    <Border x:Name="Bubble" Visibility="Collapsed" Canvas.Left="-300" Canvas.Top="-300" Background="#F2F4F8" CornerRadius="11" Padding="10,5,10,6" MaxWidth="230" Opacity="0" RenderTransformOrigin="0,1">
+     <Border.RenderTransform><TransformGroup><ScaleTransform x:Name="BubbleScale" ScaleX="0" ScaleY="0"/><RotateTransform x:Name="BubbleRot"/></TransformGroup></Border.RenderTransform>
+     <Border.Effect><DropShadowEffect Color="Black" BlurRadius="14" ShadowDepth="2" Opacity="0.55"/></Border.Effect>
+     <TextBlock x:Name="BubbleText" Foreground="#050608" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"/>
+    </Border>
    </Canvas>
   </Grid>
  </Viewbox>

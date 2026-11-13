@@ -55,11 +55,30 @@ public partial class App : Application
             bool shown = ack.WaitOne(2500);
             if (!shown)
             {
-                // Первая копия висит без окна — убиваем её и стартуем заново.
+                // Первая копия может ещё запускаться (автозапуск на медленном ПК) — даём ей второй шанс.
+                showEvent.Set();
+                shown = ack.WaitOne(6000);
+            }
+            if (!shown)
+            {
+                // Убиваем только «старую» зависшую копию: процесс, запущенный меньше 20 с назад,
+                // скорее всего просто ещё стартует, и убивать его нельзя.
                 var me = Environment.ProcessId;
+                bool killed = false;
                 foreach (var p in Process.GetProcessesByName(Process.GetCurrentProcess().ProcessName))
-                    if (p.Id != me) { try { p.Kill(true); p.WaitForExit(3000); } catch { } }
-                try { Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true }); } catch { }
+                {
+                    if (p.Id == me) continue;
+                    try
+                    {
+                        if (DateTime.Now - p.StartTime < TimeSpan.FromSeconds(20)) continue;
+                        p.Kill(true);
+                        p.WaitForExit(3000);
+                        killed = true;
+                    }
+                    catch (Exception ex) { Log.Warn("Не удалось завершить зависшую копию Moku: " + ex.Message); }
+                }
+                if (killed)
+                    try { Process.Start(new ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = true }); } catch { }
             }
             _mutex.Dispose();
             _mutex = null;

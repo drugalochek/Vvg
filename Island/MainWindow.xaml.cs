@@ -54,20 +54,10 @@ public partial class MainWindow : Window
     enum IslandState { Collapsed, Toast, Expanded }
     enum EyeMood { Neutral, Happy, Excited, Calm, Sleepy, Focused, Surprised }
     EyeMood _eyeMood = EyeMood.Neutral;
-    DateTime _moodUntil = DateTime.MinValue;
-
-    // Эмоции меняют только форму и движение двух исходных белых овалов. Никаких зрачков/новых деталей.
-    void SetEyeMood(EyeMood mood, double seconds = 2.0)
-    {
-        if (_welcomeRunning) return;
-        _eyeMood = mood;
-        _moodUntil = seconds > 0 ? DateTime.Now.AddSeconds(seconds) : DateTime.MaxValue;
-        EnsureFx();
-    }
 
     // ---- Win32 ----
     const int WM_CLIPBOARDUPDATE = 0x031D, WM_HOTKEY = 0x0312, HotkeyId = 1;
-    const uint MOD_ALT = 0x0001, VK_SPACE = 0x20;
+    const uint MOD_ALT = 0x0001, MOD_CONTROL = 0x0002, MOD_NOREPEAT = 0x4000, VK_SPACE = 0x20;
     const int GWL_EXSTYLE = -20, WS_EX_TOOLWINDOW = 0x80;
 
     [DllImport("user32.dll", SetLastError = true)] static extern bool AddClipboardFormatListener(IntPtr h);
@@ -100,6 +90,10 @@ public partial class MainWindow : Window
     // ---- Размеры острова ----
     const double CollapsedH = 36, ToastW = 340, ToastH = 56, FullW = 652, FullH = 348;
     const double IdleW = 204, PlayW = 312, GlowPad = 12;
+    // С треком свёрнутый остров чуть выше: волна музыки занимает низ и не наезжает на глаза.
+    const double PlayH = 44, CollapsedWaveMax = 8.5;
+    double MiniH => _now != null ? PlayH : CollapsedH;
+    double MiniR => MiniH / 2;
 
     static readonly string[] AccentColors =
         { "#FFFFFFFF", "#FF30D158", "#FF0A84FF", "#FFFF453A", "#FFFF9F0A", "#FFFF375F" };
@@ -119,7 +113,7 @@ public partial class MainWindow : Window
     System.Drawing.Icon? _ownedTrayIcon;
     System.Windows.Forms.ContextMenuStrip? _trayMenu;
     Action? _refreshTrayLanguage;
-    int _animVer, _fullFadeVer, _totalChars;
+    int _fullFadeVer, _totalChars;
     NowPlaying? _now;
     string? _lastTrack;
     SolidColorBrush _accent = Brushes.White;
@@ -145,6 +139,7 @@ public partial class MainWindow : Window
         try
         {
         InitializeComponent();
+        InitEyes();
         Log.Info("MainWindow: XAML loaded");
         startupStage = "window setup";
         Pill.VerticalAlignment = VerticalAlignment.Top;
@@ -191,8 +186,7 @@ public partial class MainWindow : Window
 
         startupStage = "initializing timers";
         _clock.Tick += (_, _) => { UpdateMini(); ScheduleClock(); };
-        _seekTimer.Tick += (_, _) => RefreshSeekTimeline();
-        _seekTimer.Start();
+        _seekTimer.Tick += (_, _) => RefreshSeekTimeline();   // запускается только в раскрытом виде
         UpdateMini();
         ScheduleClock();
 
@@ -225,11 +219,7 @@ public partial class MainWindow : Window
         Closing += OnWindowClosing;
         Closed += OnClosed;
         // Start as a small round island; the welcome animation unfolds it after Loaded.
-        _boxW = 48;
-        _boxH = 48;
-        Pill.Width = 48;
-        Pill.Height = 48;
-        Pill.CornerRadius = new CornerRadius(24);
+        SnapIsland(48, 48, 24);
         Grid.SetColumn(Eyes, 0);
         Grid.SetColumnSpan(Eyes, 3);
         Eyes.HorizontalAlignment = HorizontalAlignment.Center;
@@ -257,8 +247,10 @@ public partial class MainWindow : Window
         _source.AddHook(WndProc);
         if (!AddClipboardFormatListener(hwnd))
             Log.Error("AddClipboardFormatListener не удался, код " + Marshal.GetLastWin32Error());
-        if (!RegisterHotKey(hwnd, HotkeyId, MOD_ALT, VK_SPACE))
-            Log.Warn("Alt+Space занят другой программой, горячая клавиша недоступна (код " + Marshal.GetLastWin32Error() + ")");
+        // Alt+Space в Windows открывает системное меню окна (и занят PowerToys Run), поэтому
+        // используем Ctrl+Alt+Space. MOD_NOREPEAT — удержание клавиши не «мигает» островом.
+        if (!RegisterHotKey(hwnd, HotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_SPACE))
+            Log.Warn("Ctrl+Alt+Space занят другой программой, горячая клавиша недоступна (код " + Marshal.GetLastWin32Error() + ")");
         ApplyPosition();
         InitializeTray();
         _tbCreated = RegisterWindowMessage("TaskbarCreated");
@@ -369,7 +361,7 @@ public partial class MainWindow : Window
     {
         double k = _s.Scale / 100.0;
         // запас на «желейное» растяжение и пружинный перелёт + поля Pill (12 по бокам, 14 снизу)
-        double w = Math.Ceiling(pillW * k * 1.12) + 24, h = Math.Ceiling(pillH * k * 1.1) + 18;
+        double w = Math.Ceiling(pillW * k * 1.16) + 24, h = Math.Ceiling(pillH * k * 1.16) + 18;
         double sw = SystemParameters.PrimaryScreenWidth;
         double sh = SystemParameters.PrimaryScreenHeight;
         double left = _s.Align switch
@@ -378,7 +370,7 @@ public partial class MainWindow : Window
             "Right" => sw - w - 16 + GlowPad,
             _ => (sw - w) / 2
         } + _s.OffsetX;
-        Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
+        UpdateJellyOrigin();
         Pill.HorizontalAlignment = _s.Align switch
         {
             "Left" => HorizontalAlignment.Left,
@@ -392,6 +384,8 @@ public partial class MainWindow : Window
         {
             double initialTop = _s.VerticalAlign switch { "Bottom" => sh - h - 16, "Center" => (sh - h) / 2, _ => 0 } + _s.OffsetY;
             Width = w; Height = h; Left = left; Top = initialTop;   // окно ещё не создано
+            _boxW = pillW;
+            _boxH = pillH;
             return;
         }
         var m = src.CompositionTarget.TransformToDevice;
@@ -447,7 +441,7 @@ public partial class MainWindow : Window
             _bodyBrush.Opacity = 1.0;
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
-        Pill.CornerRadius = new CornerRadius(_s.CornerRadius);
+        if (_ready) RetargetRadius();
         if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
@@ -473,7 +467,7 @@ public partial class MainWindow : Window
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
-    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; Pill.CornerRadius = new CornerRadius(_s.CornerRadius); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); _s.Save(); }
+    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); _s.Save(); }
     void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
     void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
     void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
@@ -923,6 +917,7 @@ public partial class MainWindow : Window
         }
         SyncRecent();
         ShowToast("Copied", text.Replace('\r', ' ').Replace('\n', ' '), ColorOk);
+        SetEyeMood(EyeMood.Happy, 1.6);
     }
 
     async Task<bool> SetClipboardTextAsync(string text)
@@ -1015,69 +1010,6 @@ public partial class MainWindow : Window
     }
 
     // ================= Состояния и анимации =================
-    void Animate(double w, double h, double radius, bool spring)
-    {
-        int ver = ++_animVer;
-        SetWindowBox(Math.Max(_boxW, w), Math.Max(_boxH, h));   // одно изменение размера окна на старте анимации
-        _boxW = w; _boxH = h;
-        // Soft layout motion; the pill itself gets a separate multi-stage jelly settle.
-        var dur = TimeSpan.FromMilliseconds(spring ? 340 : 285);
-        IEasingFunction ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
-
-        var aw = new DoubleAnimation(w, dur) { EasingFunction = ease };
-        var ah = new DoubleAnimation(h, dur)
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-
-        aw.Completed += (_, _) =>
-        {
-            if (ver != _animVer) return;
-            Pill.BeginAnimation(WidthProperty, null);
-            Pill.Width = w;
-            Pill.BeginAnimation(HeightProperty, null);
-            Pill.Height = h;
-            SetWindowBox(w, h);                                  // одно изменение размера окна по окончании
-        };
-
-        // Visible jelly motion: stretch on the travel axis, squash on the other,
-        // then make two progressively smaller rebounds before settling.
-        _jellyTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        _jellyTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        var sx = new DoubleAnimationUsingKeyFrames();
-        var sy = new DoubleAnimationUsingKeyFrames();
-        var jellyEase = new CubicEase { EasingMode = EasingMode.EaseOut };
-        if (spring)
-        {
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.15, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(90)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.91, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(175)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.045, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(270)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.84, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(90)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.10, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(175)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.97, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(270)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(390)), jellyEase));
-        }
-        else
-        {
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(0.86, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(75)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.075, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
-            sx.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(315)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.14, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(75)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(0.95, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(155)), jellyEase));
-            sy.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(315)), jellyEase));
-        }
-        sx.Completed += (_, _) => _jellyTransform.ScaleX = 1;
-        sy.Completed += (_, _) => _jellyTransform.ScaleY = 1;
-
-        Pill.CornerRadius = new CornerRadius(radius);
-        RebuildBody();
-        Pill.BeginAnimation(WidthProperty, aw);
-        Pill.BeginAnimation(HeightProperty, ah);
-        _jellyTransform.BeginAnimation(ScaleTransform.ScaleXProperty, sx);
-        _jellyTransform.BeginAnimation(ScaleTransform.ScaleYProperty, sy);
-    }
-
     void FadeInFull()
     {
         Full.Opacity = 0;
@@ -1118,11 +1050,7 @@ public partial class MainWindow : Window
         // The intro is a separate visual state: a true 48x48 black circle,
         // with only the two eyes visible. Keep every other panel out of the tree's
         // visible layer until the circle has finished unfolding.
-        _boxW = 48;
-        _boxH = 48;
-        Pill.Width = 48;
-        Pill.Height = 48;
-        Pill.CornerRadius = new CornerRadius(24);
+        SnapIsland(48, 48, 24);
         Grid.SetColumn(Eyes, 0);
         Grid.SetColumnSpan(Eyes, 3);
         Eyes.HorizontalAlignment = HorizontalAlignment.Center;
@@ -1142,44 +1070,35 @@ public partial class MainWindow : Window
         ApplyPosition();
         RebuildBody();
 
-        // 1. Pause on the round face so the greeting is actually visible.
-        await Task.Delay(360);
+        // Глаза в приветствии ведёт сценарий, но двигаются они тем же пружинным движком.
+        _eyeScript = true;
+        _scriptGazeX = _scriptGazeY = 0;
+        _scriptTilt = 0;
+        RevealEyes();
+        EnsureFx();
 
-        // 2. Complete the wink before starting the gaze movement.
-        var wink = new DoubleAnimationUsingKeyFrames();
-        var ease = new CubicEase { EasingMode = EasingMode.EaseInOut };
-        wink.KeyFrames.Add(new EasingDoubleKeyFrame(0.08, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(75)), ease));
-        wink.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(235)), ease));
-        wink.Completed += (_, _) =>
-        {
-            EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            EyeLScale.ScaleY = 1;
-        };
-        EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, wink);
-        await Task.Delay(255);
+        // 1. Пауза на круглой «мордочке», чтобы приветствие было заметно.
+        await Task.Delay(420);
 
-        // 3. Both eyes briefly look toward the eye that just winked.
-        var gaze = new DoubleAnimation(-2.6, TimeSpan.FromMilliseconds(145))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-        EyeLShift.BeginAnimation(TranslateTransform.XProperty, gaze);
-        EyeRShift.BeginAnimation(TranslateTransform.XProperty, gaze);
-        await Task.Delay(250);
+        // 2. Левый глаз подмигивает, и оба глаза кренятся в его сторону.
+        //    Глаза остаются ровно по центру: никакого сдвига вбок, только наклон.
+        StartBlink(_eyeL, 0, 0.12);
+        _scriptTilt = -14;
+        await Task.Delay(540);          // ждём, пока подмигивание полностью закончится
 
-        EyeLShift.BeginAnimation(TranslateTransform.XProperty, null);
-        EyeRShift.BeginAnimation(TranslateTransform.XProperty, null);
-        EyeLShift.X = EyeRShift.X = 0;
+        // 3. Возвращаются в ровное положение с лёгким пружинистым покачиванием.
+        _scriptTilt = 0;
+        await Task.Delay(380);
+
         Grid.SetColumnSpan(Eyes, 1);
         Eyes.HorizontalAlignment = HorizontalAlignment.Left;
         Eyes.Margin = new Thickness(14, 0, 0, 0);
         UpdateMini();
 
-        // 4. Only now unfold the island.
-        Animate(IdleW, CollapsedH, 24, spring: true);
-        await Task.Delay(390);
-        Pill.CornerRadius = new CornerRadius(18);
-        RebuildBody();
+        // 4. Только теперь остров «растекается» из кружка в пилюлю.
+        Animate(IdleW, CollapsedH, 18, spring: true);
+        await Task.Delay(420);
+        _eyeScript = false;
         _welcomeRunning = false;
         if (_now == null)
         {
@@ -1196,7 +1115,7 @@ public partial class MainWindow : Window
         UpdatePlayButton();
         UpdateMini();
         FadeWelcomeInfo();
-        if (_now != null) Animate(PlayW, CollapsedH, 18, spring: false);
+        if (_now != null) Animate(PlayW, PlayH, PlayH / 2, spring: false);
         EnsureFx();
     }
 
@@ -1227,6 +1146,7 @@ public partial class MainWindow : Window
         }
 
         _state = IslandState.Collapsed;
+        _seekTimer.Stop();
         Mini.Visibility = Visibility.Visible;
         ToastPanel.Visibility = Visibility.Collapsed;
         TimePanel.Visibility = Visibility.Visible;
@@ -1249,34 +1169,8 @@ public partial class MainWindow : Window
         };
         Full.BeginAnimation(OpacityProperty, fade);
 
-        Animate(_now != null ? PlayW : IdleW, CollapsedH, 18, spring: false);
+        Animate(_now != null ? PlayW : IdleW, MiniH, MiniR, spring: false);
         EnsureFx();
-    }
-
-    void RevealEyes()
-    {
-        // Start from a neutral gaze so returning from the expanded panel never
-        // makes the eyes snap toward the current mouse position.
-        _lLx = _lLy = _lRx = _lRy = 0;
-        EyeLShift.X = EyeLShift.Y = EyeRShift.X = EyeRShift.Y = 0;
-        EyeLScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        EyeRScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-
-        foreach (var scale in new[] { EyeLScale, EyeRScale })
-        {
-            var reveal = new DoubleAnimationUsingKeyFrames();
-            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(0.12, KeyTime.FromTimeSpan(TimeSpan.Zero), ease));
-            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(1.12, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)), ease));
-            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(245)), ease));
-            reveal.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(360)), ease));
-            reveal.Completed += (_, _) =>
-            {
-                scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                scale.ScaleY = 1;
-            };
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, reveal);
-        }
     }
 
     void Expand()
@@ -1287,6 +1181,8 @@ public partial class MainWindow : Window
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();
+        RefreshSeekTimeline();
+        _seekTimer.Start();
         Animate(FullW, FullH, 30, spring: true);
         Activate();
     }
@@ -1295,6 +1191,7 @@ public partial class MainWindow : Window
     void ShowToast(string title, string sub, string? colorHex = null)
     {
         if (_welcomeRunning || _state == IslandState.Expanded) return;
+        if (colorHex == ColorError) SetEyeMood(EyeMood.Surprised, 1.2);
         _state = IslandState.Toast;
         ToastTitle.Text = title;
         ToastSub.Text = sub;
@@ -1367,11 +1264,9 @@ public partial class MainWindow : Window
     readonly GradientStop _tintEnd = new(Color.FromRgb(0, 0, 0), 1.0);
     LinearGradientBrush? _bodyBrush;
     Color _accentColor = Colors.White;
-    double _wavePhase, _waveAmp, _waveBeatPulse, _open = 1, _blinkT = -1;
-    double _lLx, _lLy, _lRx, _lRy, _eyeFollow = 0.2;
+    double _wavePhase, _waveAmp, _waveBeatPulse;
     bool _lastWave;
-    DateTime _nextBlink = DateTime.Now.AddSeconds(3), _lastMove = DateTime.Now, _lastEyeUpdate = DateTime.Now, _lastBlinkUpdate = DateTime.Now;
-    int _lastCx = int.MinValue, _lastCy;
+    readonly List<Point> _wavePts = new(256);
 
     void InitLiquid()
     {
@@ -1381,7 +1276,7 @@ public partial class MainWindow : Window
         _bodyBrush.GradientStops.Add(_tintEnd);
         Body.Fill = _bodyBrush;
         ApplyAppearance();
-        Pill.SizeChanged += (_, _) => RebuildBody();
+        Pill.SizeChanged += (_, _) => { if (!_islandMoving) RebuildBody(); };
         _weather.Changed += w => Dispatcher.BeginInvoke(new Action(() => ApplyWeather(w)));
         _ = _weather.StartAsync();
         EnsureFx();
@@ -1402,14 +1297,17 @@ public partial class MainWindow : Window
             Math.Clamp((args.RenderingTime - _lastRenderTime).TotalSeconds, 0.001, 0.05);
         _lastRenderTime = args.RenderingTime;
         bool playing = !_welcomeRunning && _now?.Playing == true;
-        if (playing && _audio.ConsumeBeat())
+        bool beat = playing && _audio.ConsumeBeat();
+        if (beat)
             _waveBeatPulse = Math.Min(1.0, _waveBeatPulse + 0.82);
 
         // All three frequency bands move the liquid; kick transients add a separate accent.
         _waveBeatPulse *= Math.Exp(-6.4 * dt);
         double activity = playing ? _audio.ActivityLevel : 0;
         double bandMotion = playing ? _audio.MidLevel * 2.0 + _audio.HighLevel * 1.6 : 0;
-        double target = playing ? Math.Clamp(0.25 + activity * 9.0 + bandMotion + _waveBeatPulse * 4.8, 0, 12.5) : 0;
+        // В свёрнутом виде волна ниже: она живёт в нижней полосе острова и не накрывает глаза.
+        double ampMax = _state == IslandState.Collapsed ? CollapsedWaveMax : 12.5;
+        double target = playing ? Math.Clamp(0.25 + activity * 9.0 + bandMotion + _waveBeatPulse * 4.8, 0, ampMax) : 0;
         double response = target > _waveAmp ? 23.0 : 7.5; // fast attack, softer release
         double follow = 1 - Math.Exp(-response * dt);
         _waveAmp += (target - _waveAmp) * follow;
@@ -1417,11 +1315,12 @@ public partial class MainWindow : Window
         _wavePhase += (2.4 + activity * 12.0 + bandMotion * 2.2 + _waveBeatPulse * 2.8) * dt;
 
         bool wave = _waveAmp > 0.01;
-        bool eyes = !_welcomeRunning && IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
-        if (eyes) UpdateEyes(playing);
-        if (wave || _lastWave) RebuildBody();
+        bool moving = StepIsland(dt);
+        bool eyes = IsVisible && _state == IslandState.Collapsed && TimePanel.Visibility == Visibility.Visible;
+        if (eyes) UpdateEyes(dt, playing, beat);
+        if (wave || _lastWave || moving) RebuildBody();
         _lastWave = wave;
-        if (!wave && !eyes)
+        if (!wave && !eyes && !moving)
         {
             CompositionTarget.Rendering -= FxRendering;
             _fxAttached = false;
@@ -1445,7 +1344,9 @@ public partial class MainWindow : Window
 
     List<Point> WavePoints(double xa, double xb, double yb, double amp, double w, double r)
     {
-        var pts = new List<Point>();
+        // Один переиспользуемый список: StreamGeometry копирует точки, а GC не дёргается каждый кадр.
+        var pts = _wavePts;
+        pts.Clear();
         for (double x = xa; x >= xb; x -= 3.0) pts.Add(new Point(x, yb + WaveY(x, w, amp, r)));
         pts.Add(new Point(xb, yb));
         return pts;
@@ -1453,13 +1354,15 @@ public partial class MainWindow : Window
 
     void RebuildBody()
     {
-        double w = Pill.ActualWidth, h = Pill.ActualHeight;
+        double w = double.IsNaN(Pill.Width) ? Pill.ActualWidth : Pill.Width;
+        double h = double.IsNaN(Pill.Height) ? Pill.ActualHeight : Pill.Height;
         if (w < 8 || h < 8 || _bodyBrush == null) return;
         double amp = _waveAmp;
         double x0 = 0.5, x1 = w - 0.5, y0 = 0.5, yb = h - amp - 0.5;
         double r = Math.Min(Pill.CornerRadius.TopLeft, Math.Min((x1 - x0) / 2, (yb - y0) / 2));
         if (r < 0.5) r = 0;
         bool wave = amp > 0.01;
+        var wavePts = wave ? WavePoints(x1 - r, x0 + r, yb, amp, w, r) : null;
 
         var g = new StreamGeometry();
         using (var c = g.Open())
@@ -1469,7 +1372,7 @@ public partial class MainWindow : Window
             c.ArcTo(new Point(x1, y0 + r), new Size(r, r), 0, false, SweepDirection.Clockwise, true, false);
             c.LineTo(new Point(x1, yb - r), true, false);
             c.ArcTo(new Point(x1 - r, yb), new Size(r, r), 0, false, SweepDirection.Clockwise, true, false);
-            if (wave) c.PolyLineTo(WavePoints(x1 - r, x0 + r, yb, amp, w, r), true, true);
+            if (wavePts != null) c.PolyLineTo(wavePts, true, true);
             else c.LineTo(new Point(x0 + r, yb), true, false);
             c.ArcTo(new Point(x0, yb - r), new Size(r, r), 0, false, SweepDirection.Clockwise, true, false);
             c.LineTo(new Point(x0, y0 + r), true, false);
@@ -1484,7 +1387,7 @@ public partial class MainWindow : Window
             using (var c2 = wg.Open())
             {
                 c2.BeginFigure(new Point(x1 - r, yb), false, false);
-                c2.PolyLineTo(WavePoints(x1 - r, x0 + r, yb, amp, w, r), true, true);
+                c2.PolyLineTo(wavePts!, true, true);
             }
             wg.Freeze();
             Wave.Data = wg;
@@ -1494,84 +1397,6 @@ public partial class MainWindow : Window
 
         // Геометрия волны не должна перезаписывать выбранные цвета темы:
         // альфа-канал и положение градиента принадлежат настройкам темы.
-    }
-
-    void UpdateEyes(bool playing)
-    {
-        if (!GetCursorPos(out var p)) return;
-        var now = DateTime.Now;
-        if (p.X != _lastCx || p.Y != _lastCy) { _lastCx = p.X; _lastCy = p.Y; _lastMove = now; }
-        bool idleSleep = false;   // не засыпает: при АФК водит глазами и моргает
-        if (_moodUntil != DateTime.MaxValue && now >= _moodUntil) _eyeMood = EyeMood.Neutral;
-        bool sleepy = idleSleep || _eyeMood == EyeMood.Sleepy; // курсор давно стоит — глазки засыпают
-        bool excited = _eyeMood == EyeMood.Excited;
-        bool surprised = _eyeMood == EyeMood.Surprised;
-        bool focused = _eyeMood == EyeMood.Focused;
-        double eyeDt = Math.Clamp((now - _lastEyeUpdate).TotalSeconds, 0.001, 0.05);
-        _eyeFollow = 1 - Math.Exp(-12.0 * eyeDt);
-        double openness = sleepy ? 0.30 : surprised ? 1.24 : focused ? 0.88 : 1.0;
-        _open += (openness - _open) * (1 - Math.Exp(-5.5 * eyeDt));
-        if (Math.Abs(openness - _open) < 0.002) _open = openness;
-        _lastEyeUpdate = now;
-
-        // Keep following the pointer even when it is stationary. Random idle glances
-        // used to override the pointer target after three seconds, making tracking appear broken.
-        Look(EyeL, p, sleepy, playing, ref _lLx, ref _lLy);
-        Look(EyeR, p, sleepy, playing, ref _lRx, ref _lRy);
-        if (excited) { _lLy += Math.Sin(now.TimeOfDay.TotalSeconds * 11) * 0.65; _lRy += Math.Sin(now.TimeOfDay.TotalSeconds * 11 + 0.45) * 0.65; }
-        if (_eyeMood == EyeMood.Happy) { _lLy += 0.35; _lRy += 0.35; }
-        EyeLShift.X = _lLx; EyeLShift.Y = _lLy;
-        EyeRShift.X = _lRx; EyeRShift.Y = _lRy;
-
-        double blink = 1;
-        if (_blinkT >= 0)
-        {
-            _blinkT += Math.Clamp((now - _lastBlinkUpdate).TotalSeconds, 0.001, 0.05);
-            double ph = _blinkT / 0.17;
-            if (ph >= 1)
-            {
-                _blinkT = -1;
-                _nextBlink = now.AddSeconds(_rng.NextDouble() < 0.22 ? 0.25 : 2.5 + _rng.NextDouble() * 4.5);
-            }
-            else blink = 1 - 0.93 * Math.Sin(Math.PI * ph);
-        }
-        else if (now >= _nextBlink) _blinkT = 0;
-
-        _lastBlinkUpdate = now;
-        double sy = Math.Max(0.06, Math.Min(1.28, _open * blink));
-        EyeLScale.ScaleY = sy;
-        EyeRScale.ScaleY = sy;
-    }
-
-    /// <summary>Овал целиком смещается в сторону курсора (до ±3 px), плавно догоняя цель.</summary>
-    void Look(FrameworkElement eye, POINT cur, bool sleepy, bool playing, ref double lx, ref double ly)
-    {
-        double tx = 0, ty = sleepy ? 2.2 : 0;
-        if (!sleepy)
-        {
-            try
-            {
-                    var c = eye.PointToScreen(new Point(eye.ActualWidth / 2, eye.ActualHeight / 2));
-                    double dx = cur.X - c.X, dy = cur.Y - c.Y, d = Math.Sqrt(dx * dx + dy * dy);
-                    // Ignore a distant cursor. Otherwise the first frame after
-                    // startup can pull both eyes hard to one side of the pill.
-                    if (d > 1)
-                    {
-                        double k = Smooth(Math.Min(1.0, d / 90.0));
-                        tx = dx / d * 2.35 * k;
-                        ty = dy / d * 2.15 * k;
-                    }
-                }
-            catch (InvalidOperationException) { }   // окно скрыто/ещё не отрисовано — глаз остаётся на месте
-            // Tiny continuous sway keeps the eyes alive without sudden direction changes.
-            double dance = Math.Sin(_wavePhase * (playing ? 1.35 : 0.72));
-            tx += dance * (playing ? 0.24 : 0.12);
-            ty += Math.Sin(_wavePhase * (playing ? 1.8 : 0.95) + 0.6) * (playing ? 0.42 : 0.22);
-        }
-        lx += (tx - lx) * _eyeFollow;
-        ly += (ty - ly) * _eyeFollow;
-        if (Math.Abs(tx - lx) < 0.01) lx = tx;   // дошли до цели — перестаём менять значения и вызывать перерисовку
-        if (Math.Abs(ty - ly) < 0.01) ly = ty;
     }
 
     void ApplyWeather(WeatherInfo? w)
@@ -2010,7 +1835,7 @@ public partial class MainWindow : Window
             return;
         }
         var win = new SnipWindow(shot.Value.Img, shot.Value.Sx, shot.Value.Sy,
-            msg => ShowToast("Screenshot", msg, ColorOk));
+            msg => { ShowToast("Screenshot", msg, ColorOk); SetEyeMood(EyeMood.Happy, 1.8); });
         win.Closed += (_, _) => Show();
         win.Show();
     }
@@ -2090,9 +1915,21 @@ public partial class MainWindow : Window
         keybd_event(vk, 0, 2, UIntPtr.Zero);
     }
 
-    void MediaPrev_Click(object s, RoutedEventArgs e) => PressKey(VK_MEDIA_PREV);
-    void MediaPlay_Click(object s, RoutedEventArgs e) => PressKey(VK_MEDIA_PLAY);
-    void MediaNext_Click(object s, RoutedEventArgs e) => PressKey(VK_MEDIA_NEXT);
+    /// <summary>Команда текущему плееру через медиасессию Windows; если не вышло — медиаклавиша.</summary>
+    async Task MediaCommand(Func<GlobalSystemMediaTransportControlsSession, Windows.Foundation.IAsyncOperation<bool>> op, byte fallbackKey)
+    {
+        var session = _mediaSession;
+        if (session != null)
+        {
+            try { if (await op(session)) return; }
+            catch (Exception ex) { Log.Warn("Media command failed, using media key: " + ex.Message); }
+        }
+        PressKey(fallbackKey);
+    }
+
+    async void MediaPrev_Click(object s, RoutedEventArgs e) => await MediaCommand(x => x.TrySkipPreviousAsync(), VK_MEDIA_PREV);
+    async void MediaPlay_Click(object s, RoutedEventArgs e) => await MediaCommand(x => x.TryTogglePlayPauseAsync(), VK_MEDIA_PLAY);
+    async void MediaNext_Click(object s, RoutedEventArgs e) => await MediaCommand(x => x.TrySkipNextAsync(), VK_MEDIA_NEXT);
     void VolDown_Click(object s, RoutedEventArgs e) => PressKey(VK_VOLUME_DOWN);
     void VolUp_Click(object s, RoutedEventArgs e) => PressKey(VK_VOLUME_UP);
     void VolMute_Click(object s, RoutedEventArgs e) => PressKey(VK_VOLUME_MUTE);
@@ -2100,6 +1937,7 @@ public partial class MainWindow : Window
     void OnMediaChanged(NowPlaying? np)
     {
         _now = np;
+        _audio.SetActive(np?.Playing == true);   // захват звука только пока играет музыка
         // Cache media state silently until the welcome sequence has finished.
         if (_welcomeRunning) return;
         if (np == null)
@@ -2113,8 +1951,8 @@ public partial class MainWindow : Window
             NowTitle.Text = np.Title;
             NowArtist.Text = np.Artist;
             PlayBtn.Content = np.Playing ? "\uE769" : "\uE768";
-            if (!np.Playing) SetEyeMood(EyeMood.Calm, 1.8);
-            else SetEyeMood(EyeMood.Happy, 0.9);
+            if (!np.Playing) SetEyeMood(EyeMood.Calm, 3.0);
+            else if (_eyeMood != EyeMood.Excited) SetEyeMood(EyeMood.Happy, 1.4);
             var key = np.Artist + "|" + np.Title;
             if (np.Playing && key != _lastTrack)
             {
@@ -2131,11 +1969,9 @@ public partial class MainWindow : Window
         FadeInWelcomeElement(WeatherHost);
         FadeInWelcomeElement(TempText);
         EnsureFx();
+        // Ширина меняется, только если трек появился/пропал: Animate сам пропускает ту же цель,
+        // поэтому частые события плеера больше не дёргают остров.
         if (_state == IslandState.Collapsed)
-        {
-            // Resize the compact island when media metadata appears or disappears.
-            Animate(_now != null ? PlayW : IdleW, CollapsedH, 18, spring: false);
-            Collapse();
-        }
+            Animate(_now != null ? PlayW : IdleW, MiniH, MiniR, spring: false);
     }
 }

@@ -18,11 +18,7 @@ public partial class MainWindow : Window
     FrameworkElement? _anchor;
     DispatcherTimer? _hop;
 
-    // глаза
-    double _ex, _ey, _vx, _vy, _tx, _ty, _gx, _gy, _gtx, _gty, _blinkT = -1;
-    bool _eyesInit;
-    DateTime _last = DateTime.Now, _nextBlink = DateTime.Now.AddSeconds(2.5), _nextGlance = DateTime.Now, _lastMove = DateTime.MinValue;
-    readonly Random _rng = new();
+    // глаза, эмоции и подсказки — в MainWindow.Mood.cs
 
     string T(string ru, string en) => _en ? en : ru;
 
@@ -45,6 +41,7 @@ public partial class MainWindow : Window
         AppLanguageEnglish.IsChecked = _en;
         AppLanguageRussian.IsChecked = !_en;
         if (_uninstallMode) AppLanguagePanel.Visibility = Visibility.Collapsed;
+        InitMood();
         CompositionTarget.Rendering += Frame;
         Closed += (_, _) => CompositionTarget.Rendering -= Frame;
         Refresh();
@@ -110,11 +107,13 @@ public partial class MainWindow : Window
         HintText.Text = hint;
         NextButton.Content = _page switch { 0 => T("Далее →", "Next →"), 1 => _uninstallMode ? T("Удалить", "Uninstall") : T("Установить", "Install"), 2 => T("Подожди…", "Please wait…"), _ => T("Готово", "Finish") };
         NextButton.IsEnabled = _page switch { 0 => AgreeCheck.IsChecked == true, 1 => _uninstallMode || !string.IsNullOrWhiteSpace(FolderBox.Text), 2 => false, _ => true };
+        AnimateTexts();
     }
 
     void GoPage(int p)
     {
         _page = p; Refresh();
+        OnPageEntered(p);
         SetAnchor(new[] { Step0, Step1, Step2, Step3 }[p]);
         Hop(900, () => SetAnchor(_page switch
         {
@@ -135,69 +134,35 @@ public partial class MainWindow : Window
 
     void SetAnchor(FrameworkElement el) => _anchor = el;
 
-    // ---------- глазки ----------
-    void Frame(object? s, EventArgs e)
-    {
-        var now = DateTime.Now;
-        double dt = Math.Clamp((now - _last).TotalSeconds, 0.001, 0.05); _last = now;
-        if (_anchor != null && _anchor.IsVisible && _anchor.IsLoaded)
-        {
-            try
-            {
-                var p = _anchor.TransformToVisual(EyeLayer).Transform(new Point(0, _anchor.ActualHeight / 2));
-                _tx = p.X - 30; _ty = p.Y - 8;
-                if (!_eyesInit) { _ex = _tx; _ey = _ty; _eyesInit = true; }
-            }
-            catch (InvalidOperationException) { }
-        }
-        if (!_eyesInit) return;
-        // мягкая пружина: плавный перелёт без рывков
-        const double k = 95, c = 17.5;
-        _vx += ((_tx - _ex) * k - _vx * c) * dt; _vy += ((_ty - _ey) * k - _vy * c) * dt;
-        _ex += _vx * dt; _ey += _vy * dt;
-        // взгляд: за курсором, а если он стоит — сам поглядывает по сторонам (не спит)
-        if ((now - _lastMove).TotalSeconds < 2.5)
-        {
-            var m = Mouse.GetPosition(EyeLayer);
-            _gtx = Math.Clamp((m.X - _ex) / 60, -2.6, 2.6); _gty = Math.Clamp((m.Y - _ey) / 60, -1.6, 1.6);
-        }
-        else if (now >= _nextGlance)
-        {
-            _gtx = (_rng.NextDouble() * 2 - 1) * 2.4; _gty = (_rng.NextDouble() * 2 - 1) * 1.3;
-            _nextGlance = now.AddSeconds(1.3 + _rng.NextDouble() * 2.7);
-        }
-        double f = 1 - Math.Exp(-7 * dt);
-        _gx += (_gtx - _gx) * f; _gy += (_gty - _gy) * f;
-        Canvas.SetLeft(Eyes, _ex + _gx); Canvas.SetTop(Eyes, _ey + _gy);
-        double speed = Math.Sqrt(_vx * _vx + _vy * _vy);
-        double open = 1 + Math.Min(0.12, speed / 1800);
-        double blink = 1;
-        if (_blinkT >= 0)
-        {
-            _blinkT += dt; double ph = _blinkT / 0.18;
-            if (ph >= 1) { _blinkT = -1; _nextBlink = now.AddSeconds(_rng.NextDouble() < 0.2 ? 0.3 : 2.5 + _rng.NextDouble() * 3.5); }
-            else blink = 1 - 0.92 * Math.Sin(Math.PI * ph);
-        }
-        else if (now >= _nextBlink) _blinkT = 0;
-        EyeLScale.ScaleY = EyeRScale.ScaleY = Math.Max(0.07, open * blink);
-    }
-
     void Window_MouseMove(object sender, System.Windows.Input.MouseEventArgs e) => _lastMove = DateTime.Now;
-    void Window_Loaded(object sender, RoutedEventArgs e) { Activate(); Hop(700, () => SetAnchor(AgreeCheck)); }
+    void Window_Loaded(object sender, RoutedEventArgs e) { Activate(); Hop(700, () => SetAnchor(AgreeCheck)); GreetOnLoad(); }
     void Drag_Down(object sender, MouseButtonEventArgs e) { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); }
 
     // ---------- события ----------
-    void Ru_Click(object s, RoutedEventArgs e) { _en = false; Refresh(); }
-    void En_Click(object s, RoutedEventArgs e) { _en = true; Refresh(); }
-    void Close_Click(object s, RoutedEventArgs e) { if (!_installing) Close(); }
-    void Agree_Changed(object s, RoutedEventArgs e) { Refresh(); SetAnchor(AgreeCheck.IsChecked == true ? NextButton : AgreeCheck); }
-    void Folder_Changed(object s, TextChangedEventArgs e) { if (IsLoaded) { Refresh(); Hop(1200, () => SetAnchor(NextButton)); } }
+    void Ru_Click(object s, RoutedEventArgs e) { if (_en) Wink(); _en = false; Refresh(); }
+    void En_Click(object s, RoutedEventArgs e) { if (!_en) Wink(); _en = true; Refresh(); }
+    void Close_Click(object s, RoutedEventArgs e)
+    {
+        if (_installing) { RefuseClose(); return; }
+        Feel(Mood.Surprised, 1.0);
+        BeginClose();
+    }
+    void Agree_Changed(object s, RoutedEventArgs e)
+    {
+        Refresh();
+        SetAnchor(AgreeCheck.IsChecked == true ? NextButton : AgreeCheck);
+        if (IsLoaded) AgreeReaction(AgreeCheck.IsChecked == true);
+    }
+    void Folder_Changed(object s, TextChangedEventArgs e) { if (IsLoaded) { Refresh(); FolderReaction(); Hop(1200, () => SetAnchor(NextButton)); } }
     void Back_Click(object s, RoutedEventArgs e) { if (_page == 1 && !_installing) GoPage(0); }
 
     void Browse_Click(object s, RoutedEventArgs e)
     {
+        BrowseStarted();
         var d = new OpenFolderDialog { Title = T("Выбери папку для Moku", "Choose Moku folder"), InitialDirectory = Directory.Exists(FolderBox.Text) ? FolderBox.Text : null };
-        if (d.ShowDialog(this) == true) { FolderBox.Text = d.FolderName; SetAnchor(NextButton); }
+        bool chosen = d.ShowDialog(this) == true;
+        if (chosen) { FolderBox.Text = d.FolderName; SetAnchor(NextButton); }
+        BrowseFinished(chosen);
     }
 
     async void Next_Click(object s, RoutedEventArgs e)
@@ -214,6 +179,7 @@ public partial class MainWindow : Window
         string root = Path.GetPathRoot(installDir) ?? "";
         if (string.Equals(installDir, Path.TrimEndingDirectorySeparator(root), StringComparison.OrdinalIgnoreCase))
         {
+            OnError();
             MessageBox.Show(this, T("Путь установки выглядит небезопасно. Удаление отменено.", "The install path is unsafe. Uninstall was cancelled."), "Moku", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
@@ -222,7 +188,9 @@ public partial class MainWindow : Window
         try
         {
             _installing = true; GoPage(2);
-            StatusText.Text = T("ШАГ 1 ИЗ 3  ·  ЗАКРЫВАЮ MOKU", "STEP 1 OF 3  ·  CLOSING MOKU");
+            Status(T("ШАГ 1 ИЗ 3  ·  ЗАКРЫВАЮ MOKU", "STEP 1 OF 3  ·  CLOSING MOKU"));
+            Progress.Value = 12;
+            await Task.Delay(260);   // дать глазкам и статусу показаться
             foreach (var process in Process.GetProcessesByName("Moku"))
             {
                 try
@@ -237,7 +205,9 @@ public partial class MainWindow : Window
                 catch { }
             }
 
-            StatusText.Text = T("ШАГ 2 ИЗ 3  ·  УДАЛЯЮ ЯРЛЫКИ И АВТОЗАПУСК", "STEP 2 OF 3  ·  REMOVING SHORTCUTS & STARTUP");
+            Progress.Value = 40;
+            Status(T("ШАГ 2 ИЗ 3  ·  УДАЛЯЮ ЯРЛЫКИ И АВТОЗАПУСК", "STEP 2 OF 3  ·  REMOVING SHORTCUTS & STARTUP"));
+            await Task.Delay(260);
             string startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Moku");
             try { File.Delete(Path.Combine(startMenu, "Moku.lnk")); } catch { }
             try { File.Delete(Path.Combine(startMenu, "Uninstall Moku.lnk")); } catch { }
@@ -265,7 +235,9 @@ public partial class MainWindow : Window
                 try { if (Directory.Exists(dataDir)) Directory.Delete(dataDir, true); } catch { }
             }
 
-            StatusText.Text = T("ШАГ 3 ИЗ 3  ·  ЗАВЕРШАЮ УДАЛЕНИЕ", "STEP 3 OF 3  ·  FINISHING REMOVAL");
+            Progress.Value = 75;
+            Status(T("ШАГ 3 ИЗ 3  ·  ЗАВЕРШАЮ УДАЛЕНИЕ", "STEP 3 OF 3  ·  FINISHING REMOVAL"));
+            await Task.Delay(260);
             string script = Path.Combine(Path.GetTempPath(), "Moku-Remove-" + Guid.NewGuid().ToString("N") + ".cmd");
             string safeDir = installDir.Replace("%", "%%");
             File.WriteAllText(script, "@echo off\r\ntimeout /t 3 /nobreak >nul\r\nrmdir /s /q \"" + safeDir + "\"\r\ndel \"%~f0\"\r\n", System.Text.Encoding.Default);
@@ -278,6 +250,7 @@ public partial class MainWindow : Window
                 WindowStyle = ProcessWindowStyle.Hidden
             });
             Progress.Value = 100;
+            await Task.Delay(220);
             _installing = false;
             _done = true;
             GoPage(3);
@@ -286,6 +259,7 @@ public partial class MainWindow : Window
         {
             _installing = false;
             GoPage(1);
+            OnError();
             MessageBox.Show(this, T("Не удалось удалить Moku: ", "Uninstall failed: ") + ex.Message, "Moku", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -303,7 +277,7 @@ public partial class MainWindow : Window
             exe = Path.Combine(target, "Moku.exe");
             tempExe = exe + ".installing";
             _installing = true; GoPage(2);
-            StatusText.Text = T("ШАГ 1 ИЗ 3  ·  ЗАКРЫВАЮ СТАРУЮ КОПИЮ", "STEP 1 OF 3  ·  STOPPING OLD COPY");
+            Status(T("ШАГ 1 ИЗ 3  ·  ЗАКРЫВАЮ СТАРУЮ КОПИЮ", "STEP 1 OF 3  ·  STOPPING OLD COPY"));
             // старая копия, висящая в фоне, блокировала файл и не давала острову показаться
             foreach (var pr in Process.GetProcessesByName("Moku"))
             {
@@ -320,7 +294,7 @@ public partial class MainWindow : Window
                 catch { /* Не трогаем процесс, путь которого не удалось проверить. */ }
             }
 
-            StatusText.Text = T("ШАГ 2 ИЗ 3  ·  КОПИРУЮ ФАЙЛЫ", "STEP 2 OF 3  ·  COPYING FILES");
+            Status(T("ШАГ 2 ИЗ 3  ·  КОПИРУЮ ФАЙЛЫ", "STEP 2 OF 3  ·  COPYING FILES"));
             await Task.Run(() =>
             {
                 Directory.CreateDirectory(target);
@@ -349,7 +323,7 @@ public partial class MainWindow : Window
                 iconOutput.Flush(true);
             });
 
-            StatusText.Text = T("ШАГ 3 ИЗ 3  ·  ЯРЛЫКИ И НАСТРОЙКИ", "STEP 3 OF 3  ·  SHORTCUTS & SETTINGS");
+            Status(T("ШАГ 3 ИЗ 3  ·  ЯРЛЫКИ И НАСТРОЙКИ", "STEP 3 OF 3  ·  SHORTCUTS & SETTINGS"));
             SetAnchor(StatusText); Progress.Value = 88;
             var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Moku");
             Directory.CreateDirectory(startMenu);
@@ -405,6 +379,7 @@ public partial class MainWindow : Window
         {
             try { if (!string.IsNullOrEmpty(tempExe) && File.Exists(tempExe)) File.Delete(tempExe); } catch { }
             _installing = false; GoPage(1);
+            OnError();
             System.Windows.MessageBox.Show(this, T("Не удалось установить: ", "Install failed: ") + ex.Message, "Moku", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -417,8 +392,9 @@ public partial class MainWindow : Window
             if (!_uninstallMode && LaunchCheck.IsChecked == true && File.Exists(exe))
                 Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(exe)! });
         }
-        catch (Exception ex) { System.Windows.MessageBox.Show(this, ex.Message, "Moku"); }
-        Close();
+        catch (Exception ex) { OnError(); System.Windows.MessageBox.Show(this, ex.Message, "Moku"); }
+        if (!_uninstallMode && LaunchCheck.IsChecked == true) Feel(Mood.Excited, 1.0);
+        BeginClose();
     }
 
     static void CreateShortcut(string path, string target, string arguments = "", string? iconPath = null)

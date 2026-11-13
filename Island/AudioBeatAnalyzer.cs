@@ -1,20 +1,37 @@
 using System.Diagnostics;
 using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 using NAudio.Wave;
+using Timer = System.Threading.Timer;
 
 namespace Island;
 
-/// <summary>Measures low, mid and high output energy through WASAPI loopback.</summary>
-internal sealed class AudioBeatAnalyzer : IDisposable
+/// <summary>
+/// Measures low, mid and high output energy through WASAPI loopback.
+/// • Захват работает только пока играет музыка (SetActive) — в простое не тратит CPU.
+/// • При смене устройства вывода (наушники, Bluetooth, HDMI) захват автоматически
+///   пересоздаётся на новом устройстве — волна больше не «умирает» после переключения.
+/// </summary>
+internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
 {
-    WasapiLoopbackCapture? _capture;
-    Biquad? _lowPass, _midHighPass, _midLowPass, _highPass;
-    int _channels, _bits, _sampleRate;
-    bool _isFloat, _disposed;
+    /// <summary>Одна сессия захвата со своими фильтрами: старый поток никогда не трогает состояние нового.</summary>
+    sealed class CaptureSession
+    {
+        public required WasapiLoopbackCapture Capture;
+        public required Biquad LowPass, MidHighPass, MidLowPass, HighPass;
+        public int Channels, Bits, SampleRate;
+        public bool IsFloat;
+        public double BassFloor;
+    }
+
+    readonly object _gate = new();
+    readonly MMDeviceEnumerator? _enumerator;
+    CaptureSession? _session;
+    Timer? _restartTimer;
+    bool _wantActive, _disposed;
     float _bassLevel, _midLevel, _highLevel, _activityLevel;
     int _beatPending;
     long _lastBeatTicks;
-    double _bassFloor;
 
     public float BassLevel => Volatile.Read(ref _bassLevel);
     public float MidLevel => Volatile.Read(ref _midLevel);
@@ -25,37 +42,133 @@ internal sealed class AudioBeatAnalyzer : IDisposable
     {
         try
         {
-            _capture = new WasapiLoopbackCapture();
-            var format = _capture.WaveFormat;
-            _channels = Math.Max(1, format.Channels);
-            _bits = format.BitsPerSample;
-            _sampleRate = format.SampleRate;
-            _isFloat = format.Encoding == WaveFormatEncoding.IeeeFloat && _bits == 32;
-            _lowPass = Biquad.LowPass(_sampleRate, 160);
-            _midHighPass = Biquad.HighPass(_sampleRate, 160);
-            _midLowPass = Biquad.LowPass(_sampleRate, 2200);
-            _highPass = Biquad.HighPass(_sampleRate, 2200);
-            _capture.DataAvailable += OnDataAvailable;
-            _capture.RecordingStopped += OnRecordingStopped;
-            _capture.StartRecording();
-            Log.Info($"Audio multi-band analysis started ({_sampleRate} Hz, {_channels} ch, {_bits}-bit)");
+            _enumerator = new MMDeviceEnumerator();
+            _enumerator.RegisterEndpointNotificationCallback(this);
         }
         catch (Exception ex)
         {
-            Log.Warn("WASAPI loopback unavailable; music wave will use a quiet fallback: " + ex.Message);
+            _enumerator = null;
+            Log.Warn("Audio device notifications unavailable: " + ex.Message);
         }
     }
 
     public bool ConsumeBeat() => Interlocked.Exchange(ref _beatPending, 0) != 0;
 
-    void OnDataAvailable(object? sender, WaveInEventArgs e)
+    /// <summary>Включить/выключить анализ звука (вызывается из UI при play/pause).</summary>
+    public void SetActive(bool active)
     {
-        if (_disposed || e.BytesRecorded <= 0 || _capture == null ||
-            _lowPass == null || _midHighPass == null || _midLowPass == null || _highPass == null) return;
+        lock (_gate)
+        {
+            if (_disposed || _wantActive == active) return;
+            _wantActive = active;
+        }
+        if (active) ScheduleRestart(0);
+        else
+        {
+            CancelRestart();
+            StopCapture();
+        }
+    }
+
+    void ScheduleRestart(int delayMs)
+    {
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _restartTimer?.Dispose();
+            _restartTimer = new Timer(_ =>
+            {
+                StopCapture();
+                StartCapture();
+            }, null, delayMs, Timeout.Infinite);
+        }
+    }
+
+    void CancelRestart()
+    {
+        lock (_gate)
+        {
+            _restartTimer?.Dispose();
+            _restartTimer = null;
+        }
+    }
+
+    void StartCapture()
+    {
+        lock (_gate)
+        {
+            if (_disposed || !_wantActive || _session != null) return;
+            try
+            {
+                var capture = new WasapiLoopbackCapture();
+                var format = capture.WaveFormat;
+                int rate = format.SampleRate;
+                var session = new CaptureSession
+                {
+                    Capture = capture,
+                    Channels = Math.Max(1, format.Channels),
+                    Bits = format.BitsPerSample,
+                    SampleRate = rate,
+                    IsFloat = format.Encoding == WaveFormatEncoding.IeeeFloat && format.BitsPerSample == 32,
+                    LowPass = Biquad.LowPass(rate, 160),
+                    MidHighPass = Biquad.HighPass(rate, 160),
+                    MidLowPass = Biquad.LowPass(rate, 2200),
+                    HighPass = Biquad.HighPass(rate, 2200)
+                };
+                capture.DataAvailable += (_, e) => OnDataAvailable(session, e);
+                capture.RecordingStopped += (_, e) => OnRecordingStopped(session, e);
+                _session = session;
+                capture.StartRecording();
+                Log.Info($"Audio multi-band analysis started ({rate} Hz, {session.Channels} ch, {session.Bits}-bit)");
+            }
+            catch (Exception ex)
+            {
+                _session = null;
+                Log.Warn("WASAPI loopback unavailable; retrying later: " + ex.Message);
+                // Например, нет ни одного устройства вывода. Повторим, когда оно появится, или через 5 с.
+                _restartTimer?.Dispose();
+                _restartTimer = new Timer(_ => StartCapture(), null, 5000, Timeout.Infinite);
+            }
+        }
+    }
+
+    void StopCapture()
+    {
+        CaptureSession? session;
+        lock (_gate)
+        {
+            session = _session;
+            _session = null;
+        }
+        Volatile.Write(ref _bassLevel, 0);
+        Volatile.Write(ref _midLevel, 0);
+        Volatile.Write(ref _highLevel, 0);
+        Volatile.Write(ref _activityLevel, 0);
+        if (session == null) return;
         try
         {
-            int bytesPerSample = Math.Max(1, _bits / 8);
-            int frameBytes = bytesPerSample * _channels;
+            session.Capture.StopRecording();
+            session.Capture.Dispose();
+        }
+        catch (Exception ex) { Log.Warn("Audio capture stop: " + ex.Message); }
+    }
+
+    void OnRecordingStopped(CaptureSession session, StoppedEventArgs e)
+    {
+        bool current;
+        lock (_gate) current = ReferenceEquals(_session, session) && !_disposed && _wantActive;
+        if (!current) return;                       // это мы сами остановили старую сессию
+        if (e.Exception != null) Log.Warn("WASAPI loopback stopped: " + e.Exception.Message);
+        ScheduleRestart(1000);                      // устройство пропало/сменилось — переподключаемся
+    }
+
+    void OnDataAvailable(CaptureSession s, WaveInEventArgs e)
+    {
+        if (_disposed || e.BytesRecorded <= 0 || !ReferenceEquals(Volatile.Read(ref _session), s)) return;
+        try
+        {
+            int bytesPerSample = Math.Max(1, s.Bits / 8);
+            int frameBytes = bytesPerSample * s.Channels;
             int frames = e.BytesRecorded / frameBytes;
             if (frames == 0) return;
 
@@ -64,13 +177,13 @@ internal sealed class AudioBeatAnalyzer : IDisposable
             {
                 double mono = 0;
                 int offset = frame * frameBytes;
-                for (int channel = 0; channel < _channels; channel++)
-                    mono += ReadSample(e.Buffer, offset + channel * bytesPerSample);
-                mono /= _channels;
+                for (int channel = 0; channel < s.Channels; channel++)
+                    mono += ReadSample(e.Buffer, offset + channel * bytesPerSample, s.IsFloat, s.Bits);
+                mono /= s.Channels;
 
-                double low = _lowPass.Process(mono);
-                double midSample = _midLowPass.Process(_midHighPass.Process(mono));
-                double highSample = _highPass.Process(mono);
+                double low = s.LowPass.Process(mono);
+                double midSample = s.MidLowPass.Process(s.MidHighPass.Process(mono));
+                double highSample = s.HighPass.Process(mono);
                 lowSquares += low * low;
                 midSquares += midSample * midSample;
                 highSquares += highSample * highSample;
@@ -79,7 +192,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable
             double lowRms = Math.Sqrt(lowSquares / frames);
             double midRms = Math.Sqrt(midSquares / frames);
             double highRms = Math.Sqrt(highSquares / frames);
-            double seconds = (double)frames / _sampleRate;
+            double seconds = (double)frames / s.SampleRate;
 
             // Compress each band independently so quieter instruments remain visible.
             float bass = (float)Math.Clamp(lowRms * 25.0, 0, 1);
@@ -93,8 +206,8 @@ internal sealed class AudioBeatAnalyzer : IDisposable
 
             // Kick detection remains low-band and transient-based; the visible wave uses all bands.
             double floorFollow = 1.0 - Math.Exp(-seconds / 1.35);
-            _bassFloor += (lowRms - _bassFloor) * floorFollow;
-            double threshold = Math.Max(0.005, _bassFloor * 1.42);
+            s.BassFloor += (lowRms - s.BassFloor) * floorFollow;
+            double threshold = Math.Max(0.005, s.BassFloor * 1.42);
             long now = Stopwatch.GetTimestamp();
             long previous = Interlocked.Read(ref _lastBeatTicks);
             bool refractoryPassed = now - previous > Stopwatch.Frequency * 0.17;
@@ -107,10 +220,10 @@ internal sealed class AudioBeatAnalyzer : IDisposable
         catch (Exception ex) { Log.Warn("Audio beat analysis failed: " + ex.Message); }
     }
 
-    double ReadSample(byte[] buffer, int offset)
+    static double ReadSample(byte[] buffer, int offset, bool isFloat, int bits)
     {
-        if (_isFloat) return BitConverter.ToSingle(buffer, offset);
-        return _bits switch
+        if (isFloat) return BitConverter.ToSingle(buffer, offset);
+        return bits switch
         {
             8 => (buffer[offset] - 128) / 128.0,
             16 => BitConverter.ToInt16(buffer, offset) / 32768.0,
@@ -126,27 +239,37 @@ internal sealed class AudioBeatAnalyzer : IDisposable
         return (value & 0x800000) != 0 ? value | unchecked((int)0xFF000000) : value;
     }
 
-    void OnRecordingStopped(object? sender, StoppedEventArgs e)
+    // ---- IMMNotificationClient: Windows сообщает о смене устройств вывода ----
+    void IMMNotificationClient.OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
     {
-        if (e.Exception != null && !_disposed)
-            Log.Warn("WASAPI loopback stopped: " + e.Exception.Message);
+        if (flow != DataFlow.Render || role != Role.Multimedia) return;
+        bool active;
+        lock (_gate) active = _wantActive && !_disposed;
+        if (active)
+        {
+            Log.Info("Default audio output changed — restarting loopback capture");
+            ScheduleRestart(400);                   // небольшая пауза: драйвер нового устройства успевает проснуться
+        }
     }
+
+    void IMMNotificationClient.OnDeviceStateChanged(string deviceId, DeviceState newState) { }
+    void IMMNotificationClient.OnDeviceAdded(string pwstrDeviceId) { }
+    void IMMNotificationClient.OnDeviceRemoved(string deviceId) { }
+    void IMMNotificationClient.OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key) { }
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        var capture = _capture;
-        _capture = null;
-        if (capture == null) return;
-        try
+        lock (_gate)
         {
-            capture.DataAvailable -= OnDataAvailable;
-            capture.RecordingStopped -= OnRecordingStopped;
-            capture.StopRecording();
-            capture.Dispose();
+            if (_disposed) return;
+            _disposed = true;
+            _wantActive = false;
+            _restartTimer?.Dispose();
+            _restartTimer = null;
         }
-        catch (Exception ex) { Log.Warn("Audio analyzer shutdown: " + ex.Message); }
+        try { _enumerator?.UnregisterEndpointNotificationCallback(this); } catch { }
+        StopCapture();
+        try { _enumerator?.Dispose(); } catch { }
     }
 
     sealed class Biquad

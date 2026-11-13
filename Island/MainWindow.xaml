@@ -376,6 +376,7 @@
                             <Ellipse.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="EyeLScale" ScaleX="1" ScaleY="1"/>
+                                    <RotateTransform x:Name="EyeLRot" Angle="0"/>
                                     <TranslateTransform x:Name="EyeLShift"/>
                                 </TransformGroup>
                             </Ellipse.RenderTransform>
@@ -385,6 +386,7 @@
                             <Ellipse.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="EyeRScale" ScaleX="1" ScaleY="1"/>
+                                    <RotateTransform x:Name="EyeRRot" Angle="0"/>
                                     <TranslateTransform x:Name="EyeRShift"/>
                                 </TransformGroup>
                             </Ellipse.RenderTransform>
@@ -464,7 +466,7 @@
                             <Border x:Name="ExpandedWeatherHost" Width="20" Height="20" Margin="10,0,3,0"/>
                             <TextBlock x:Name="ExpandedTempText" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock Text="Alt + Space" Foreground="#55FFFFFF" FontSize="11"
+                        <TextBlock Text="Ctrl + Alt + Space" Foreground="#55FFFFFF" FontSize="11"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
