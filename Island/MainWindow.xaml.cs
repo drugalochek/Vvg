@@ -528,7 +528,7 @@ public partial class MainWindow : Window
         try { initial = (Color)ColorConverter.ConvertFromString(_s.ThemeBottomColor); }
         catch { initial = Colors.Black; }
         var picker = new ColorPickerWindow(initial, _s.Language == "ru") { Owner = this };
-        if (picker.ShowDialog() != true) return;
+        if (WithModal(() => picker.ShowDialog()) != true) return;
         _s.ThemeBottomColor = picker.SelectedColor.ToString();
         ApplyAppearance();
         _s.Save();
@@ -548,7 +548,7 @@ public partial class MainWindow : Window
             ? (_bodyBrush?.GradientStops[0].Color ?? Color.FromRgb(0, 0, 0))
             : (Color)ColorConverter.ConvertFromString(_s.ThemeColor);
         var picker = new ColorPickerWindow(initial, _s.Language == "ru") { Owner = this };
-        if (picker.ShowDialog() != true) return;
+        if (WithModal(() => picker.ShowDialog()) != true) return;
         _s.Theme = "Custom";
         _s.ThemeColor = picker.SelectedColor.ToString();
         if (ThemeCombo != null) ThemeCombo.SelectedValue = "Custom";
@@ -606,7 +606,7 @@ public partial class MainWindow : Window
     void CustomAccent_Click(object sender, RoutedEventArgs e)
     {
         var picker = new ColorPickerWindow(_accentColor, _s.Language == "ru") { Owner = this };
-        if (picker.ShowDialog() != true) return;
+        if (WithModal(() => picker.ShowDialog()) != true) return;
         _s.Accent = picker.SelectedColor.ToString();
         _s.Save();
         ApplyAccent();
@@ -805,7 +805,7 @@ public partial class MainWindow : Window
         if (TopGradientColorButton != null) TopGradientColorButton.Content = ru ? "Верхний цвет" : "Upper color";
         if (BottomGradientColorButton != null) BottomGradientColorButton.Content = ru ? "Нижний цвет" : "Lower color";
         if (GradientBalanceLabel != null) GradientBalanceLabel.Text = ru ? "Баланс цветов" : "Color balance";
-                if (AccentDescription != null) AccentDescription.Text = ru ? "Настрой цвета RGB, прозрачность, скругление и тему острова." : "Tune RGB color, opacity, corner rounding and island theme.";
+                if (AccentDescription != null) AccentDescription.Text = ru ? "Тема задаёт готовые цвета, кнопки градиента — любые свои. Чем ниже прозрачность, тем сильнее эффект стекла." : "A theme sets ready-made colors; the gradient buttons take any of your own. Lower opacity gives a stronger glass effect.";
         if (SupportBtn != null) SupportBtn.Content = ru ? "Поддержать автора на Boosty" : "Support the author on Boosty";
         if (AlignLeft != null) AlignLeft.Content = ru ? "Слева" : "Left";
         if (AlignCenter != null) AlignCenter.Content = ru ? "По центру" : "Center";
@@ -1482,7 +1482,11 @@ public partial class MainWindow : Window
 
     void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape) Collapse();
+        if (e.Key == Key.Escape)
+        {
+            if (SettingsHandleEscape()) { e.Handled = true; return; }   // v2.11: из раздела настроек — сначала в меню
+            Collapse();
+        }
     }
 
     void Exit_Click(object sender, RoutedEventArgs e) => ExitApplication();
@@ -1497,7 +1501,7 @@ public partial class MainWindow : Window
         SettingsPage.Visibility = tag == "Set" ? Visibility.Visible : Visibility.Collapsed;
         FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
-        if (tag == "Set") UpdateAutoButton();
+        if (tag == "Set") { UpdateAutoButton(); ShowSettingsMenu(false); }
         if (tag == "Apps")
         {
             BuildApps();

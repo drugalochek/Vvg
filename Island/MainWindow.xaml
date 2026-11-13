@@ -708,249 +708,301 @@
 
                 <!-- Settings -->
                 <ScrollViewer x:Name="SettingsPage" Grid.Row="1" Visibility="Collapsed"
-                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                              CanContentScroll="True">
-                  <StackPanel>
-                    <Grid Margin="0,2,0,14">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="LanguageLabel" Text="Language" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <Border Grid.Column="1" HorizontalAlignment="Left" Background="#17FFFFFF"
-                                BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" Padding="3">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton x:Name="LanguageEnglish" Content="English" GroupName="language"
-                                             Style="{StaticResource LanguagePill}" IsChecked="True" Checked="Language_Checked"/>
-                                <RadioButton x:Name="LanguageRussian" Content="Русский" GroupName="language"
-                                             Style="{StaticResource LanguagePill}" Checked="Language_Checked"/>
-                            </StackPanel>
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                  <Grid x:Name="SettingsRoot">
+                    <!-- v2.11: меню разделов настроек (карточки строятся кодом, MainWindow.SettingsNav.cs) -->
+                    <StackPanel x:Name="SettingsMenu">
+                        <Border Background="{StaticResource Card}" BorderBrush="{StaticResource CardRim}" BorderThickness="1"
+                                CornerRadius="17" Padding="14,0" Margin="3,0,3,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="&#xE721;" FontFamily="{StaticResource Icons}" Foreground="{StaticResource Dim}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock x:Name="SettingsSearchHint" Grid.Column="1" Text="Find a setting…" Foreground="#66FFFFFF" FontSize="13"
+                                           VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                <TextBox x:Name="SettingsSearch" Grid.Column="1" Background="Transparent" Foreground="White" CaretBrush="White"
+                                         BorderThickness="0" Padding="0,7" FontSize="13" TextChanged="SettingsSearch_TextChanged" KeyDown="SettingsSearch_KeyDown"/>
+                                <Button x:Name="SettingsSearchClear" Grid.Column="2" Style="{StaticResource IconBtn}" Content="&#xE711;" FontSize="11"
+                                        Width="24" Height="24" Margin="4,0,-8,0" Visibility="Collapsed" Click="SettingsSearchClear_Click"/>
+                            </Grid>
                         </Border>
-                    </Grid>
-                    <Grid Margin="0,2,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="PositionLabel" Text="Position" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <RadioButton x:Name="AlignLeft" Style="{StaticResource TabBtn}" Content="Left"
-                                         Tag="Left" GroupName="align" Checked="Align_Checked"/>
-                            <RadioButton x:Name="AlignCenter" Style="{StaticResource TabBtn}" Content="Center"
-                                         Tag="Center" GroupName="align" Checked="Align_Checked"/>
-                            <RadioButton x:Name="AlignRight" Style="{StaticResource TabBtn}" Content="Right"
-                                         Tag="Right" GroupName="align" Checked="Align_Checked"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="VerticalPositionLabel" Text="Vertical position" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <RadioButton x:Name="VerticalTop" Style="{StaticResource TabBtn}" Content="Top" Tag="Top" GroupName="vertical" Checked="VerticalAlign_Checked"/>
-                            <RadioButton x:Name="VerticalCenter" Style="{StaticResource TabBtn}" Content="Center" Tag="Center" GroupName="vertical" Checked="VerticalAlign_Checked"/>
-                            <RadioButton x:Name="VerticalBottom" Style="{StaticResource TabBtn}" Content="Bottom" Tag="Bottom" GroupName="vertical" Checked="VerticalAlign_Checked"/>
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="HorizontalOffsetLabel" Text="Horizontal offset" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="OffsetX_Minus"/>
-                            <TextBox x:Name="OffsetXInput" Style="{StaticResource MokuInput}" Text="0" ToolTip="Pixels from the selected horizontal position"
-                                     LostFocus="OffsetXInput_LostFocus" KeyDown="OffsetInput_KeyDown" PreviewMouseWheel="OffsetInput_Wheel"/>
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="OffsetX_Plus"/>
-                            <TextBlock Text="px" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="TopOffsetLabel" Text="Vertical offset" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="OffsetY_Minus"/>
-                            <TextBox x:Name="OffsetYInput" Style="{StaticResource MokuInput}" Text="8" ToolTip="Pixels from the selected vertical position"
-                                     LostFocus="OffsetYInput_LostFocus" KeyDown="OffsetInput_KeyDown" PreviewMouseWheel="OffsetInput_Wheel"/>
-                            <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="OffsetY_Plus"/>
-                            <TextBlock Text="px" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="IslandSizeLabel" Text="Island size" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <DockPanel>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="Scale_Minus"/>
-                                <TextBlock x:Name="ScaleText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Scale_Plus"/>
-                            </DockPanel>
-                            <Slider Style="{StaticResource MokuSlider}" x:Name="ScaleSlider" Minimum="70" Maximum="150" TickFrequency="5" ValueChanged="ScaleSlider_Changed"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="AccentLabel" Text="Music and event color" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel x:Name="AccentPanel" Grid.Column="1" Orientation="Horizontal"
-                                    VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="GlassOpacityLabel" Text="Island opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <DockPanel>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="GlassOpacity_Minus"/>
-                                <TextBlock x:Name="GlassOpacityText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="GlassOpacity_Plus"/>
-                            </DockPanel>
-                            <Slider Style="{StaticResource MokuSlider}" x:Name="OpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="OpacitySlider_Changed"/>
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="FullscreenOpacityLabel" Text="Fullscreen opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock x:Name="FullscreenOpacityText" Foreground="White" FontSize="12" Margin="0,0,0,3"/>
-                            <Slider Style="{StaticResource MokuSlider}" x:Name="FullscreenOpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="FullscreenOpacitySlider_Changed"/>
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="CornerRadiusLabel" Text="Corner rounding" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <StackPanel Grid.Column="1">
-                            <DockPanel>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="Radius_Minus"/>
-                                <TextBlock x:Name="RadiusText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
-                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Radius_Plus"/>
-                            </DockPanel>
-                            <Slider Style="{StaticResource MokuSlider}" x:Name="RadiusSlider" Minimum="0" Maximum="40" TickFrequency="1" ValueChanged="RadiusSlider_Changed"/>
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
-                        <Grid Grid.Column="1">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                            <ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
-                                      Background="Transparent" Foreground="White" Height="38" BorderThickness="0"
-                                      Padding="0" IsTextSearchEnabled="False">
-                                <ComboBox.Resources>
-                                    <Style TargetType="{x:Type ComboBoxItem}">
-                                        <Setter Property="Foreground" Value="#F4F6FA"/>
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="Padding" Value="12,9"/>
-                                        <Setter Property="Margin" Value="2"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="{x:Type ComboBoxItem}">
-                                                    <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                                                        <ContentPresenter/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#30FFFFFF"/></Trigger>
-                                                        <Trigger Property="IsSelected" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#48FFFFFF"/></Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </ComboBox.Resources>
-                                <ComboBox.Template>
-                                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                                        <Grid>
-                                            <Border x:Name="themeSurface" Background="#24FFFFFF" BorderBrush="#66FFFFFF"
-                                                    BorderThickness="1" CornerRadius="12"/>
-                                            <Grid Margin="12,0,10,0">
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="22"/></Grid.ColumnDefinitions>
-                                                <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
-                                                                  HorizontalAlignment="Left"
-                                                                  Content="{TemplateBinding SelectionBoxItem}"
-                                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                                                  ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
-                                                                  TextElement.Foreground="White"/>
-                                                <Path Grid.Column="1" Data="M 0 0 L 5 5 L 10 0"
-                                                      Stroke="#CCFFFFFF" StrokeThickness="1.6"
-                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                            </Grid>
-                                            <ToggleButton Background="Transparent" BorderThickness="0"
-                                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                                          Focusable="False" ClickMode="Press">
-                                                <ToggleButton.Template>
-                                                    <ControlTemplate TargetType="{x:Type ToggleButton}">
-                                                        <Border Background="Transparent" CornerRadius="12"/>
-                                                    </ControlTemplate>
-                                                </ToggleButton.Template>
-                                            </ToggleButton>
-                                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
-                                                   Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}"
-                                                   PopupAnimation="Fade">
-                                                <Border Background="#F0141B27" BorderBrush="#42FFFFFF"
-                                                        BorderThickness="1" CornerRadius="13" Padding="6"
-                                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
-                                                    <ScrollViewer MaxHeight="240" CanContentScroll="True"
-                                                                  VerticalScrollBarVisibility="Auto"
-                                                                  HorizontalScrollBarVisibility="Disabled">
-                                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
-                                                    </ScrollViewer>
-                                                </Border>
-                                            </Popup>
-                                        </Grid>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="themeSurface" Property="Background" Value="#38FFFFFF"/>
-                                                <Setter TargetName="themeSurface" Property="BorderBrush" Value="#AAFFFFFF"/>
-                                            </Trigger>
-                                            <Trigger Property="IsDropDownOpen" Value="True">
-                                                <Setter TargetName="themeSurface" Property="Background" Value="#38FFFFFF"/>
-                                                <Setter TargetName="themeSurface" Property="BorderBrush" Value="#CCFFFFFF"/>
-                                            </Trigger>
-                                            <Trigger Property="IsEnabled" Value="False">
-                                                <Setter TargetName="themeSurface" Property="Opacity" Value="0.45"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </ComboBox.Template>
-                                <ComboBoxItem Content="Midnight" Tag="Midnight"/>
-                                <ComboBoxItem Content="Ocean" Tag="Ocean"/>
-                                <ComboBoxItem Content="Amethyst" Tag="Amethyst"/>
-                                <ComboBoxItem Content="Emerald" Tag="Emerald"/>
-                                <ComboBoxItem Content="Rose" Tag="Rose"/>
-                                <ComboBoxItem Content="Custom color" Tag="Custom"/>
-                            </ComboBox>
-
-                        </Grid>
-                    </Grid>
-                    <StackPanel Margin="0,2,0,12">
-                        <TextBlock x:Name="GradientColorsLabel" Text="Island gradient colors" Foreground="White" FontSize="13" Margin="0,0,0,7"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                            <Button x:Name="TopGradientColorButton" Style="{StaticResource TileBtn}" Height="36" Width="154"
-                                    Margin="0,0,8,0" Click="TopGradientColor_Click" Content="Upper color"/>
-                            <Button x:Name="BottomGradientColorButton" Style="{StaticResource TileBtn}" Height="36" Width="154"
-                                    Margin="0" Click="BottomGradientColor_Click" Content="Lower color"/>
-                        </StackPanel>
-                        <DockPanel Margin="0,8,0,0">
-                            <TextBlock x:Name="GradientBalanceText" Text="70%" Foreground="#CCFFFFFF" FontSize="12"
-                                       DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                            <TextBlock x:Name="GradientBalanceLabel" Text="Color balance" Foreground="#BFFFFFFF"
-                                       FontSize="11" VerticalAlignment="Center"/>
-                        </DockPanel>
-                        <Slider x:Name="GradientBalanceSlider" Style="{StaticResource MokuSlider}"
-                                Minimum="10" Maximum="90" TickFrequency="5"
-                                ValueChanged="GradientBalanceSlider_Changed"/>
+                        <UniformGrid x:Name="SettingsCards" Columns="2"/>
+                        <StackPanel x:Name="SettingsResults" Visibility="Collapsed" Margin="3,0"/>
                     </StackPanel>
-                    <!-- v2.7: расширенные настройки (строятся кодом, MainWindow.SettingsExtra.cs) -->
-                    <StackPanel x:Name="ExtraSettingsPanel" Margin="0,0,0,12"/>
 
-                    <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
-                            HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
+                    <!-- Открытый раздел -->
+                    <StackPanel x:Name="SettingsDetail" Visibility="Collapsed">
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Button x:Name="SettingsBackBtn" Style="{StaticResource IconBtn}" Content="&#xE72B;" Width="32" Height="32" Margin="0,0,6,0"
+                                    Click="SettingsBack_Click"/>
+                            <Border x:Name="SettingsDetailBadge" Grid.Column="1" Width="30" Height="30" CornerRadius="15" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="SettingsDetailIcon" FontFamily="{StaticResource Icons}" FontSize="14" Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                <TextBlock x:Name="SettingsDetailTitle" Foreground="White" FontSize="15" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SettingsDetailSub" Foreground="#80FFFFFF" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                            <Button x:Name="SettingsResetBtn" Grid.Column="3" Style="{StaticResource TileBtn}" Height="30" Margin="0"
+                                    Padding="12,0" Click="SettingsReset_Click"/>
+                        </Grid>
 
-                    <Button x:Name="SupportBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
-                            HorizontalAlignment="Left" Margin="0,8,0,0" Click="SupportAuthor_Click"/>
+                        <!-- Цвета и тема -->
+                        <StackPanel x:Name="CatLook" Visibility="Collapsed">
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <Grid Grid.Column="1">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <ComboBox x:Name="ThemeCombo" SelectedValuePath="Tag" SelectionChanged="Theme_Changed"
+                                          Background="Transparent" Foreground="White" Height="38" BorderThickness="0"
+                                          Padding="0" IsTextSearchEnabled="False">
+                                    <ComboBox.Resources>
+                                        <Style TargetType="{x:Type ComboBoxItem}">
+                                            <Setter Property="Foreground" Value="#F4F6FA"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Padding" Value="12,9"/>
+                                            <Setter Property="Margin" Value="2"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                                                        <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#30FFFFFF"/></Trigger>
+                                                            <Trigger Property="IsSelected" Value="True"><Setter TargetName="itemBorder" Property="Background" Value="#48FFFFFF"/></Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ComboBox.Resources>
+                                    <ComboBox.Template>
+                                        <ControlTemplate TargetType="{x:Type ComboBox}">
+                                            <Grid>
+                                                <Border x:Name="themeSurface" Background="#24FFFFFF" BorderBrush="#66FFFFFF"
+                                                        BorderThickness="1" CornerRadius="12"/>
+                                                <Grid Margin="12,0,10,0">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="22"/></Grid.ColumnDefinitions>
+                                                    <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
+                                                                      HorizontalAlignment="Left"
+                                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                                                      TextElement.Foreground="White"/>
+                                                    <Path Grid.Column="1" Data="M 0 0 L 5 5 L 10 0"
+                                                          Stroke="#CCFFFFFF" StrokeThickness="1.6"
+                                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Grid>
+                                                <ToggleButton Background="Transparent" BorderThickness="0"
+                                                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                                              Focusable="False" ClickMode="Press">
+                                                    <ToggleButton.Template>
+                                                        <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                                            <Border Background="Transparent" CornerRadius="12"/>
+                                                        </ControlTemplate>
+                                                    </ToggleButton.Template>
+                                                </ToggleButton>
+                                                <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                                                       Focusable="False" IsOpen="{TemplateBinding IsDropDownOpen}"
+                                                       PopupAnimation="Fade">
+                                                    <Border Background="#F0141B27" BorderBrush="#42FFFFFF"
+                                                            BorderThickness="1" CornerRadius="13" Padding="6"
+                                                            MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                                        <ScrollViewer MaxHeight="240" CanContentScroll="True"
+                                                                      VerticalScrollBarVisibility="Auto"
+                                                                      HorizontalScrollBarVisibility="Disabled">
+                                                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                                        </ScrollViewer>
+                                                    </Border>
+                                                </Popup>
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="themeSurface" Property="Background" Value="#38FFFFFF"/>
+                                                    <Setter TargetName="themeSurface" Property="BorderBrush" Value="#AAFFFFFF"/>
+                                                </Trigger>
+                                                <Trigger Property="IsDropDownOpen" Value="True">
+                                                    <Setter TargetName="themeSurface" Property="Background" Value="#38FFFFFF"/>
+                                                    <Setter TargetName="themeSurface" Property="BorderBrush" Value="#CCFFFFFF"/>
+                                                </Trigger>
+                                                <Trigger Property="IsEnabled" Value="False">
+                                                    <Setter TargetName="themeSurface" Property="Opacity" Value="0.45"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ComboBox.Template>
+                                    <ComboBoxItem Content="Midnight" Tag="Midnight"/>
+                                    <ComboBoxItem Content="Ocean" Tag="Ocean"/>
+                                    <ComboBoxItem Content="Amethyst" Tag="Amethyst"/>
+                                    <ComboBoxItem Content="Emerald" Tag="Emerald"/>
+                                    <ComboBoxItem Content="Rose" Tag="Rose"/>
+                                    <ComboBoxItem Content="Custom color" Tag="Custom"/>
+                                </ComboBox>
 
-                    <TextBlock x:Name="AccentDescription" Text="Glass appearance with subtle white highlights and adjustable color."
-                               Foreground="#66FFFFFF" FontSize="11" Margin="2,12,0,0" TextWrapping="Wrap"/>
-                  </StackPanel>
+                            </Grid>
+                        </Grid>
+                        <StackPanel Margin="0,2,0,12">
+                            <TextBlock x:Name="GradientColorsLabel" Text="Island gradient colors" Foreground="White" FontSize="13" Margin="0,0,0,7"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                <Button x:Name="TopGradientColorButton" Style="{StaticResource TileBtn}" Height="36" Width="154"
+                                        Margin="0,0,8,0" Click="TopGradientColor_Click" Content="Upper color"/>
+                                <Button x:Name="BottomGradientColorButton" Style="{StaticResource TileBtn}" Height="36" Width="154"
+                                        Margin="0" Click="BottomGradientColor_Click" Content="Lower color"/>
+                            </StackPanel>
+                            <DockPanel Margin="0,8,0,0">
+                                <TextBlock x:Name="GradientBalanceText" Text="70%" Foreground="#CCFFFFFF" FontSize="12"
+                                           DockPanel.Dock="Right" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                <TextBlock x:Name="GradientBalanceLabel" Text="Color balance" Foreground="#BFFFFFFF"
+                                           FontSize="11" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <Slider x:Name="GradientBalanceSlider" Style="{StaticResource MokuSlider}"
+                                    Minimum="10" Maximum="90" TickFrequency="5"
+                                    ValueChanged="GradientBalanceSlider_Changed"/>
+                        </StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="AccentLabel" Text="Music and event color" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel x:Name="AccentPanel" Grid.Column="1" Orientation="Horizontal"
+                                        VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="GlassOpacityLabel" Text="Island opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel>
+                                    <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="GlassOpacity_Minus"/>
+                                    <TextBlock x:Name="GlassOpacityText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
+                                    <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="GlassOpacity_Plus"/>
+                                </DockPanel>
+                                <Slider Style="{StaticResource MokuSlider}" x:Name="OpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="OpacitySlider_Changed"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock x:Name="AccentDescription" Text="Glass appearance with subtle white highlights and adjustable color."
+                                   Foreground="#66FFFFFF" FontSize="11" Margin="2,12,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- Положение и размер -->
+                        <StackPanel x:Name="CatPlace" Visibility="Collapsed">
+                        <Grid Margin="0,2,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="PositionLabel" Text="Position" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <RadioButton x:Name="AlignLeft" Style="{StaticResource TabBtn}" Content="Left"
+                                             Tag="Left" GroupName="align" Checked="Align_Checked"/>
+                                <RadioButton x:Name="AlignCenter" Style="{StaticResource TabBtn}" Content="Center"
+                                             Tag="Center" GroupName="align" Checked="Align_Checked"/>
+                                <RadioButton x:Name="AlignRight" Style="{StaticResource TabBtn}" Content="Right"
+                                             Tag="Right" GroupName="align" Checked="Align_Checked"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="VerticalPositionLabel" Text="Vertical position" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <RadioButton x:Name="VerticalTop" Style="{StaticResource TabBtn}" Content="Top" Tag="Top" GroupName="vertical" Checked="VerticalAlign_Checked"/>
+                                <RadioButton x:Name="VerticalCenter" Style="{StaticResource TabBtn}" Content="Center" Tag="Center" GroupName="vertical" Checked="VerticalAlign_Checked"/>
+                                <RadioButton x:Name="VerticalBottom" Style="{StaticResource TabBtn}" Content="Bottom" Tag="Bottom" GroupName="vertical" Checked="VerticalAlign_Checked"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="HorizontalOffsetLabel" Text="Horizontal offset" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="OffsetX_Minus"/>
+                                <TextBox x:Name="OffsetXInput" Style="{StaticResource MokuInput}" Text="0" ToolTip="Pixels from the selected horizontal position"
+                                         LostFocus="OffsetXInput_LostFocus" KeyDown="OffsetInput_KeyDown" PreviewMouseWheel="OffsetInput_Wheel"/>
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="OffsetX_Plus"/>
+                                <TextBlock Text="px" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="TopOffsetLabel" Text="Vertical offset" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="OffsetY_Minus"/>
+                                <TextBox x:Name="OffsetYInput" Style="{StaticResource MokuInput}" Text="8" ToolTip="Pixels from the selected vertical position"
+                                         LostFocus="OffsetYInput_LostFocus" KeyDown="OffsetInput_KeyDown" PreviewMouseWheel="OffsetInput_Wheel"/>
+                                <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="OffsetY_Plus"/>
+                                <TextBlock Text="px" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="IslandSizeLabel" Text="Island size" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel>
+                                    <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="Scale_Minus"/>
+                                    <TextBlock x:Name="ScaleText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
+                                    <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Scale_Plus"/>
+                                </DockPanel>
+                                <Slider Style="{StaticResource MokuSlider}" x:Name="ScaleSlider" Minimum="70" Maximum="150" TickFrequency="5" ValueChanged="ScaleSlider_Changed"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="CornerRadiusLabel" Text="Corner rounding" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1">
+                                <DockPanel>
+                                    <Button Style="{StaticResource IconBtn}" Content="&#xE738;" Width="28" Height="28" Click="Radius_Minus"/>
+                                    <TextBlock x:Name="RadiusText" Foreground="White" FontSize="12" Width="58" TextAlignment="Center" VerticalAlignment="Center"/>
+                                    <Button Style="{StaticResource IconBtn}" Content="&#xE710;" Width="28" Height="28" Click="Radius_Plus"/>
+                                </DockPanel>
+                                <Slider Style="{StaticResource MokuSlider}" x:Name="RadiusSlider" Minimum="0" Maximum="40" TickFrequency="1" ValueChanged="RadiusSlider_Changed"/>
+                            </StackPanel>
+                        </Grid>
+                        </StackPanel>
+
+                        <StackPanel x:Name="CatEyes" Visibility="Collapsed"/>
+                        <StackPanel x:Name="CatAnim" Visibility="Collapsed"/>
+                        <StackPanel x:Name="CatMini" Visibility="Collapsed"/>
+                        <StackPanel x:Name="CatMusic" Visibility="Collapsed"/>
+                        <StackPanel x:Name="CatApps" Visibility="Collapsed"/>
+
+                        <!-- Общие -->
+                        <StackPanel x:Name="CatGeneral" Visibility="Collapsed">
+                        <Grid Margin="0,2,0,14">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LanguageLabel" Text="Language" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <Border Grid.Column="1" HorizontalAlignment="Left" Background="#17FFFFFF"
+                                    BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" Padding="3">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="LanguageEnglish" Content="English" GroupName="language"
+                                                 Style="{StaticResource LanguagePill}" IsChecked="True" Checked="Language_Checked"/>
+                                    <RadioButton x:Name="LanguageRussian" Content="Русский" GroupName="language"
+                                                 Style="{StaticResource LanguagePill}" Checked="Language_Checked"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                            <StackPanel x:Name="CatGeneralExtra"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="FullscreenOpacityLabel" Text="Fullscreen opacity" Foreground="White" FontSize="13" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock x:Name="FullscreenOpacityText" Foreground="White" FontSize="12" Margin="0,0,0,3"/>
+                                <Slider Style="{StaticResource MokuSlider}" x:Name="FullscreenOpacitySlider" Minimum="0" Maximum="100" TickFrequency="5" ValueChanged="FullscreenOpacitySlider_Changed"/>
+                            </StackPanel>
+                        </Grid>
+                        <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
+                                HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
+
+                        <Button x:Name="SupportBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
+                                HorizontalAlignment="Left" Margin="0,8,0,0" Click="SupportAuthor_Click"/>
+
+                        </StackPanel>
+                    </StackPanel>
+                  </Grid>
                 </ScrollViewer>
             </Grid>
 

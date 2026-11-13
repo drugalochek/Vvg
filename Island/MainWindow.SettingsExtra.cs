@@ -64,56 +64,54 @@ public partial class MainWindow
 
     // ------------------------------------------------------------------ UI
 
+    /// <summary>
+    /// v2.11: настройки, которые строятся кодом, раскладываются по разделам (глаза, анимации, свёрнутый вид…).
+    /// Разделы «Цвета и тема» и «Положение и размер» лежат в разметке, сюда добавляются только их записи для поиска.
+    /// </summary>
     void BuildExtraSettings()
     {
-        if (ExtraSettingsPanel == null) return;
+        if (CatEyes == null) return;
         bool ru = _s.Language == "ru";
         string L(string r, string e) => ru ? r : e;
-        var p = ExtraSettingsPanel;
-        p.Children.Clear();
+        _settingsIndex.RemoveAll(x => !x.Static);
+        foreach (var cat in new Panel[] { CatEyes, CatAnim, CatMini, CatMusic, CatApps, CatGeneralExtra }) cat.Children.Clear();
 
-        Section(p, L("АНИМАЦИЯ", "ANIMATION"));
-        SliderRow(p, L("Желейность", "Jelly strength"), 0, 200, () => _s.JellyStrength, v => _s.JellyStrength = v, v => v + "%");
-        SliderRow(p, L("Скорость анимаций", "Animation speed"), 50, 200, () => _s.AnimationSpeed, v => _s.AnimationSpeed = v, v => v + "%");
-        // v2.10: характер появления и отдельные скорости
-        ChoiceRow(p, L("Стиль появления", "Appear style"), "appear",
-            new[] { ("Spring", L("Пружина", "Spring")), ("Smooth", L("Плавно", "Smooth")), ("Drop", L("Капля", "Drop")) },
-            () => _s.AppearStyle, v => { _s.AppearStyle = v; JellyKick(); });
-        SliderRow(p, L("Скорость раскрытия", "Expand speed"), 50, 200, () => _s.ExpandSpeed, v => _s.ExpandSpeed = v, v => v + "%");
-        SliderRow(p, L("Скорость уведомлений", "Notification speed"), 50, 200, () => _s.ToastSpeed, v => _s.ToastSpeed = v, v => v + "%");
-
-        Section(p, L("ГЛАЗА", "EYES"));
-        ToggleRow(p, L("Следят за курсором", "Follow the cursor"), () => _s.EyesFollowCursor, v => _s.EyesFollowCursor = v);
-        SliderRow(p, L("Дальность взгляда", "Gaze range"), 50, 150, () => _s.GazeRange, v => _s.GazeRange = v, v => v + "%");
-        ToggleRow(p, L("Эмоции", "Emotions"), () => _s.EyeEmotions, v => { _s.EyeEmotions = v; if (!v) { _eyeMood = EyeMood.Neutral; _moodLeft = 0; } });
-        ToggleRow(p, L("Засыпать ночью", "Fall asleep at night"), () => _s.SleepAtNight, v => _s.SleepAtNight = v);
-        ToggleRow(p, L("Танцевать под музыку", "Dance to the music"), () => _s.BeatBounce, v => _s.BeatBounce = v);
-        SliderRow(p, L("Энергия танца", "Dance energy"), 0, 200, () => _s.DanceStrength, v => _s.DanceStrength = v, v => v == 0 ? L("только кивает", "nods only") : v + "%");
-        SliderRow(p, L("Частота моргания", "Blink rate"), 0, 200, () => _s.BlinkRate, v => _s.BlinkRate = v, v => v == 0 ? L("не моргают", "never") : v + "%");
-
-        // v2.10: внешний вид глаз
-        Section(p, L("ВНЕШНИЙ ВИД ГЛАЗ", "EYE LOOK"));
+        // ---------------- Глаза
+        Panel p = CatEyes; _buildCat = "eyes";
+        Section(p, L("ВНЕШНИЙ ВИД", "LOOK"));
         ChoiceRow(p, L("Форма", "Shape"), "eyestyle",
             new[] { ("Oval", L("Овалы", "Ovals")), ("Round", L("Круглые", "Round")), ("Dots", L("Точки", "Dots")),
                     ("Anime", L("Аниме", "Anime")), ("Arcs", "^ ^"), ("Robot", L("Робот", "Robot")), ("Cat", L("Кошачьи", "Cat")) },
-            () => _s.EyeStyle, v => { _s.EyeStyle = v; ApplyEyeStyle(); RefreshIslandSize(); SetEyeMood(EyeMood.Happy, 1.0); });
+            () => _s.EyeStyle, v => { _s.EyeStyle = v; ApplyEyeStyle(); RefreshIslandSize(); });
         SliderRow(p, L("Размер", "Size"), 60, 150, () => _s.EyeSize, v => { _s.EyeSize = v; ApplyEyeStyle(); }, v => v + "%", commit: RefreshIslandSize);
         SliderRow(p, L("Расстояние", "Spacing"), 4, 30, () => _s.EyeSpacing, v => { _s.EyeSpacing = v; ApplyEyeStyle(); }, v => v + " px", commit: RefreshIslandSize);
         EyeColorRow(p, L("Цвет", "Color"), ru);
         SliderRow(p, L("Свечение", "Glow"), 0, 100, () => _s.EyeGlow, v => { _s.EyeGlow = v; ApplyEyeStyle(); }, v => v == 0 ? L("выкл", "off") : v + "%");
+        Section(p, L("ПОВЕДЕНИЕ", "BEHAVIOR"));
+        ToggleRow(p, L("Следят за курсором", "Follow the cursor"), () => _s.EyesFollowCursor, v => _s.EyesFollowCursor = v);
+        SliderRow(p, L("Дальность взгляда", "Gaze range"), 50, 150, () => _s.GazeRange, v => _s.GazeRange = v, v => v + "%");
+        SliderRow(p, L("Частота моргания", "Blink rate"), 0, 200, () => _s.BlinkRate, v => _s.BlinkRate = v, v => v == 0 ? L("не моргают", "never") : v + "%");
+        ToggleRow(p, L("Эмоции", "Emotions"), () => _s.EyeEmotions, v => { _s.EyeEmotions = v; if (!v) { _eyeMood = EyeMood.Neutral; _moodLeft = 0; } });
+        ToggleRow(p, L("Засыпать ночью", "Fall asleep at night"), () => _s.SleepAtNight, v => _s.SleepAtNight = v);
+        Section(p, L("ТАНЕЦ", "DANCE"));
+        ToggleRow(p, L("Танцевать под музыку", "Dance to the music"), () => _s.BeatBounce, v => _s.BeatBounce = v);
+        SliderRow(p, L("Энергия танца", "Dance energy"), 0, 200, () => _s.DanceStrength, v => _s.DanceStrength = v, v => v == 0 ? L("только кивает", "nods only") : v + "%");
 
-        Section(p, L("МУЗЫКА", "MUSIC"));
-        ToggleRow(p, L("Волна под музыку", "Music wave"), () => _s.MusicWave, v => _s.MusicWave = v);
-        SliderRow(p, L("Высота волны", "Wave height"), 30, 150, () => _s.WaveHeight, v => _s.WaveHeight = v, v => v + "%");
+        // ---------------- Анимации
+        p = CatAnim; _buildCat = "anim";
+        Section(p, L("ПОЯВЛЕНИЕ", "APPEARING"));
+        ChoiceRow(p, L("Стиль появления", "Appear style"), "appear",
+            new[] { ("Spring", L("Пружина", "Spring")), ("Smooth", L("Плавно", "Smooth")), ("Drop", L("Капля", "Drop")) },
+            () => _s.AppearStyle, v => { _s.AppearStyle = v; JellyKick(); });
+        SliderRow(p, L("Желейность", "Jelly strength"), 0, 200, () => _s.JellyStrength, v => _s.JellyStrength = v, v => v + "%");
+        Section(p, L("СКОРОСТЬ", "SPEED"));
+        SliderRow(p, L("Общая скорость", "Overall speed"), 50, 200, () => _s.AnimationSpeed, v => _s.AnimationSpeed = v, v => v + "%");
+        SliderRow(p, L("Раскрытие острова", "Expanding"), 50, 200, () => _s.ExpandSpeed, v => _s.ExpandSpeed = v, v => v + "%");
+        SliderRow(p, L("Уведомления", "Notifications"), 50, 200, () => _s.ToastSpeed, v => _s.ToastSpeed = v, v => v + "%");
 
-        Section(p, L("УВЕДОМЛЕНИЯ", "NOTIFICATIONS"));
-        ToggleRow(p, L("При копировании", "On copy"), () => _s.ToastOnCopy, v => _s.ToastOnCopy = v);
-        ToggleRow(p, L("При смене трека", "On new track"), () => _s.ToastOnTrack, v => _s.ToastOnTrack = v);
-        SliderRow(p, L("Время показа", "Show for"), 15, 80, () => _s.ToastTime, v => _s.ToastTime = v,
-            v => (v / 10.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace(".", ru ? "," : ".") + L(" с", " s"));
-
-        // v2.10: что видно в свёрнутом острове
-        Section(p, L("СВЁРНУТЫЙ ВИД", "COMPACT VIEW"));
+        // ---------------- Свёрнутый вид
+        p = CatMini; _buildCat = "mini";
+        Section(p, L("ЧТО ПОКАЗЫВАТЬ", "WHAT TO SHOW"));
         ChoiceRow(p, L("В центре", "Center"), "minicenter",
             new[] { ("Time", L("Время", "Time")), ("Date", L("Дата", "Date")), ("TimeDate", L("Дата и время", "Date & time")), ("None", L("Ничего", "Nothing")) },
             () => _s.MiniCenter, v => { _s.MiniCenter = v; MiniSettingsChanged(); });
@@ -121,56 +119,104 @@ public partial class MainWindow
             new[] { ("Weather", L("Погода", "Weather")), ("Battery", L("Батарея", "Battery")), ("Cpu", L("Процессор", "CPU")), ("Ram", L("Память", "RAM")),
                     ("Time", L("Время", "Time")), ("Date", L("Дата", "Date")), ("None", L("Ничего", "Nothing")) },
             () => _s.MiniRight, v => { _s.MiniRight = v; MiniSettingsChanged(); });
+        Section(p, L("ЧАСЫ", "CLOCK"));
         ToggleRow(p, L("24-часовой формат", "24-hour clock"), () => _s.Clock24h, v => { _s.Clock24h = v; MiniSettingsChanged(); });
         ToggleRow(p, L("Показывать секунды", "Show seconds"), () => _s.ClockSeconds, v => { _s.ClockSeconds = v; MiniSettingsChanged(); });
+        Section(p, L("ТАЙМЕР", "TIMER"));
         SliderRow(p, L("Таймер по умолчанию", "Default timer"), 1, 180, () => _s.TimerMinutes, v => { _s.TimerMinutes = v; UpdateTimerTiles(); },
             v => v + L(" мин", " min"));
         Hint(p, L("Плитки «Таймер» и «Секундомер» — на главной вкладке. Пока они идут, отсчёт виден справа в свёрнутом острове.",
                   "Timer and Stopwatch tiles are on the Home tab. While running, the countdown shows on the right of the compact island."));
 
-        // v2.10: плитки приложений
-        Section(p, L("ПРИЛОЖЕНИЯ", "APPS"));
+        // ---------------- Музыка и уведомления
+        p = CatMusic; _buildCat = "music";
+        Section(p, L("МУЗЫКА", "MUSIC"));
+        ToggleRow(p, L("Волна под музыку", "Music wave"), () => _s.MusicWave, v => _s.MusicWave = v);
+        SliderRow(p, L("Высота волны", "Wave height"), 30, 150, () => _s.WaveHeight, v => _s.WaveHeight = v, v => v + "%");
+        Section(p, L("УВЕДОМЛЕНИЯ", "NOTIFICATIONS"));
+        ToggleRow(p, L("При копировании", "On copy"), () => _s.ToastOnCopy, v => _s.ToastOnCopy = v);
+        ToggleRow(p, L("При смене трека", "On new track"), () => _s.ToastOnTrack, v => _s.ToastOnTrack = v);
+        SliderRow(p, L("Время показа", "Show for"), 15, 80, () => _s.ToastTime, v => _s.ToastTime = v,
+            v => (v / 10.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace(".", ru ? "," : ".") + L(" с", " s"));
+        Hint(p, L("Цвет волны и уведомлений — в разделе «Цвета и тема».", "Wave and notification color is in Colors & theme."));
+
+        // ---------------- Приложения
+        p = CatApps; _buildCat = "apps";
+        Section(p, L("ПЛИТКИ", "TILES"));
         ChoiceRow(p, L("Размер плиток", "Tile size"), "tilesize",
             new[] { ("Compact", L("Компактные", "Compact")), ("Normal", L("Обычные", "Normal")), ("Large", L("Крупные", "Large")) },
             () => _s.AppTileSize, v => { _s.AppTileSize = v; BuildApps(); });
         Hint(p, L("Правой кнопкой по плитке — своя подпись, иконка и папка. Перетащи плитку на папку, чтобы положить её внутрь.",
                   "Right-click a tile to set its label, icon and folder. Drag a tile onto a folder to put it inside."));
 
-        Section(p, L("ПОВЕДЕНИЕ", "BEHAVIOR"));
+        // ---------------- Общие (язык, автозапуск и «Поддержать» — в разметке)
+        p = CatGeneralExtra; _buildCat = "general";
         ChoiceRow(p, L("Горячая клавиша", "Shortcut"), "hotkey",
             new[] { ("CtrlAltSpace", "Ctrl+Alt+Space"), ("CtrlShiftSpace", "Ctrl+Shift+Space"), ("WinAltI", "Win+Alt+I"), ("Off", L("Выкл", "Off")) },
             () => _s.Hotkey, v => { _s.Hotkey = v; RegisterIslandHotkey(true); UpdateHotkeyHint(); });
         // v2.8: плавный ползунок вместо четырёх кнопок; лишние записи убираются, только когда ползунок отпустили
         SliderRow(p, L("История буфера", "Clipboard history"), 5, 200, () => _s.ClipboardLimit, v => _s.ClipboardLimit = v,
             v => ru ? $"{v} {Plural(v, "запись", "записи", "записей")}" : $"{v} {(v == 1 ? "item" : "items")}", commit: TrimHistory);
+        Section(p, L("ИГРЫ", "GAMES"));
         ToggleRow(p, L("Прятаться в полноэкранных играх", "Fade out in fullscreen games"), () => _s.GameMode, v => { _s.GameMode = v; CheckGameMode(); });
+        _buildCat = "";
 
-        var reset = new Button
+        RefreshSettingsNav();
+    }
+
+    /// <summary>Сброс одного раздела к значениям по умолчанию.</summary>
+    void ResetSettingsSection(string cat)
+    {
+        var d = new Settings();
+        switch (cat)
         {
-            Style = (Style)FindResource("TileBtn"), Height = 36, Width = 230, Margin = new Thickness(0, 10, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Content = L("Сбросить эти настройки", "Reset these settings")
-        };
-        reset.Click += (_, _) =>
-        {
-            var d = new Settings();
-            _s.JellyStrength = d.JellyStrength; _s.AnimationSpeed = d.AnimationSpeed; _s.GazeRange = d.GazeRange;
-            _s.EyesFollowCursor = d.EyesFollowCursor; _s.EyeEmotions = d.EyeEmotions; _s.SleepAtNight = d.SleepAtNight;
-            _s.BeatBounce = d.BeatBounce; _s.DanceStrength = d.DanceStrength; _s.MusicWave = d.MusicWave; _s.WaveHeight = d.WaveHeight;
-            _s.ToastOnCopy = d.ToastOnCopy; _s.ToastOnTrack = d.ToastOnTrack; _s.GameMode = d.GameMode;
-            _s.Hotkey = d.Hotkey; _s.ClipboardLimit = d.ClipboardLimit;
-            _s.EyeStyle = d.EyeStyle; _s.EyeSize = d.EyeSize; _s.EyeSpacing = d.EyeSpacing; _s.EyeColor = d.EyeColor; _s.EyeGlow = d.EyeGlow;
-            _s.BlinkRate = d.BlinkRate; _s.AppearStyle = d.AppearStyle; _s.ExpandSpeed = d.ExpandSpeed; _s.ToastSpeed = d.ToastSpeed;
-            _s.ToastTime = d.ToastTime; _s.MiniCenter = d.MiniCenter; _s.MiniRight = d.MiniRight; _s.Clock24h = d.Clock24h;
-            _s.ClockSeconds = d.ClockSeconds; _s.TimerMinutes = d.TimerMinutes; _s.AppTileSize = d.AppTileSize;
-            _s.Save();
-            TrimHistory();
-            RegisterIslandHotkey(); UpdateHotkeyHint(); CheckGameMode();
-            ApplyEyeStyle(); BuildApps(); MiniSettingsChanged();
-            BuildExtraSettings();
-            SetEyeMood(EyeMood.Happy, 1.2);
-        };
-        p.Children.Add(reset);
+            case "look":
+                _s.Theme = d.Theme; _s.ThemeColor = d.ThemeColor; _s.ThemeBottomColor = d.ThemeBottomColor;
+                _s.GradientBalance = d.GradientBalance; _s.Accent = d.Accent;
+                if (ThemeCombo != null) ThemeCombo.SelectedValue = _s.Theme;
+                SetGlassOpacity(d.GlassOpacity);
+                ApplyAppearance(); ApplyAccent();
+                break;
+            case "place":
+                _s.Align = d.Align; _s.VerticalAlign = d.VerticalAlign;
+                (_s.Align switch { "Left" => AlignLeft, "Right" => AlignRight, _ => AlignCenter }).IsChecked = true;
+                (_s.VerticalAlign switch { "Bottom" => VerticalBottom, "Center" => VerticalCenter, _ => VerticalTop }).IsChecked = true;
+                SetOffsetX(d.OffsetX); SetOffset(d.OffsetY); SetScale(d.Scale); SetRadius(d.CornerRadius);
+                ApplyPosition();
+                break;
+            case "eyes":
+                _s.EyeStyle = d.EyeStyle; _s.EyeSize = d.EyeSize; _s.EyeSpacing = d.EyeSpacing; _s.EyeColor = d.EyeColor; _s.EyeGlow = d.EyeGlow;
+                _s.EyesFollowCursor = d.EyesFollowCursor; _s.GazeRange = d.GazeRange; _s.BlinkRate = d.BlinkRate;
+                _s.EyeEmotions = d.EyeEmotions; _s.SleepAtNight = d.SleepAtNight; _s.BeatBounce = d.BeatBounce; _s.DanceStrength = d.DanceStrength;
+                ApplyEyeStyle(); RefreshIslandSize();
+                break;
+            case "anim":
+                _s.AppearStyle = d.AppearStyle; _s.JellyStrength = d.JellyStrength; _s.AnimationSpeed = d.AnimationSpeed;
+                _s.ExpandSpeed = d.ExpandSpeed; _s.ToastSpeed = d.ToastSpeed;
+                break;
+            case "mini":
+                _s.MiniCenter = d.MiniCenter; _s.MiniRight = d.MiniRight; _s.Clock24h = d.Clock24h; _s.ClockSeconds = d.ClockSeconds;
+                _s.TimerMinutes = d.TimerMinutes;
+                UpdateTimerTiles(); MiniSettingsChanged();
+                break;
+            case "music":
+                _s.MusicWave = d.MusicWave; _s.WaveHeight = d.WaveHeight; _s.ToastOnCopy = d.ToastOnCopy; _s.ToastOnTrack = d.ToastOnTrack;
+                _s.ToastTime = d.ToastTime;
+                break;
+            case "apps":
+                _s.AppTileSize = d.AppTileSize;
+                BuildApps();
+                break;
+            case "general":
+                _s.Hotkey = d.Hotkey; _s.ClipboardLimit = d.ClipboardLimit; _s.GameMode = d.GameMode;
+                SetFullscreenOpacity(d.FullscreenOpacity);
+                TrimHistory(); RegisterIslandHotkey(); UpdateHotkeyHint(); CheckGameMode();
+                break;
+            default: return;
+        }
+        _s.Save();
+        BuildExtraSettings();
+        SetEyeMood(EyeMood.Happy, 1.2);
     }
 
     /// <summary>Изменился состав свёрнутого вида или формат часов.</summary>
@@ -269,7 +315,8 @@ public partial class MainWindow
     /// <summary>Заголовок группы — тот же вид, что и подписи «НЕДАВНО СКОПИРОВАНО» на главной.</summary>
     static void Section(Panel p, string title)
     {
-        p.Children.Add(new Border
+        bool first = p.Children.Count == 0;
+        if (!first) p.Children.Add(new Border
         {
             Height = 1, Margin = new Thickness(0, 12, 0, 0),
             Background = new SolidColorBrush(Color.FromArgb(0x14, 255, 255, 255))
@@ -277,13 +324,14 @@ public partial class MainWindow
         p.Children.Add(new TextBlock
         {
             Text = title, Foreground = new SolidColorBrush(Color.FromArgb(0x80, 255, 255, 255)),
-            FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 8)
+            FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, first ? 0 : 10, 0, 8)
         });
     }
 
-    static Grid Row(Panel p, string label, out Grid host)
+    Grid Row(Panel p, string label, out Grid host)
     {
-        var g = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        var g = new Grid { Margin = new Thickness(0, 0, 0, 10), Background = System.Windows.Media.Brushes.Transparent };
+        if (_buildCat.Length > 0) _settingsIndex.Add(new SettingEntry(() => label, _buildCat, g, false));
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });   // как у строк в разметке
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         g.Children.Add(new TextBlock { Text = label, Foreground = System.Windows.Media.Brushes.White, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap });
