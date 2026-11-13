@@ -12,11 +12,13 @@ public partial class MainWindow
 {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int maxCount);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hwnd);
     const uint WM_CLOSE = 0x0010;
     const int SW_MINIMIZE = 6;
     sealed record OpenWindow(IntPtr Handle, int ProcessId, string Title, string ProcessName, string? Executable);
     DispatcherTimer? _windowsRefreshTimer;
     bool _homeShowsWindows;
+    readonly HashSet<IntPtr> _minimizedByMoku = new();
 
     void HomeClipboardMode_Click(object sender, RoutedEventArgs e) => SetHomeView("Clipboard");
     void HomeWindowsMode_Click(object sender, RoutedEventArgs e) => SetHomeView("Windows");
@@ -75,6 +77,14 @@ public partial class MainWindow
     {
         if (OpenWindowsList == null) return;
         OpenWindowsList.Children.Clear();
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(3, 0, 3, 5) };
+        var minimizeAll = new Button { Style = (Style)FindResource("TileBtn"), Height = 30, Width = 126, Margin = new Thickness(0, 0, 5, 0), Content = Tr("Свернуть всё", "Minimize all") };
+        minimizeAll.Click += (_, _) => MinimizeAllOpenWindows();
+        var restoreAll = new Button { Style = (Style)FindResource("TileBtn"), Height = 30, Width = 126, Margin = new Thickness(0), Content = Tr("Развернуть всё", "Restore all") };
+        restoreAll.Click += (_, _) => RestoreWindowsMinimizedByMoku();
+        actions.Children.Add(minimizeAll);
+        actions.Children.Add(restoreAll);
+        OpenWindowsList.Children.Add(actions);
         var windows = GetOpenWindows();
         var groups = windows.GroupBy(w => w.Executable ?? w.ProcessName, StringComparer.OrdinalIgnoreCase).ToList();
         foreach (var group in groups)
@@ -109,8 +119,11 @@ public partial class MainWindow
             openNew.Click += (_, _) => { try { Process.Start(new ProcessStartInfo(first.Executable!) { UseShellExecute = true }); } catch (Exception ex) { Log.Warn("Open new window: " + ex.Message); } };
             menu.Items.Add(openNew);
             var minimize = new MenuItem { Header = Tr("Свернуть окна приложения", "Minimize app windows") };
-            minimize.Click += (_, _) => items.ForEach(w => ShowWindow(w.Handle, SW_MINIMIZE));
+            minimize.Click += (_, _) => MinimizeWindows(items);
             menu.Items.Add(minimize);
+            var restore = new MenuItem { Header = Tr("Развернуть свёрнутые Moku", "Restore windows minimized by Moku") };
+            restore.Click += (_, _) => RestoreWindowsMinimizedByMoku(items.Select(w => w.Handle));
+            menu.Items.Add(restore);
             var close = new MenuItem { Header = Tr("Закрыть окна приложения", "Close app windows") };
             close.Click += (_, _) => items.ForEach(w => PostMessage(w.Handle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero));
             menu.Items.Add(close);
@@ -118,6 +131,31 @@ public partial class MainWindow
             OpenWindowsList.Children.Add(tile);
         }
         if (groups.Count == 0) OpenWindowsList.Children.Add(new TextBlock { Text = Tr("Открытых окон не найдено", "No open windows found"), Foreground = new SolidColorBrush(Color.FromArgb(0x88, 255, 255, 255)), FontSize = 12, Margin = new Thickness(8, 12, 8, 8) });
+    }
+
+    void MinimizeWindows(IEnumerable<OpenWindow> windows)
+    {
+        foreach (var window in windows)
+        {
+            if (IsIconic(window.Handle)) continue;
+            _minimizedByMoku.Add(window.Handle);
+            ShowWindow(window.Handle, SW_MINIMIZE);
+        }
+    }
+
+    void MinimizeAllOpenWindows() => MinimizeWindows(GetOpenWindows());
+
+    void RestoreWindowsMinimizedByMoku(IEnumerable<IntPtr>? only = null)
+    {
+        var filter = only == null ? null : new HashSet<IntPtr>(only);
+        foreach (var hwnd in _minimizedByMoku.ToArray())
+        {
+            if (filter != null && !filter.Contains(hwnd)) continue;
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+            _minimizedByMoku.Remove(hwnd);
+        }
+        if (_homeShowsWindows) BuildOpenWindows();
     }
 
     void ActivateWindow(IntPtr hwnd)
