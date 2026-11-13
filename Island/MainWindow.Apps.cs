@@ -187,16 +187,19 @@ public partial class MainWindow
     FrameworkElement CreateAppTile(AppShortcut app, bool steamLink)
     {
         var path = app.Path;
+        string tileSize = _s.AppTileSizes.TryGetValue(path, out var savedSize) ? savedSize : "1x1";
+        double tileW = AppTileW * (tileSize == "1x1" ? 1 : 2);
+        double tileH = AppTileH * (tileSize == "2x2" ? 2 : 1);
         var tile = new Grid
         {
-            Width = AppTileW, Height = AppTileH, Margin = new Thickness(4), Tag = path,
+            Width = tileW, Height = tileH, Margin = new Thickness(4), Tag = path,
             AllowDrop = true, RenderTransformOrigin = new Point(0.5, 0.5),
             RenderTransform = new ScaleTransform(1, 1), Background = Brushes.Transparent
         };
 
         var button = new Button
         {
-            Style = (Style)FindResource("TileBtn"), Width = AppTileW, Height = AppTileH, Margin = new Thickness(0),
+            Style = (Style)FindResource("TileBtn"), Width = tileW, Height = tileH, Margin = new Thickness(0),
             ToolTip = steamLink ? app.Name : app.Path
         };
         var content = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
@@ -206,7 +209,7 @@ public partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = app.Name, FontSize = AppLabelSize, Foreground = Brushes.White,
-            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = AppTileW - 14,
+            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = tileW - 14,
             HorizontalAlignment = HorizontalAlignment.Center
         });
         button.Content = content;

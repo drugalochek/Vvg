@@ -190,6 +190,15 @@ public partial class MainWindow
         AddMenu(menu, Tr("Сменить иконку…", "Change icon…"), () => ChooseAppIcon(app));
         AddMenu(menu, Tr("Стандартная иконка", "Default icon"), () => { app.Icon = ""; _s.Save(); BuildApps(); }, app.Icon.Length > 0);
 
+        var sizeMenu = new MenuItem { Header = Tr("Размер плитки", "Tile size") };
+        foreach (var (size, label) in new[] { ("1x1", "1 × 1"), ("2x1", "2 × 1"), ("2x2", "2 × 2") })
+        {
+            var sizeItem = new MenuItem { Header = label, IsCheckable = true, IsChecked = (_s.AppTileSizes.TryGetValue(app.Path, out var currentSize) ? currentSize : "1x1") == size };
+            sizeItem.Click += (_, _) => { _s.AppTileSizes[app.Path] = size; _s.Save(); BuildApps(); };
+            sizeMenu.Items.Add(sizeItem);
+        }
+        menu.Items.Add(sizeMenu);
+
         var move = new MenuItem { Header = Tr("Переместить в папку", "Move to folder") };
         foreach (var f in FolderNames().Where(f => !SameFolder(f, app.Folder)))
         {
