@@ -30,62 +30,47 @@ public partial class MainWindow
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
         if (_hotkeyRegistered) { UnregisterHotKey(hwnd, HotkeyId); _hotkeyRegistered = false; }
-        (uint mods, uint vk) = _s.Hotkey switch
+        if (TryRegisterHotkey(hwnd, _s.Hotkey))
         {
-            "CtrlShiftSpace" => (MOD_CONTROL | MOD_SHIFT, VK_SPACE),
-            "AltSpace" => (MOD_ALT, VK_SPACE),
-            "WinAltI" => (MOD_WIN | MOD_ALT, VK_I),
-            "Off" => (0u, 0u),
-            _ => (MOD_CONTROL | MOD_ALT, VK_SPACE)
-        };
-        if (vk == 0) return;
-        _hotkeyRegistered = RegisterHotKey(hwnd, HotkeyId, mods | MOD_NOREPEAT, vk);
-        if (!_hotkeyRegistered)
-        {
-            Log.Warn($"Горячая клавиша {_s.Hotkey} занята другой программой (код {Marshal.GetLastWin32Error()})");
-            if (reportFailure)
-                ShowToast("Moku", _s.Language == "ru" ? "Это сочетание занято другой программой" : "This shortcut is used by another app", ColorError);
+            _hotkeyRegistered = _s.Hotkey != "Off";
+            _lastRegisteredHotkey = _s.Hotkey;
+            return;
         }
+        Log.Warn("Горячая клавиша " + _s.Hotkey + " занята другой программой (код " + Marshal.GetLastWin32Error() + ")");
+        _s.Hotkey = _lastRegisteredHotkey;
+        if (_s.Hotkey != "Off") _hotkeyRegistered = TryRegisterHotkey(hwnd, _s.Hotkey);
+        if (reportFailure) ShowToast("Moku", _s.Language == "ru" ? "Сочетание занято. Предыдущее сохранено." : "Shortcut is in use. Previous binding restored.", ColorError);
     }
 
-    static string HotkeyLabel(string id) => id switch
+    bool TryRegisterHotkey(IntPtr hwnd, string value)
     {
-        "CtrlShiftSpace" => "Ctrl + Shift + Space",
-        "AltSpace" => "Alt + Space",
-        "WinAltI" => "Win + Alt + I",
-        "Off" => "—",
-        _ => "Ctrl + Alt + Space"
-    };
+        if (value == "Off") return true;
+        var parts = value.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0) return false;
+        uint mods = 0;
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            switch (parts[i].ToLowerInvariant())
+            {
+                case "ctrl": case "control": mods |= MOD_CONTROL; break;
+                case "alt": mods |= MOD_ALT; break;
+                case "shift": mods |= MOD_SHIFT; break;
+                case "win": case "windows": mods |= MOD_WIN; break;
+                default: return false;
+            }
+        }
+        if (!Enum.TryParse<Key>(parts[^1], true, out var key) || key == Key.None || key == Key.System) return false;
+        uint vk = (uint)KeyInterop.VirtualKeyFromKey(key);
+        return vk != 0 && RegisterHotKey(hwnd, HotkeyId, mods | MOD_NOREPEAT, vk);
+    }
+
+    static string HotkeyLabel(string id) => id == "Off" ? "—" : id.Replace("+", " + ");
 
     void UpdateHotkeyHint()
     {
         if (HotkeyHint != null) HotkeyHint.Text = _s.Hotkey == "Off" ? "" : HotkeyLabel(_s.Hotkey);
     }
 
-    bool _capturingHotkey;
-    string _lastRegisteredHotkey = "Alt+Space";
-
-    void CaptureHotkeyButton_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (!_capturingHotkey) return;
-        e.Handled = true;
-        if (e.Key == Key.Escape) { _capturingHotkey = false; BuildExtraSettings(); return; }
-        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin) return;
-        var parts = new List<string>();
-        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) parts.Add("Ctrl");
-        if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0) parts.Add("Alt");
-        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) parts.Add("Shift");
-        if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0) parts.Add("Win");
-        parts.Add(key.ToString());
-        string previous = _s.Hotkey;
-        _s.Hotkey = string.Join("+", parts);
-        RegisterIslandHotkey(true);
-        if (_s.Hotkey != previous) _s.Save();
-        _capturingHotkey = false;
-        UpdateHotkeyHint();
-        BuildExtraSettings();
-    }
     // ------------------------------------------------------------------ UI
 
     /// <summary>
@@ -175,13 +160,9 @@ public partial class MainWindow
 
         // ---------------- Общие (язык, автозапуск и «Поддержать» — в разметке)
         p = CatGeneralExtra; _buildCat = "general";
-        Row(p, L("Горячая клавиша", "Shortcut"), out var hotkeyHost);
-        var hotkeyButton = new Button { Style = (Style)FindResource("TileBtn"), Height = 34, Width = 190, Margin = new Thickness(0) };
-        void RefreshHotkeyButton() => hotkeyButton.Content = _capturingHotkey ? L("Нажми клавишу… (Esc — отмена)", "Press a key… (Esc to cancel)") : L("Изменить: ", "Change: ") + HotkeyLabel(_s.Hotkey);
-        RefreshHotkeyButton();
-        hotkeyButton.PreviewKeyDown += CaptureHotkeyButton_KeyDown;
-        hotkeyButton.Click += (_, _) => { _capturingHotkey = true; RefreshHotkeyButton(); hotkeyButton.Focus(); };
-        hotkeyHost.Children.Add(hotkeyButton);
+        ChoiceRow(p, L("Горячая клавиша", "Shortcut"), "hotkey",
+            new[] { ("CtrlAltSpace", "Ctrl+Alt+Space"), ("CtrlShiftSpace", "Ctrl+Shift+Space"), ("WinAltI", "Win+Alt+I"), ("Off", L("Выкл", "Off")) },
+            () => _s.Hotkey, v => { _s.Hotkey = v; RegisterIslandHotkey(true); UpdateHotkeyHint(); });
         // v2.8: плавный ползунок вместо четырёх кнопок; лишние записи убираются, только когда ползунок отпустили
         SliderRow(p, L("История буфера", "Clipboard history"), 5, 200, () => _s.ClipboardLimit, v => _s.ClipboardLimit = v,
             v => ru ? $"{v} {Plural(v, "запись", "записи", "записей")}" : $"{v} {(v == 1 ? "item" : "items")}", commit: TrimHistory);
