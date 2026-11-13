@@ -1669,6 +1669,20 @@ public partial class MainWindow : Window
                                                        : "File not found. Remove this shortcut and add it again.", ColorError);
                 BuildApps(); return;
             }
+            if (!steamLink)
+            {
+                if (TryActivateExistingApp(path, out bool running))
+                {
+                    Collapse();
+                    return;
+                }
+                if (running)
+                {
+                    ShowToast("Moku", Tr("Приложение уже запущено, но его окно недоступно", "The app is running, but no accessible window was found"), ColorError);
+                    return;
+                }
+            }
+            if (IsLaunchDebounced(path)) return;
             Collapse();
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
