@@ -124,7 +124,7 @@ Check(menuStyle.Descendants(ui+"ControlTemplate").Any(),"context menu replaces s
 Check(menuStyle.Descendants(ui+"Border").Any(e=>(string?)e.Attribute("CornerRadius")=="{DynamicResource MokuPopupRadius}"),"menu uses shared live corner radius");
 var itemStyle=popups.Descendants(ui+"Style").Single(e=>(string?)e.Attribute(xns+"Key")=="MokuMenuItem");
 Check(itemStyle.Descendants(ui+"Popup").Single().Descendants(ui+"Border").Any(e=>(string?)e.Attribute("CornerRadius")=="{DynamicResource MokuPopupRadius}"),"submenus share custom rounded theme");
-Check(itemStyle.Descendants(ui+"Setter").Any(e=>(string?)e.Attribute("Property")=="ItemContainerStyle"),"nested submenu items retain Moku styling");
+Check(popups.Descendants(ui+"Style").Any(e=>(string?)e.Attribute("TargetType")=="MenuItem" && e.Attribute(xns+"Key")==null && (string?)e.Attribute("BasedOn")=="{StaticResource MokuMenuItem}"),"implicit menu item style covers submenus without styling separators as MenuItem");
 var previewStyle=popups.Descendants(ui+"Style").Single(e=>(string?)e.Attribute(xns+"Key")=="MokuWindowTooltip");
 Check(previewStyle.Descendants(ui+"Border").Any(e=>(string?)e.Attribute("CornerRadius")=="{DynamicResource MokuPopupRadius}"),"window previews retain themed roundable popup");
 

@@ -16,7 +16,6 @@
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Padding" Value="9,7"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="ItemContainerStyle" Value="{DynamicResource MokuMenuItem}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
@@ -79,7 +78,6 @@
             <Setter Property="MinWidth" Value="200"/>
             <Setter Property="MaxWidth" Value="520"/>
             <Setter Property="HasDropShadow" Value="False"/>
-            <Setter Property="ItemContainerStyle" Value="{StaticResource MokuMenuItem}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ContextMenu">
