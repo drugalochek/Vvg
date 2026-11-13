@@ -1471,7 +1471,7 @@ public partial class MainWindow : Window
             var artwork = LoadSteamArtwork(gameId);
             if (artwork != null) panel.Children.Add(new System.Windows.Controls.Image { Source = artwork, Width = 30, Height = 30, Stretch = Stretch.UniformToFill, Margin = new Thickness(0,0,7,0) });
             panel.Children.Add(new TextBlock { Text = game.Name, Foreground = Brushes.White, FontSize = 11,
-                Width = 104, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+                Width = artwork == null ? 112 : 80, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
             panel.Children.Add(new TextBlock { Text = "+", Foreground = Brushes.White, FontSize = 18,
                 Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             add.Content = panel;

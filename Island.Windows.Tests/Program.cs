@@ -26,8 +26,13 @@ internal static class Program
         {
             // Load the production compiled resources, without invoking Moku's OnStartup,
             // singleton handling, real MainWindow, network, hotkeys or background services.
-            var app = new Island.App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            app.InitializeComponent();
+            using var watchdog = new System.Threading.Timer(_ =>
+            {
+                Console.Error.WriteLine("Windows WPF smoke test exceeded 60 seconds."); Environment.Exit(2);
+            }, null, TimeSpan.FromSeconds(60), System.Threading.Timeout.InfiniteTimeSpan);
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            { Source = new Uri("/Moku;component/PopupStyles.xaml", UriKind.Relative) });
             var button = new Button { Content = "Popup smoke test" };
             var window = new Window { Width = 360, Height = 180, Content = button, ShowInTaskbar = false };
             window.Show(); Pump();

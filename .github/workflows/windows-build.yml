@@ -21,6 +21,7 @@ jobs:
       - name: Publish Windows app (requires .NET 8 Desktop Runtime)
         run: dotnet publish Island/Island.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o Island/publish
       - name: Exercise compiled WPF menus and live preview rounding
+        timeout-minutes: 3
         run: dotnet run --project Island.Windows.Tests/Island.Windows.Tests.csproj -c Release
       - name: Compile WPF installer with application payload
         run: dotnet build Installer/Installer.csproj -c Release
