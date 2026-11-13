@@ -47,6 +47,9 @@ public class Settings
     public string Hotkey { get; set; } = "Alt+Space";
     public int ClipboardLimit { get; set; } = 50;    // 5..200 записей
     public List<AppShortcut> Apps { get; set; } = new();
+    public List<string> AppFolders { get; set; } = new();
+    public List<string> RootTileOrder { get; set; } = new();
+    public bool SteamSuggestionsExpanded { get; set; } = true;
     public List<string> HiddenSteamGames { get; set; } = new();
     public bool TransparentOverNormalWindows { get; set; } = false;
     public string HomeStartupView { get; set; } = "Clipboard";
@@ -138,6 +141,13 @@ public class Settings
         }
         Apps = Apps.Where(a => a != null && !string.IsNullOrWhiteSpace(a.Path) &&
             !string.IsNullOrWhiteSpace(a.Name)).Take(60).ToList();
+        AppFolders = (AppFolders ?? new()).Select(LibraryPolicies.CleanName)
+            .Concat(Apps.Select(a => a.Folder)).Where(f => f.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        foreach (var a in Apps.Where(a => a.Folder.Length > 0))
+            a.Folder = AppFolders.FirstOrDefault(f => string.Equals(f, a.Folder, StringComparison.OrdinalIgnoreCase)) ?? "";
+        RootTileOrder ??= new();
+        RootTileOrder = LibraryPolicies.OrderedRootKeys(this);
     }
 
     public static Settings Load()

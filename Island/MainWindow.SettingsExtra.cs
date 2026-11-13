@@ -157,22 +157,18 @@ public partial class MainWindow
         ChoiceRow(p, L("Размер плиток", "Tile size"), "tilesize",
             new[] { ("Compact", L("Компактные", "Compact")), ("Normal", L("Обычные", "Normal")), ("Large", L("Крупные", "Large")) },
             () => _s.AppTileSize, v => { _s.AppTileSize = v; BuildApps(); });
-        Hint(p, L("Правой кнопкой по плитке — своя подпись, иконка и папка. Перетащи плитку на папку, чтобы положить её внутрь.",
-                  "Right-click a tile to set its label, icon and folder. Drag a tile onto a folder to put it inside."));
+        Hint(p, L("Кнопка «Создать папку» — в Приложениях. Перетащи файл в папку; крестик внутри папки вернёт его в общий список.",
+                  "Use Create folder in Apps. Drag a file into a folder; its cross returns it to the main list."));
 
-        BuildHiddenSteamSettings(CatApps);
 
         // ---------------- Общие (язык, автозапуск и «Поддержать» — в разметке)
         p = CatGeneralExtra; _buildCat = "general";
         BuildHotkeyRow(p);
         var home = CatHome; _buildCat = "home";
-        ChoiceRow(home, L("При открытии показывать", "Show on open"), "homeview",
-            new[] { ("Clipboard", L("Буфер обмена", "Clipboard")), ("Windows", L("Запущенные окна", "Running windows")) },
-            () => _s.HomeStartupView, v => { _s.HomeStartupView = v; _s.Save(); });
-        ToggleRow(home, L("Запоминать последнюю открытую вкладку", "Remember last opened tab"),
-            () => _s.RememberLastTab, v => { _s.RememberLastTab = v; _s.Save(); });
-        Hint(home, L("Если включено, Главная запоминает выбор между буфером обмена и окнами. Если выключено — использует выбор выше.",
-            "When enabled, Home remembers Clipboard or Windows. Otherwise it uses the default above."));
+        ChoiceRow(home, L("На Главной показывать", "Show on Home"), "homeview",
+            new[] { ("Clipboard", L("Буфер обмена", "Clipboard")), ("Windows", L("Запущенные приложения", "Running apps")) },
+            () => _s.HomeStartupView, v => { _s.HomeStartupView = v; _s.Save(); SetHomeView(v, false); });
+        Hint(home, L("Выбери один блок. На самой Главной переключателей нет.", "Choose one block. There are no switches on Home itself."));
         _buildCat = "general";
         SliderRow(p, L("История буфера", "Clipboard history"), 5, 200, () => _s.ClipboardLimit, v => _s.ClipboardLimit = v,
             v => ru ? $"{v} {Plural(v, "запись", "записи", "записей")}" : $"{v} {(v == 1 ? "item" : "items")}", commit: TrimHistory);

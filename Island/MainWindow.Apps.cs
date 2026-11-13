@@ -59,7 +59,7 @@ public partial class MainWindow
     double AppTileH => _s.AppTileSize switch { "Compact" => 72, "Large" => 108, _ => 88 };
     double AppIconSize => _s.AppTileSize switch { "Compact" => 24, "Large" => 44, _ => 32 };
     double AppLabelSize => _s.AppTileSize switch { "Compact" => 10, "Large" => 12, _ => 11 };
-    string? _dragAppPath;
+    string? _dragAppPath, _dragFolderName;
     Point _dragStart;
     bool _dragArmed, _suppressAppClick;
     FrameworkElement? _dragTile;
@@ -73,9 +73,9 @@ public partial class MainWindow
         AppsHeading.Text = _openFolder != null ? _openFolder.ToUpperInvariant() : Tr("ВАШИ ПРИЛОЖЕНИЯ", "YOUR APPS");
         if (AppsHint != null)
             AppsHint.Text = _openFolder != null
-                ? Tr("Перетащи плитку на «Назад», чтобы вынуть её из папки.", "Drag a tile onto Back to take it out of the folder.")
-                : Tr("Добавьте любимые программы. ПКМ по плитке — подпись, иконка, папка.",
-                     "Add your favorite apps. Right-click a tile for name, icon and folder.");
+                ? Tr("Крестик на файле — вынуть из папки. Или перетащи файл на «Назад».", "Use the cross to move a file out, or drag it onto Back.")
+                : Tr("Добавляй любые файлы. Создай папку и перетащи в неё плитки. ПКМ — обычный запуск или от администратора.",
+                     "Add any files. Create a folder and drag tiles into it. Right-click for normal or administrator launch.");
     }
 
     void BuildApps()
@@ -84,28 +84,26 @@ public partial class MainWindow
         AppsGrid.Children.Clear();
         if (!AppsGrid.AllowDrop)
         {
-            AppsGrid.AllowDrop = true;
-            AppsGrid.Background ??= Brushes.Transparent;
+            AppsGrid.AllowDrop = true; AppsGrid.Background ??= Brushes.Transparent;
             AppsGrid.DragOver += (_, e) =>
             {
-                e.Effects = e.Data.GetDataPresent("MokuAppPath") ? DragDropEffects.Move : DragDropEffects.None;
+                e.Effects = e.Data.GetDataPresent("MokuAppPath") || e.Data.GetDataPresent("MokuFolderName") ? DragDropEffects.Move : DragDropEffects.None;
                 e.Handled = true;
             };
         }
-        BuildSteamCandidates();
-        var visible = _s.Apps.Where(a => (IsSteamLink(a.Path) && !_s.HiddenSteamGames.Contains(SteamId(a.Path))) || File.Exists(a.Path)).ToList();
-        if (_openFolder != null && !visible.Any(a => SameFolder(a.Folder, _openFolder))) _openFolder = null;   // папка опустела
+        var visible = _s.Apps.Where(a => IsSteamLink(a.Path) || File.Exists(a.Path)).ToList();
+        if (_openFolder != null && !_s.AppFolders.Any(f => SameFolder(f, _openFolder))) _openFolder = null;
+        if (CreateFolderButton != null) CreateFolderButton.Visibility = _openFolder == null ? Visibility.Visible : Visibility.Collapsed;
         UpdateAppsHeading();
+        BuildSteamCandidates();
 
         if (_openFolder == null)
         {
-            var folders = visible.Where(a => a.Folder.Length > 0).Select(a => a.Folder)
-                                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                                 .OrderBy(f => f, StringComparer.CurrentCultureIgnoreCase).ToList();
-            foreach (var folder in folders)
-                AppsGrid.Children.Add(CreateFolderTile(folder, visible.Where(a => SameFolder(a.Folder, folder)).ToList()));
-            foreach (var app in visible.Where(a => a.Folder.Length == 0))
-                AppsGrid.Children.Add(CreateAppTile(app, IsSteamLink(app.Path)));
+            var items = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase);
+            foreach (var folder in FolderNames()) items[LibraryPolicies.FolderKey(folder)] = CreateFolderTile(folder, visible.Where(a => SameFolder(a.Folder, folder)).ToList());
+            foreach (var app in visible.Where(a => a.Folder.Length == 0)) items[LibraryPolicies.FileKey(app.Path)] = CreateAppTile(app, IsSteamLink(app.Path));
+            foreach (var key in LibraryPolicies.OrderedRootKeys(_s))
+                if (items.TryGetValue(key, out var tile)) AppsGrid.Children.Add(tile);
         }
         else
         {
@@ -120,8 +118,8 @@ public partial class MainWindow
         {
             AppsGrid.Children.Add(new TextBlock
             {
-                Text = Tr("Пока пусто. Нажми «Добавить», чтобы выбрать программу.",
-                          "No apps yet. Select Add app to get started."),
+                Text = Tr("Пока пусто. Нажми «Добавить файл» или «Создать папку».",
+                          "No files yet. Select Add file or Create folder."),
                 Foreground = (System.Windows.Media.Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
                 FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
                 TextWrapping = TextWrapping.Wrap, MaxWidth = 440
@@ -228,19 +226,13 @@ public partial class MainWindow
 
         // Крестик в углу: появляется при наведении на плитку.
         var close = CreateRemoveButton();
-        close.Click += (_, _) => { if (steamLink) HideSteamGame(app); else RemoveAppAnimated(tile, path); };
+        close.ToolTip = app.Folder.Length > 0 ? Tr("Вынуть из папки в общий список", "Move out of folder to the main list") : Tr("Убрать из списка — файл останется на диске", "Remove from list — keep the file on disk");
+        close.Click += (_, _) => { if (app.Folder.Length > 0) MoveAppToFolder(path, ""); else RemoveAppAnimated(tile, path); };
         tile.Children.Add(close);
         tile.MouseEnter += (_, _) => FadeTo(close, 1, 160);
         tile.MouseLeave += (_, _) => FadeTo(close, 0, 220);
 
-        // Перестановка перетаскиванием.
-        tile.PreviewMouseLeftButtonDown += (_, e) =>
-        {
-            if (IsInside(e.OriginalSource as DependencyObject, close)) return;
-            _dragArmed = true; _dragStart = e.GetPosition(AppsGrid); _dragAppPath = path;
-        };
-        tile.PreviewMouseLeftButtonUp += (_, _) => _dragArmed = false;
-        tile.PreviewMouseMove += (_, e) => AppTile_MouseMove(tile, e);
+        HookTileDrag(tile, path, null, close);
         tile.DragEnter += AppTile_DragOver;
         tile.DragOver += AppTile_DragOver;
         tile.Drop += (_, e) => { e.Handled = true; };
@@ -316,9 +308,20 @@ public partial class MainWindow
         tile.BeginAnimation(OpacityProperty, fade);
     }
 
+    void HookTileDrag(FrameworkElement tile, string? path, string? folder, DependencyObject? close)
+    {
+        tile.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (close != null && IsInside(e.OriginalSource as DependencyObject, close)) return;
+            _dragArmed = true; _dragStart = e.GetPosition(AppsGrid); _dragAppPath = path; _dragFolderName = folder;
+        };
+        tile.PreviewMouseLeftButtonUp += (_, _) => _dragArmed = false;
+        tile.PreviewMouseMove += (_, e) => AppTile_MouseMove(tile, e);
+    }
+
     void AppTile_MouseMove(FrameworkElement tile, MouseEventArgs e)
     {
-        if (!_dragArmed || e.LeftButton != MouseButtonState.Pressed || _dragAppPath == null) return;
+        if (!_dragArmed || e.LeftButton != MouseButtonState.Pressed || (_dragAppPath == null && _dragFolderName == null)) return;
         var p = e.GetPosition(AppsGrid);
         if (Math.Abs(p.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(p.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
@@ -330,14 +333,15 @@ public partial class MainWindow
         tile.Opacity = 0.45;
         try
         {
-            DragDrop.DoDragDrop(tile, new DataObject("MokuAppPath", _dragAppPath), DragDropEffects.Move);
+            var data = _dragFolderName != null ? new DataObject("MokuFolderName", _dragFolderName) : new DataObject("MokuAppPath", _dragAppPath!);
+            DragDrop.DoDragDrop(tile, data, DragDropEffects.Move);
         }
         catch (Exception ex) { Log.Warn("Перетаскивание плитки: " + ex.Message); }
         finally
         {
             FadeTo(tile, 1, 180);
             _dragTile = null;
-            _dragAppPath = null;
+            _dragAppPath = null; _dragFolderName = null;
             SaveAppOrder();
             // Клик после отпускания уже не придёт — снимаем блокировку чуть позже.
             Dispatcher.BeginInvoke(new Action(() => _suppressAppClick = false),
@@ -348,7 +352,7 @@ public partial class MainWindow
     void AppTile_DragOver(object sender, DragEventArgs e)
     {
         e.Handled = true;
-        if (!e.Data.GetDataPresent("MokuAppPath") || _dragTile == null || sender is not FrameworkElement target)
+        if ((!e.Data.GetDataPresent("MokuAppPath") && !e.Data.GetDataPresent("MokuFolderName")) || _dragTile == null || sender is not FrameworkElement target)
         {
             e.Effects = DragDropEffects.None;
             return;
@@ -357,8 +361,7 @@ public partial class MainWindow
         if (ReferenceEquals(target, _dragTile)) return;
         int from = AppsGrid.Children.IndexOf(_dragTile), to = AppsGrid.Children.IndexOf(target);
         if (from < 0 || to < 0 || from == to) return;
-        // Плитки одного размера, поэтому после перестановки под курсором оказывается сама
-        // перетаскиваемая плитка — «дрожания» туда-обратно нет.
+        // Repack mixed-size folder and file tiles after a move.
         AppsGrid.Children.RemoveAt(from);
         AppsGrid.Children.Insert(to, _dragTile);
         LayoutAppTiles();
@@ -379,19 +382,26 @@ public partial class MainWindow
 
     void SaveAppOrder()
     {
-        var order = AppsGrid.Children.OfType<FrameworkElement>().Select(c => c.Tag as string).Where(t => t != null).ToList();
-        if (order.Count == 0) return;
-        var reordered = new List<AppShortcut>();
-        foreach (var p in order)
+        var tiles = AppsGrid.Children.OfType<FrameworkElement>().ToList();
+        if (_openFolder == null)
         {
-            var a = _s.Apps.FirstOrDefault(x => string.Equals(x.Path, p, StringComparison.OrdinalIgnoreCase));
-            if (a != null && !reordered.Contains(a)) reordered.Add(a);
+            var order = tiles.Select(t => t.Tag switch
+            {
+                FolderTileTag f => LibraryPolicies.FolderKey(f.Name),
+                string path when _s.Apps.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase) && a.Folder.Length == 0) => LibraryPolicies.FileKey(path),
+                _ => null
+            }).Where(k => k != null).Select(k => k!).ToList();
+            _s.RootTileOrder = order.Concat(_s.RootTileOrder).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
-        // Пропавшие с диска приложения (не показаны) остаются в конце списка.
+        var paths = tiles.Select(t => t.Tag as string).Where(p => p != null).ToList();
+        var reordered = new List<AppShortcut>();
+        foreach (var path in paths)
+        {
+            var app = _s.Apps.FirstOrDefault(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (app != null && !reordered.Contains(app)) reordered.Add(app);
+        }
         reordered.AddRange(_s.Apps.Where(a => !reordered.Contains(a)));
-        if (reordered.SequenceEqual(_s.Apps)) return;
-        _s.Apps = reordered;
-        _s.Save();
+        _s.Apps = reordered; _s.Save();
     }
 
     // ------------------------------------------------------------------ иконки Steam

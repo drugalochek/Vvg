@@ -162,38 +162,20 @@
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="hv" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.18"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="hv" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.24"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="hv" Storyboard.TargetProperty="Opacity" To="0.22" Duration="0:0:0.08"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="hv" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.18"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsVisible" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="hv" Property="Opacity" Value="0.12"/>
+                            </MultiTrigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsPressed" Value="True"/>
+                                    <Condition Property="IsVisible" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="hv" Property="Opacity" Value="0.22"/>
+                            </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -616,15 +598,7 @@
                             </StackPanel>
                         </Border>
 
-                        <StackPanel Grid.Row="1" Margin="0,7,0,3">
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="HomeClipboardModeBtn" Style="{StaticResource TileBtn}" Width="91" Height="25" Content="Буфер" FontSize="11" Click="HomeClipboardMode_Click"/>
-                                <Button x:Name="HomeWindowsModeBtn" Style="{StaticResource TileBtn}" Width="75" Height="25" Content="Окна" FontSize="11" Click="HomeWindowsMode_Click"/>
-                                <Button x:Name="MinimizeAllBtn" Style="{StaticResource TileBtn}" Width="77" Height="25" Content="Свернуть всё" FontSize="9" Click="MinimizeAll_Click"/>
-                                <Button x:Name="RestoreAllBtn" Style="{StaticResource TileBtn}" Width="78" Height="25" Content="Развернуть всё" FontSize="9" Click="RestoreAll_Click"/>
-                            </StackPanel>
-                            <TextBlock x:Name="RecentlyCopiedText" Text="RECENTLY COPIED" Foreground="#66FFFFFF" FontSize="10" FontWeight="SemiBold" Margin="6,4,0,1"/>
-                        </StackPanel>
+                        <TextBlock x:Name="RecentlyCopiedText" Grid.Row="1" Text="RECENTLY COPIED" Foreground="#66FFFFFF" FontSize="10" FontWeight="SemiBold" Margin="6,12,0,4"/>
                         <ListBox x:Name="RecentList" Grid.Row="2" Background="Transparent" BorderThickness="0"
                                  ItemsSource="{Binding Recent}" ItemContainerStyle="{StaticResource HistItem}"
                                  ItemTemplate="{StaticResource HistTemplate}"
@@ -690,7 +664,7 @@
                         <StackPanel Grid.Column="0">
                             <TextBlock x:Name="AppsHeading" Text="YOUR APPS" Foreground="White"
                                        FontSize="11" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="AppsHint" Text="Add your favorite apps for one-click launch."
+                            <TextBlock x:Name="AppsHint" Text="Add files or create a folder." TextWrapping="Wrap" MaxWidth="330" HorizontalAlignment="Left"
                                        Foreground="#88FFFFFF" FontSize="11" Margin="0,3,0,0"/>
                             <Button x:Name="ScanSteamButton" Style="{StaticResource TileBtn}" Height="30" Width="154"
                                     HorizontalAlignment="Left" Margin="0,7,0,0" Click="ScanSteam_Click">
@@ -701,8 +675,11 @@
                             </Button>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="CreateFolderButton" Style="{StaticResource TileBtn}" Height="34" Width="124" Margin="0,0,7,0" Click="CreateFolder_Click">
+                                <TextBlock x:Name="CreateFolderText" Text="Create folder" FontSize="12"/>
+                            </Button>
                             <Button x:Name="AddAppButton" Style="{StaticResource TileBtn}"
-                                    Height="34" Width="104" Margin="0" HorizontalAlignment="Right" Click="AddApp_Click">
+                                    Height="34" Width="124" Margin="0" HorizontalAlignment="Right" Click="AddApp_Click">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Text="&#xE710;" FontFamily="{StaticResource Icons}" Margin="0,0,7,0"/>
                                     <TextBlock x:Name="AddAppText" Text="Add app" FontSize="12"/>
@@ -713,8 +690,14 @@
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
-                            <WrapPanel x:Name="SteamGamesGrid" Margin="0,0,4,6"/>
                             <Canvas x:Name="AppsGrid" Margin="0,0,4,4"/>
+                            <Expander x:Name="SteamSuggestionsExpander" Foreground="White" Background="Transparent" IsExpanded="True"
+                                      Margin="4,8,4,4" Expanded="SteamSuggestions_Toggled" Collapsed="SteamSuggestions_Toggled">
+                                <Expander.Header>
+                                    <TextBlock x:Name="SteamSuggestionsHeader" Text="Steam games — add to list" Foreground="#CCFFFFFF" FontSize="11"/>
+                                </Expander.Header>
+                                <WrapPanel x:Name="SteamGamesGrid" Margin="0,8,0,0"/>
+                            </Expander>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

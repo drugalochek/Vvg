@@ -7,7 +7,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../Island/FeaturePolicies.cs" Link="FeaturePolicies.cs" />
+    <Compile Include="../Island/LibraryPolicies.cs" Link="LibraryPolicies.cs" />
+    <Compile Include="../Island/FileLaunchPolicy.cs" Link="FileLaunchPolicy.cs" />
     <Compile Include="../Island/Settings.cs" Link="Settings.cs" />
     <Compile Include="../Island/Log.cs" Link="Log.cs" />
+    <None Include="../Island/App.xaml" Link="PopupStyles.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Island/MainWindow.xaml" Link="MainWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

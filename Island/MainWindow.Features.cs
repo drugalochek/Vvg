@@ -26,6 +26,7 @@ public partial class MainWindow
     readonly Dictionary<string, string> _steamInstallPaths = new(StringComparer.OrdinalIgnoreCase);
     DispatcherTimer? _appsScanTimer;
     bool _appLayoutHooked;
+    readonly Dictionary<string, (int Pid, long Started)> _trackedFileLaunches = new(StringComparer.OrdinalIgnoreCase);
 
     void BuildHotkeyRow(Panel panel)
     {
@@ -157,16 +158,10 @@ public partial class MainWindow
         }
         else ShowToast("Moku", text, ColorError);
     }
-    void OpenNewAppWindow(string path)
-    {
-        if (!TryBeginAppLaunch(ResolveLaunchTarget(path))) return;
-        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); Collapse(); }
-        catch (Exception ex) { _pendingAppLaunches.Remove(ResolveLaunchTarget(path)); Log.Warn(ex.Message); ReportAppAction(Tr("Не удалось открыть новое окно.", "Could not open a new window.")); }
-    }
     void AddAppActions(ContextMenu menu, AppShortcut app)
     {
-        AddMenu(menu, Tr("Открыть / переключиться", "Open / switch to app"), () => LaunchApp(app.Path));
-        AddMenu(menu, Tr("Новое окно", "New window"), () => OpenNewAppWindow(app.Path));
+        AddMenu(menu, Tr("Открыть обычным способом", "Open normally"), () => LaunchApp(app.Path));
+        AddMenu(menu, Tr("Запустить от имени администратора", "Run as administrator"), () => LaunchApp(app.Path, true), !IsSteamLink(app.Path) && FileLaunchPolicy.CanElevate(app.Path));
         var size = new MenuItem { Header = Tr("Размер плитки", "Tile size") };
         foreach (var value in new[] { "1x1", "2x1", "2x2" })
         {
@@ -203,32 +198,28 @@ public partial class MainWindow
         _appsScanTimer.Start();
     }
     void StopAppsScanWatch() { _appsScanTimer?.Stop(); _appsScanTimer = null; }
-    void HideSteamGame(AppShortcut app)
+    void SteamSuggestions_Toggled(object sender, RoutedEventArgs e)
     {
-        var id = SteamId(app.Path); if (id.Length == 0) return;
-        if (!_s.HiddenSteamGames.Contains(id)) _s.HiddenSteamGames.Add(id);
-        _s.HiddenSteamNames[id] = app.Name;
-        _s.Apps.RemoveAll(x => string.Equals(x.Path, app.Path, StringComparison.OrdinalIgnoreCase));
-        _steamCandidates.RemoveAll(x => string.Equals(x.Path, app.Path, StringComparison.OrdinalIgnoreCase));
-        _s.Save(); BuildApps(); BuildExtraSettings();
+        if (!_ready || SteamSuggestionsExpander == null || e.OriginalSource != SteamSuggestionsExpander) return;
+        _s.SteamSuggestionsExpanded = SteamSuggestionsExpander.IsExpanded; _s.Save();
     }
-    void RestoreSteamGame(string id)
+    void TrackFileLaunch(string path, Process? process)
     {
-        _s.HiddenSteamGames.Remove(id);
-        _s.Save(); ScanSteam_Click(this, new RoutedEventArgs()); BuildExtraSettings();
+        if (process == null) return;
+        try { if (!process.HasExited) _trackedFileLaunches[path] = (process.Id, ProcessStarted(process.Id)); } catch { }
     }
-    void BuildHiddenSteamSettings(Panel panel)
+    bool TryActivateTrackedLaunch(string path)
     {
-        Section(panel, Tr("СКРЫТЫЕ ИГРЫ STEAM", "HIDDEN STEAM GAMES"));
-        if (_s.HiddenSteamGames.Count == 0) { Hint(panel, Tr("Скрытых игр нет. ПКМ по игре → «Скрыть игру».", "No hidden games. Right-click a game → Hide game.")); return; }
-        foreach (var id in _s.HiddenSteamGames.ToArray())
+        if (!_trackedFileLaunches.TryGetValue(path, out var identity)) return false;
+        try
         {
-            Row(panel, _s.HiddenSteamNames.GetValueOrDefault(id, "Steam · " + id), out var host);
-            var button = new Button { Style = (Style)FindResource("TileBtn"), Content = Tr("Вернуть", "Restore"), Height = 28, FontSize = 11 };
-            button.Click += (_, _) => RestoreSteamGame(id); host.Children.Add(button);
+            using var process = Process.GetProcessById(identity.Pid);
+            if (process.HasExited || (identity.Started != 0 && ProcessStarted(identity.Pid) != identity.Started)) { _trackedFileLaunches.Remove(path); return false; }
+            var window = GetOpenWindows().FirstOrDefault(w => w.ProcessId == identity.Pid);
+            if (window != null) ActivateWindow(window.Handle);
+            else ReportAppAction(Tr("Файл или скрипт уже запущен. Доступного окна нет.", "The file or script is already running. No accessible window was found."));
+            return true;
         }
-        var all = new Button { Style = (Style)FindResource("TileBtn"), Content = Tr("Вернуть все", "Restore all"), Height = 29, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(12, 0, 12, 0) };
-        all.Click += (_, _) => { _s.HiddenSteamGames.Clear(); _s.Save(); ScanSteam_Click(this, new RoutedEventArgs()); BuildExtraSettings(); };
-        panel.Children.Add(all);
+        catch { _trackedFileLaunches.Remove(path); return false; }
     }
 }

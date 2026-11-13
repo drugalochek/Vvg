@@ -229,7 +229,7 @@ public partial class MainWindow : Window
         TempText.Visibility = Visibility.Collapsed;
         ApplyPosition();
         _ready = true;
-        SetHomeView(FeaturePolicies.HomeView(_s.RememberLastTab, _s.LastHomeView, _s.HomeStartupView), false);
+        SetHomeView(_s.HomeStartupView, false);
         Log.Info("MainWindow: initialization complete");
         }
         catch (Exception ex)
@@ -433,6 +433,7 @@ public partial class MainWindow : Window
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
         if (_ready) RetargetRadius();
         ApplyGlass();
+        RefreshPopupTheme();
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
     }
@@ -480,7 +481,7 @@ public partial class MainWindow : Window
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
-    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); SaveSoon(); }
+    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); RefreshPopupTheme(); SaveSoon(); }
     void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
     void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
     void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
@@ -705,18 +706,14 @@ public partial class MainWindow : Window
         if (TabClip != null) TabClip.Content = ru ? "Буфер" : "Clipboard";
         if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
         UpdateAppsHeading();
-        if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
-        if (HomeClipboardModeBtn != null) HomeClipboardModeBtn.Content = ru ? "Буфер" : "Clipboard";
-        if (HomeWindowsModeBtn != null) HomeWindowsModeBtn.Content = ru ? "Окна" : "Windows";
-        if (MinimizeAllBtn != null) MinimizeAllBtn.Content = ru ? "Свернуть всё" : "Minimize all";
-        if (RestoreAllBtn != null) RestoreAllBtn.Content = ru ? "Развернуть всё" : "Restore all";
+        if (CreateFolderText != null) CreateFolderText.Text = ru ? "Создать папку" : "Create folder";
         if (ScanSteamText != null) ScanSteamText.Text = ru ? "Найти игры Steam" : "Find Steam games";
-        if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
+        if (AddAppText != null) AddAppText.Text = ru ? "Добавить файл" : "Add file";
                 if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
         if (MenuSettings != null) MenuSettings.Header = ru ? "Настройки" : "Settings";
         if (MenuExit != null) MenuExit.Header = ru ? "Выход" : "Exit";
         if (NowTitle != null) NowTitle.Text = ru ? "Ничего не воспроизводится" : "Nothing playing";
-        if (RecentlyCopiedText != null) RecentlyCopiedText.Text = ru ? "НЕДАВНО СКОПИРОВАНО" : "RECENTLY COPIED";
+        if (RecentlyCopiedText != null) RecentlyCopiedText.Text = _homeShowsWindows ? (ru ? "ЗАПУЩЕННЫЕ ПРИЛОЖЕНИЯ" : "RUNNING APPS") : (ru ? "НЕДАВНО СКОПИРОВАНО" : "RECENTLY COPIED");
         if (ClearHistoryButton != null) ClearHistoryButton.ToolTip = ru ? "Очистить историю" : "Clear history";
         if (PositionLabel != null) PositionLabel.Text = ru ? "Положение" : "Position";
         if (TopOffsetLabel != null) TopOffsetLabel.Text = ru ? "Отступ сверху" : "Top offset";
@@ -1151,7 +1148,7 @@ public partial class MainWindow : Window
         _state = IslandState.Expanded;
         UpdateHomeRefreshState();
         TabHome.IsChecked = true;
-        SetHomeView(FeaturePolicies.HomeView(_s.RememberLastTab, _s.LastHomeView, _s.HomeStartupView), false);
+        SetHomeView(_s.HomeStartupView, false);
         UpdateHomeRefreshState();
         CheckGameMode();
         Mini.Visibility = Visibility.Collapsed;
@@ -1457,7 +1454,14 @@ public partial class MainWindow : Window
     {
         if (SteamGamesGrid == null) return;
         SteamGamesGrid.Children.Clear();
-        foreach (var game in _steamCandidates.Where(g => !_s.HiddenSteamGames.Contains(SteamId(g.Path)) && !_s.Apps.Any(a =>
+        if (SteamSuggestionsExpander != null)
+        {
+            SteamSuggestionsExpander.IsExpanded = _s.SteamSuggestionsExpanded;
+            SteamSuggestionsExpander.Visibility = _openFolder == null ? Visibility.Visible : Visibility.Collapsed;
+        }
+        int available = _steamCandidates.Count(g => !_s.Apps.Any(a => string.Equals(a.Path, g.Path, StringComparison.OrdinalIgnoreCase)));
+        if (SteamSuggestionsHeader != null) SteamSuggestionsHeader.Text = Tr($"Игры Steam — добавить ({available})", $"Steam games — add ({available})");
+        foreach (var game in _steamCandidates.Where(g => !_s.Apps.Any(a =>
             string.Equals(a.Path, g.Path, StringComparison.OrdinalIgnoreCase))))
         {
             var add = new Button { Style = (Style)FindResource("TileBtn"), Width = 150, Height = 42,
@@ -1521,7 +1525,7 @@ public partial class MainWindow : Window
                         var data = File.ReadAllText(manifest);
                         var id = Regex.Match(data, @"""appid""\s+""(\d+)""").Groups[1].Value;
                         var name = Regex.Match(data, @"""name""\s+""([^""]+)""").Groups[1].Value;
-                        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name) || _s.HiddenSteamGames.Contains(id)) continue;
+                        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
                         _s.HiddenSteamNames[id] = name;
                         var installDir = Regex.Match(data, @"""installdir""\s+""([^""]+)""").Groups[1].Value;
                         if (!string.IsNullOrWhiteSpace(installDir))
@@ -1531,22 +1535,17 @@ public partial class MainWindow : Window
                             if (gameDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) _steamInstallPaths[id] = gameDir;
                         }
                         var link = "steam://rungameid/" + id;
-                        if (_s.Apps.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
                         if (_steamCandidates.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
                         _steamCandidates.Add(new AppShortcut { Path = link, Name = name });
                     }
                     catch (IOException ex) { Log.Warn("Не удалось прочитать Steam manifest: " + ex.Message); }
                 }
             }
-            foreach (var game in _steamCandidates)
-                if (!_s.Apps.Any(a => string.Equals(a.Path, game.Path, StringComparison.OrdinalIgnoreCase)))
-                    { if (_s.Apps.Count < 60) _s.Apps.Add(game); }
-            _s.Save();
-            BuildApps();
+            BuildSteamCandidates();
             var message = _steamCandidates.Count == 0
-                ? (_s.Language == "ru" ? "Установленные игры Steam не найдены" : "No installed Steam games found")
-                : (_s.Language == "ru" ? $"Добавлено установленных игр: {_steamCandidates.Count}."
-                                       : $"Added {_steamCandidates.Count} installed games.");
+                ? Tr("Установленные игры Steam не найдены", "No installed Steam games found")
+                : Tr($"Найдено игр Steam: {_steamCandidates.Count}. Нажми + у нужной игры.", $"Steam games found: {_steamCandidates.Count}. Select + to add a game.");
+            if (showResult) AppsHint.Text = message;
             if (showResult) ShowToast("Steam", message, _steamCandidates.Count == 0 ? ColorError : ColorOk);
         }
         catch (Exception ex)
@@ -1561,31 +1560,23 @@ public partial class MainWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = _s.Language == "ru" ? "Выбери приложение или ярлык" : "Choose an app or shortcut",
-            Filter = _s.Language == "ru"
-                ? "Приложения и ярлыки (*.exe;*.lnk;*.url)|*.exe;*.lnk;*.url|Все файлы (*.*)|*.*"
-                : "Applications and shortcuts (*.exe;*.lnk;*.url)|*.exe;*.lnk;*.url|All files (*.*)|*.*",
-            CheckFileExists = true, Multiselect = false
+            Title = Tr("Добавить файлы или приложения", "Add files or apps"),
+            Filter = Tr("Все файлы (*.*)|*.*|Приложения и ярлыки|*.exe;*.com;*.lnk;*.url|Пакетные файлы и скрипты|*.bat;*.cmd;*.ps1|Изображения|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif|Библиотеки DLL|*.dll",
+                        "All files (*.*)|*.*|Apps and shortcuts|*.exe;*.com;*.lnk;*.url|Batch files and scripts|*.bat;*.cmd;*.ps1|Images|*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif|DLL libraries|*.dll"),
+            CheckFileExists = true, Multiselect = true
         };
-        if (dialog.ShowDialog(this) != true) return;
-
-        string selected = dialog.FileName;
-        string path = selected;
-        string name = System.IO.Path.GetFileNameWithoutExtension(selected);
-        if (System.IO.Path.GetExtension(selected).Equals(".url", StringComparison.OrdinalIgnoreCase))
+        if (WithModal(() => dialog.ShowDialog(this)) != true) return;
+        foreach (var selected in dialog.FileNames)
         {
-            string? urlLine = File.ReadLines(selected).FirstOrDefault(line =>
-                line.TrimStart().StartsWith("URL=", StringComparison.OrdinalIgnoreCase));
-            path = urlLine?.Trim().Substring(4).Trim() ?? "";
-            if (!IsSteamLink(path))
+            string path = selected;
+            if (Path.GetExtension(selected).Equals(".url", StringComparison.OrdinalIgnoreCase))
             {
-                ShowToast("Moku", _s.Language == "ru"
-                    ? "Поддерживаются интернет-ярлыки Steam (steam://)"
-                    : "Only Steam internet shortcuts (steam://) are supported", ColorError);
-                return;
+                string? urlLine = File.ReadLines(selected).FirstOrDefault(l => l.TrimStart().StartsWith("URL=", StringComparison.OrdinalIgnoreCase));
+                string target = urlLine?.Trim()[4..].Trim() ?? "";
+                if (IsSteamLink(target)) path = target;
             }
+            AddSavedApp(path, Path.GetFileNameWithoutExtension(selected));
         }
-        AddSavedApp(path, name);
     }
 
     static bool IsSteamLink(string value) =>
@@ -1600,37 +1591,40 @@ public partial class MainWindow : Window
             ShowToast("Moku", _s.Language == "ru" ? "Это приложение уже добавлено" : "This app is already added");
             return;
         }
+        if (_s.Apps.Count >= 60) { ReportAppAction(Tr("В списке уже 60 файлов и приложений.", "The list already contains 60 files and apps.")); return; }
         _s.Apps.Add(new AppShortcut { Path = path, Name = name, Folder = _openFolder ?? "" });
         _s.Save(); BuildApps();
         ShowToast("Moku", _s.Language == "ru" ? "Приложение добавлено" : "App added");
     }
 
-    void LaunchApp(string path)
+    void LaunchApp(string path, bool elevated = false)
     {
+        string launchKey = path;
         try
         {
             bool steam = IsSteamLink(path);
-            if (!steam && !File.Exists(path))
-            {
-                ReportAppAction(Tr("Файл не найден. Добавь приложение заново.", "File not found. Add the app again."));
-                BuildApps(); return;
-            }
+            if (!steam && !File.Exists(path)) { ReportAppAction(Tr("Файл не найден. Добавь его заново.", "File not found. Add it again.")); BuildApps(); return; }
+            if (elevated && (steam || !FileLaunchPolicy.CanElevate(path))) { ReportAppAction(Tr("Для этого типа файла нет запуска от администратора.", "This file type has no administrator launch command.")); return; }
             string target = ResolveLaunchTarget(path);
-            if (TryActivateExistingApp(target, out bool running)) { Collapse(); return; }
-            if (running)
+            if (!elevated && TryActivateTrackedLaunch(path)) return;
+            if (!elevated && (steam || FileLaunchPolicy.IsNativeApplication(target)))
             {
-                ReportAppAction(Tr("Приложение уже запущено, но доступного окна нет.", "The app is running, but no accessible window was found."));
-                return;
+                if (TryActivateExistingApp(target, out bool running)) return;
+                if (running) { ReportAppAction(Tr("Приложение уже запущено, но доступного окна нет.", "The app is running, but no accessible window was found.")); return; }
             }
-            if (!TryBeginAppLaunch(target)) return;
-            try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-            catch { _pendingAppLaunches.Remove(target); throw; }
+            launchKey = (elevated ? "admin:" : "") + target;
+            if (!TryBeginAppLaunch(launchKey)) return;
+            var info = steam ? new ProcessStartInfo(path) { UseShellExecute = true } : FileLaunchPolicy.Create(path, elevated, Environment.SystemDirectory);
+            using var process = Process.Start(info);
+            TrackFileLaunch(path, process);
             Collapse();
         }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        { _pendingAppLaunches.Remove(launchKey); ReportAppAction(Tr("Запуск от администратора отменён.", "Administrator launch cancelled.")); }
         catch (Exception ex)
         {
-            Log.Error("Could not launch application", ex);
-            ReportAppAction(Tr("Не удалось запустить приложение.", "Could not launch app."));
+            _pendingAppLaunches.Remove(launchKey); Log.Error("Could not open file or app", ex);
+            ReportAppAction(Tr("Не удалось открыть файл. Для PNG и DLL нужна подходящая программа или ассоциация Windows.", "Could not open file. Documents and DLLs need a suitable app or Windows file association."));
         }
     }
 
@@ -1660,7 +1654,7 @@ public partial class MainWindow : Window
                 Text = t.Label, FontSize = 11, Margin = new Thickness(0, 5, 0, 0),
                 HorizontalAlignment = global::System.Windows.HorizontalAlignment.Center
             });
-            var btn = new Button { Style = style, Content = sp };
+            var btn = new Button { Style = style, Content = sp, Focusable = false, IsTabStop = false };
             var act = t.Act;
             btn.Click += (_, _) => act();
             TileGrid.Children.Add(btn);

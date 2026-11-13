@@ -16,18 +16,26 @@ namespace Island;
 
 /// <summary>
 /// v2.10: папки на вкладке «Приложения», свои подписи и иконки плиток.
-/// Папка существует, пока в ней есть хотя бы одно приложение (хранится в AppShortcut.Folder).
+/// Пустые папки и порядок корневых плиток сохраняются отдельно от файлов.
 /// </summary>
 public partial class MainWindow
 {
-    IEnumerable<string> FolderNames() => _s.Apps.Where(a => a.Folder.Length > 0).Select(a => a.Folder)
-        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f, StringComparer.CurrentCultureIgnoreCase);
+    sealed record FolderTileTag(string Name);
+    IEnumerable<string> FolderNames() => _s.AppFolders;
+
+    void CreateFolder_Click(object sender, RoutedEventArgs e)
+    {
+        string? name = AskText(Tr("Название новой папки", "New folder name"), Tr("Новая папка", "New folder"), 40);
+        if (name == null) return;
+        if (!LibraryPolicies.CreateFolder(_s, name)) { ReportAppAction(Tr("Папка с таким названием уже есть.", "A folder with this name already exists.")); return; }
+        _s.Save(); BuildApps();
+    }
 
     FrameworkElement CreateFolderTile(string folder, List<AppShortcut> apps)
     {
         var tile = new Grid
         {
-            Width = AppTileW, Height = AppTileH, Margin = new Thickness(4), AllowDrop = true,
+            Width = AppTileW, Height = AppTileH, Margin = new Thickness(4), Tag = new FolderTileTag(folder), AllowDrop = true,
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1), Background = Brushes.Transparent
         };
         var button = new Button
@@ -61,7 +69,7 @@ public partial class MainWindow
             TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = AppTileW - 14, HorizontalAlignment = HorizontalAlignment.Center
         });
         button.Content = content;
-        button.Click += (_, _) => OpenFolder(folder);
+        button.Click += (_, _) => { if (_suppressAppClick) { _suppressAppClick = false; return; } OpenFolder(folder); };
 
         var menu = new ContextMenu();
         button.ContextMenu = menu;
@@ -70,9 +78,9 @@ public partial class MainWindow
             menu.Items.Clear();
             AddMenu(menu, Tr("Открыть", "Open"), () => OpenFolder(folder));
             AddMenu(menu, Tr("Переименовать папку…", "Rename folder…"), () => RenameFolder(folder));
-            AddMenu(menu, Tr("Расформировать папку", "Ungroup folder"), () =>
+            AddMenu(menu, Tr("Удалить папку — файлы оставить", "Remove folder — keep files"), () =>
             {
-                foreach (var a in _s.Apps.Where(a => SameFolder(a.Folder, folder))) a.Folder = "";
+                LibraryPolicies.RemoveFolder(_s, folder);
                 _s.Save(); BuildApps();
             });
         };
@@ -80,6 +88,7 @@ public partial class MainWindow
 
         // Бросили плитку на папку — кладём приложение внутрь.
         HookFolderDrop(tile, folder);
+        HookTileDrag(tile, null, folder, null);
         return tile;
     }
 
@@ -121,6 +130,7 @@ public partial class MainWindow
         tile.DragLeave += (_, _) => Highlight(false);
         tile.DragOver += (_, e) =>
         {
+            if (e.Data.GetDataPresent("MokuFolderName")) { AppTile_DragOver(tile, e); return; }
             e.Effects = e.Data.GetDataPresent("MokuAppPath") ? DragDropEffects.Move : DragDropEffects.None;
             e.Handled = true;
         };
@@ -129,6 +139,7 @@ public partial class MainWindow
             e.Handled = true;
             Highlight(false);
             if (e.Data.GetData("MokuAppPath") is string path) MoveAppToFolder(path, folder, afterDrag: true);
+            else if (e.Data.GetDataPresent("MokuFolderName")) SaveAppOrder();
         };
     }
 
@@ -141,10 +152,10 @@ public partial class MainWindow
 
     void MoveAppToFolder(string path, string folder, bool afterDrag = false)
     {
-        var app = _s.Apps.FirstOrDefault(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase));
-        if (app == null || SameFolder(app.Folder, folder)) return;
-        // Пишем имя так же, как у уже существующей папки (без дублей «Игры» / «игры»).
-        app.Folder = FolderNames().FirstOrDefault(f => SameFolder(f, folder)) ?? folder.Trim();
+        string name = LibraryPolicies.CleanName(folder);
+        if (name.Length > 0 && !_s.AppFolders.Any(f => SameFolder(f, name))) LibraryPolicies.CreateFolder(_s, name);
+        if (!LibraryPolicies.MoveFile(_s, path, name)) return;
+        var app = _s.Apps.First(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase));
         _s.Save();
         ShowToast("Moku", app.Folder.Length > 0
             ? Tr($"Перемещено в «{app.Folder}»", $"Moved to “{app.Folder}”")
@@ -159,8 +170,8 @@ public partial class MainWindow
     {
         string? name = AskText(Tr("Название папки", "Folder name"), folder, 40);
         if (name == null || name == folder) return;
-        foreach (var a in _s.Apps.Where(a => SameFolder(a.Folder, folder))) a.Folder = name;
-        if (SameFolder(_openFolder, folder)) _openFolder = name;
+        if (!LibraryPolicies.RenameFolder(_s, folder, name)) { ReportAppAction(Tr("Папка с таким названием уже есть.", "A folder with this name already exists.")); return; }
+        if (SameFolder(_openFolder, folder)) _openFolder = LibraryPolicies.CleanName(name);
         _s.Save(); BuildApps();
     }
 
@@ -207,8 +218,8 @@ public partial class MainWindow
         menu.Items.Add(move);
 
         menu.Items.Add(new Separator());
-        AddMenu(menu, IsSteamLink(app.Path) ? Tr("Скрыть игру", "Hide game") : Tr("Удалить из списка", "Remove from list"),
-            () => { if (IsSteamLink(app.Path)) HideSteamGame(app); else RemoveAppAnimated(tile, app.Path); });
+        AddMenu(menu, app.Folder.Length > 0 ? Tr("Вынуть из папки", "Move out of folder") : Tr("Убрать из списка", "Remove from list"),
+            () => { if (app.Folder.Length > 0) MoveAppToFolder(app.Path, ""); else RemoveAppAnimated(tile, app.Path); });
     }
 
     void ChooseAppIcon(AppShortcut app)
