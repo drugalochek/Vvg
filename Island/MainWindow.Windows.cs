@@ -129,6 +129,7 @@ public partial class MainWindow
             menu.Items.Add(new Separator());
             AddMenu(menu, Tr("Новое окно", "New window"), () => OpenNewAppWindow(first.Executable!), first.Executable != null);
             AddMenu(menu, Tr("Свернуть окна приложения", "Minimize app windows"), () => { MinimizeWindows(items); BuildOpenWindows(); });
+            AddMenu(menu, Tr("Развернуть свёрнутые Moku", "Restore windows minimized by Moku"), () => RestoreWindowsMinimizedByMoku(items.Select(w => w.Handle)));
             AddMenu(menu, Tr("Закрыть окна приложения", "Close app windows"), () => items.ForEach(w => PostMessage(w.Handle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero)));
             tile.ContextMenu = menu;
             OpenWindowsList.Children.Add(tile);
@@ -228,13 +229,16 @@ public partial class MainWindow
         }
     }
     void MinimizeAll_Click(object sender, RoutedEventArgs e) { MinimizeWindows(GetOpenWindows()); }
-    void RestoreAll_Click(object sender, RoutedEventArgs e)
+    void RestoreAll_Click(object sender, RoutedEventArgs e) => RestoreWindowsMinimizedByMoku();
+    void RestoreWindowsMinimizedByMoku(IEnumerable<IntPtr>? only = null)
     {
+        var filter = only == null ? null : new HashSet<IntPtr>(only);
         foreach (var (hwnd, identity) in _mokuMinimized.ToArray())
         {
+            if (filter != null && !filter.Contains(hwnd)) continue;
             GetWindowThreadProcessId(hwnd, out uint pid);
             if (IsWindow(hwnd) && pid == identity.Pid && ProcessStarted((int)pid) == identity.Started && IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+            _mokuMinimized.Remove(hwnd);
         }
-        _mokuMinimized.Clear();
     }
 }
