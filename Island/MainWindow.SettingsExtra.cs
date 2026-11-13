@@ -168,6 +168,7 @@ public partial class MainWindow
             v => ru ? $"{v} {Plural(v, "запись", "записи", "записей")}" : $"{v} {(v == 1 ? "item" : "items")}", commit: TrimHistory);
         Section(p, L("ИГРЫ", "GAMES"));
         ToggleRow(p, L("Прятаться в полноэкранных играх", "Fade out in fullscreen games"), () => _s.GameMode, v => { _s.GameMode = v; CheckGameMode(); });
+        ToggleRow(p, L("Также при обычном окне под островком", "Also when a normal window is underneath"), () => _s.TransparentOverNormalWindows, v => { _s.TransparentOverNormalWindows = v; _s.Save(); CheckGameMode(); });
         _buildCat = "";
 
         RefreshSettingsNav();
@@ -217,7 +218,7 @@ public partial class MainWindow
                 BuildApps();
                 break;
             case "general":
-                _s.Hotkey = d.Hotkey; _s.ClipboardLimit = d.ClipboardLimit; _s.GameMode = d.GameMode;
+                _s.Hotkey = d.Hotkey; _s.ClipboardLimit = d.ClipboardLimit; _s.GameMode = d.GameMode; _s.TransparentOverNormalWindows = d.TransparentOverNormalWindows;
                 SetFullscreenOpacity(d.FullscreenOpacity);
                 TrimHistory(); RegisterIslandHotkey(); UpdateHotkeyHint(); CheckGameMode();
                 break;

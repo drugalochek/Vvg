@@ -283,7 +283,7 @@ public partial class MainWindow : Window
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder sb, int max);
     [StructLayout(LayoutKind.Sequential)] struct GameRect { public int L, T, R, B; }
     System.Windows.Threading.DispatcherTimer? _gameTimer;
-    bool _gameMode; int _topTick;
+    bool _gameMode, _dimMode; int _topTick;
     void StartGameWatch()
     {
         _gameTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -296,7 +296,7 @@ public partial class MainWindow : Window
         {
             var me = new WindowInteropHelper(this).Handle;
             var fg = GetForegroundWindow();
-            bool full = false;
+            bool full = false, normalOverlap = false;
             if (fg != IntPtr.Zero && fg != me && GetWindowRect(fg, out var r))
             {
                 var cls = new System.Text.StringBuilder(64); GetClassName(fg, cls, 64);
@@ -304,14 +304,21 @@ public partial class MainWindow : Window
                 bool shell = cn is "WorkerW" or "Progman" or "Shell_TrayWnd";
                 bool noCaption = (GetWindowLong(fg, -16) & 0x00C00000) == 0;
                 full = _s.GameMode && !shell && noCaption && r.L <= 0 && r.T <= 0 && r.R >= GetSystemMetrics(0) && r.B >= GetSystemMetrics(1);
+                if (_s.TransparentOverNormalWindows && !shell && !full && GetWindowRect(me, out var island))
+                    normalOverlap = r.L < island.R && r.R > island.L && r.T < island.B && r.B > island.T;
             }
             if (full != _gameMode)
             {
                 _gameMode = full;
                 int ex = GetWindowLong(me, GWL_EXSTYLE);
                 SetWindowLong(me, GWL_EXSTYLE, full ? ex | 0x20 | 0x08000000 : ex & ~0x20 & ~0x08000000);
-                FadeWindowOpacity(full ? _s.FullscreenOpacity / 100.0 : 1.0, full ? 450 : 380);
                 if (full && _state == IslandState.Expanded) Collapse();
+            }
+            bool dim = full || normalOverlap;
+            if (dim != _dimMode)
+            {
+                _dimMode = dim;
+                FadeWindowOpacity(dim ? _s.FullscreenOpacity / 100.0 : 1.0, dim ? 450 : 380);
             }
             if (IsVisible && ++_topTick % 5 == 0)
                 SetWindowPos(me, (IntPtr)(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
