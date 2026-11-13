@@ -18,6 +18,15 @@ public partial class MainWindow
 
     DispatcherTimer? _appsScanTimer;
     readonly Dictionary<string, DateTime> _launchAttempts = new(StringComparer.OrdinalIgnoreCase);
+    bool IsLaunchDebounced(string path)
+    {
+        var now = DateTime.UtcNow;
+        if (_launchAttempts.TryGetValue(path, out var previous) && now - previous < TimeSpan.FromMilliseconds(900)) return true;
+        _launchAttempts[path] = now;
+        foreach (var key in _launchAttempts.Where(x => now - x.Value > TimeSpan.FromSeconds(10)).Select(x => x.Key).ToArray()) _launchAttempts.Remove(key);
+        return false;
+    }
+    readonly Dictionary<string, DateTime> _launchAttempts = new(StringComparer.OrdinalIgnoreCase);
 
     bool IsLaunchDebounced(string path)
     {
