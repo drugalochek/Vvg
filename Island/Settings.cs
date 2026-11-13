@@ -44,7 +44,7 @@ public class Settings
     public bool ToastOnCopy { get; set; } = true;
     public bool ToastOnTrack { get; set; } = true;
     public bool GameMode { get; set; } = true;       // полупрозрачность и «сквозные» клики в полноэкранных играх
-    public string Hotkey { get; set; } = "CtrlAltSpace"; // CtrlAltSpace | CtrlShiftSpace | AltSpace | WinAltI | Off
+    public string Hotkey { get; set; } = "Alt+Space";
     public int ClipboardLimit { get; set; } = 50;    // 5..200 записей
     public List<AppShortcut> Apps { get; set; } = new();
     public List<string> HiddenSteamGames { get; set; } = new();
@@ -102,7 +102,7 @@ public class Settings
         WaveHeight = Math.Clamp(WaveHeight, 30, 150);
         ClipboardLimit = Math.Clamp(ClipboardLimit, 5, 200);
         DanceStrength = Math.Clamp(DanceStrength, 0, 200);
-        if (Hotkey is not ("CtrlAltSpace" or "CtrlShiftSpace" or "AltSpace" or "WinAltI" or "Off")) Hotkey = "CtrlAltSpace";
+        if (string.IsNullOrWhiteSpace(Hotkey) || Hotkey.Length > 48) Hotkey = "Alt+Space";
         if (EyeStyle is not ("Oval" or "Round" or "Dots" or "Anime" or "Arcs" or "Robot" or "Cat")) EyeStyle = "Oval";
         EyeSize = Math.Clamp(EyeSize, 60, 150);
         EyeSpacing = Math.Clamp(EyeSpacing, 4, 30);
