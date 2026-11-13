@@ -83,7 +83,7 @@ public partial class MainWindow : Window
     const byte VK_MEDIA_NEXT = 0xB0, VK_MEDIA_PREV = 0xB1, VK_MEDIA_PLAY = 0xB3;
 
     // ---- Ограничения памяти ----
-    const int MaxItems = 50;
+    int MaxItems => _s.ClipboardLimit;   // настраивается: 10–100 записей
     const int MaxItemChars = 200_000;
     const int MaxTotalChars = 1_500_000;
 
@@ -247,10 +247,9 @@ public partial class MainWindow : Window
         _source.AddHook(WndProc);
         if (!AddClipboardFormatListener(hwnd))
             Log.Error("AddClipboardFormatListener не удался, код " + Marshal.GetLastWin32Error());
-        // Alt+Space в Windows открывает системное меню окна (и занят PowerToys Run), поэтому
-        // используем Ctrl+Alt+Space. MOD_NOREPEAT — удержание клавиши не «мигает» островом.
-        if (!RegisterHotKey(hwnd, HotkeyId, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_SPACE))
-            Log.Warn("Ctrl+Alt+Space занят другой программой, горячая клавиша недоступна (код " + Marshal.GetLastWin32Error() + ")");
+        // По умолчанию Ctrl+Alt+Space (Alt+Space — системное меню окна). Сочетание выбирается в настройках.
+        RegisterIslandHotkey();
+        UpdateHotkeyHint();
         ApplyPosition();
         InitializeTray();
         _tbCreated = RegisterWindowMessage("TaskbarCreated");
@@ -298,7 +297,7 @@ public partial class MainWindow : Window
                 string cn = cls.ToString();
                 bool shell = cn is "WorkerW" or "Progman" or "Shell_TrayWnd";
                 bool noCaption = (GetWindowLong(fg, -16) & 0x00C00000) == 0;
-                full = !shell && noCaption && r.L <= 0 && r.T <= 0 && r.R >= GetSystemMetrics(0) && r.B >= GetSystemMetrics(1);
+                full = _s.GameMode && !shell && noCaption && r.L <= 0 && r.T <= 0 && r.R >= GetSystemMetrics(0) && r.B >= GetSystemMetrics(1);
             }
             if (full != _gameMode)
             {
@@ -801,6 +800,7 @@ public partial class MainWindow : Window
             for (int i = 0; i < Math.Min(TileGrid.Children.Count, labels.Length); i++)
                 if (TileGrid.Children[i] is Button b && b.Content is StackPanel sp && sp.Children.Count > 1 && sp.Children[1] is TextBlock tb) tb.Text = labels[i];
         }
+        BuildExtraSettings();
     }
 
     void SupportAuthor_Click(object sender, RoutedEventArgs e)
@@ -916,7 +916,7 @@ public partial class MainWindow : Window
             History.RemoveAt(History.Count - 1);
         }
         SyncRecent();
-        ShowToast("Copied", text.Replace('\r', ' ').Replace('\n', ' '), ColorOk);
+        if (_s.ToastOnCopy) ShowToast("Copied", text.Replace('\r', ' ').Replace('\n', ' '), ColorOk);
         SetEyeMood(EyeMood.Happy, 1.6);
     }
 
@@ -1307,7 +1307,7 @@ public partial class MainWindow : Window
         double bandMotion = playing ? _audio.MidLevel * 2.0 + _audio.HighLevel * 1.6 : 0;
         // В свёрнутом виде волна ниже: она живёт в нижней полосе острова и не накрывает глаза.
         double ampMax = _state == IslandState.Collapsed ? CollapsedWaveMax : 12.5;
-        double target = playing ? Math.Clamp(0.25 + activity * 9.0 + bandMotion + _waveBeatPulse * 4.8, 0, ampMax) : 0;
+        double target = playing && _s.MusicWave ? Math.Clamp((0.25 + activity * 9.0 + bandMotion + _waveBeatPulse * 4.8) * _s.WaveHeight / 100.0, 0, ampMax) : 0;
         double response = target > _waveAmp ? 23.0 : 7.5; // fast attack, softer release
         double follow = 1 - Math.Exp(-response * dt);
         _waveAmp += (target - _waveAmp) * follow;
@@ -1958,7 +1958,7 @@ public partial class MainWindow : Window
             {
                 _lastTrack = key;
                 SetEyeMood(EyeMood.Excited, 2.4);
-                ShowToast("Now playing",
+                if (_s.ToastOnTrack) ShowToast("Now playing",
                     string.IsNullOrEmpty(np.Artist) ? np.Title : $"{np.Artist} — {np.Title}");
             }
         }

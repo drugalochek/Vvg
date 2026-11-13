@@ -22,7 +22,7 @@ public partial class MainWindow
     const double BouncyStiffness = 290, BouncyZeta = 0.66;   // раскрытие / тост: заметный отскок
     const double SoftStiffness = 360, SoftZeta = 0.82;       // сворачивание: мягко, почти без перелёта
     const double JellyStiffness = 540, JellyZeta = 0.30;     // «желе»: 2–3 затухающих колебания
-    const double JellyMax = 0.065;                           // максимум растяжения, ±6,5 %
+    double JellyMax => Math.Max(0.0005, 0.065 * _s.JellyStrength / 100.0);   // максимум растяжения (±6,5 % при 100 %)
 
     /// <summary>Скругление для состояния с учётом настройки «Скругление» (18 px = как в дизайне).</summary>
     double StateRadius(double baseRadius, double w, double h)
@@ -106,8 +106,10 @@ public partial class MainWindow
     {
         if (!_islandMoving) return false;
 
-        _pw.Step(dt, _islandStiffness, _islandZeta);
-        _ph.Step(dt, _islandStiffness * 0.9, _islandZeta);   // высота чуть «ленивее» ширины — форма течёт, а не масштабируется
+        double speed = _s.AnimationSpeed / 100.0;                 // время анимации ∝ 1/speed → жёсткость ∝ speed²
+        double k = _islandStiffness * speed * speed;
+        _pw.Step(dt, k, _islandZeta);
+        _ph.Step(dt, k * 0.9, _islandZeta);   // высота чуть «ленивее» ширины — форма течёт, а не масштабируется
         _pr.Step(dt, 420, 0.9);
 
         // Squash & stretch из относительной скорости: тянется по оси движения, сжимается по другой.

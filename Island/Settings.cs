@@ -27,6 +27,22 @@ public class Settings
     public int GradientBalance { get; set; } = 70; // положение перехода: 0..100
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
+
+    // ---- v2.7: расширенные настройки ----
+    public int JellyStrength { get; set; } = 100;    // «желейность» острова, 0..200 %
+    public int AnimationSpeed { get; set; } = 100;   // скорость пружин, 50..200 %
+    public int GazeRange { get; set; } = 100;        // дальность взгляда глаз, 50..150 %
+    public bool EyesFollowCursor { get; set; } = true;
+    public bool EyeEmotions { get; set; } = true;
+    public bool SleepAtNight { get; set; } = true;
+    public bool BeatBounce { get; set; } = true;     // глаза подпрыгивают в такт
+    public bool MusicWave { get; set; } = true;
+    public int WaveHeight { get; set; } = 100;       // 30..150 %
+    public bool ToastOnCopy { get; set; } = true;
+    public bool ToastOnTrack { get; set; } = true;
+    public bool GameMode { get; set; } = true;       // полупрозрачность и «сквозные» клики в полноэкранных играх
+    public string Hotkey { get; set; } = "CtrlAltSpace"; // CtrlAltSpace | CtrlShiftSpace | AltSpace | WinAltI | Off
+    public int ClipboardLimit { get; set; } = 50;    // 10..100 записей
     public List<AppShortcut> Apps { get; set; } = new();
 
     static string FilePath => System.IO.Path.Combine(
@@ -53,6 +69,12 @@ public class Settings
         GradientBalance = Math.Clamp(GradientBalance, 10, 90);
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
+        JellyStrength = Math.Clamp(JellyStrength, 0, 200);
+        AnimationSpeed = Math.Clamp(AnimationSpeed, 50, 200);
+        GazeRange = Math.Clamp(GazeRange, 50, 150);
+        WaveHeight = Math.Clamp(WaveHeight, 30, 150);
+        ClipboardLimit = Math.Clamp(ClipboardLimit, 10, 100);
+        if (Hotkey is not ("CtrlAltSpace" or "CtrlShiftSpace" or "AltSpace" or "WinAltI" or "Off")) Hotkey = "CtrlAltSpace";
         Apps ??= new();
         Apps = Apps.Where(a => a != null && !string.IsNullOrWhiteSpace(a.Path) &&
             !string.IsNullOrWhiteSpace(a.Name)).Take(60).ToList();

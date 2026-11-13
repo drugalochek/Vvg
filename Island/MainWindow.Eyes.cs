@@ -68,7 +68,7 @@ public partial class MainWindow
     /// <summary>Показать эмоцию. seconds ≤ 0 — бессрочно. Время идёт только пока глаза на экране.</summary>
     void SetEyeMood(EyeMood mood, double seconds = 2.0)
     {
-        if (_welcomeRunning) return;
+        if (_welcomeRunning || (!_s.EyeEmotions && mood != EyeMood.Neutral)) return;
         _eyeMood = mood;
         _moodLeft = seconds > 0 ? seconds : double.PositiveInfinity;
         EnsureFx();
@@ -195,7 +195,7 @@ public partial class MainWindow
 
         // ---- эффективная эмоция ----
         var mood = _eyeMood;
-        if (!_eyeScript)
+        if (!_eyeScript && _s.EyeEmotions)
         {
             if (haveCenter && cd < 260 && _cursorSpeed > 5200 && t - _lastStartleAt > 6 && mood == EyeMood.Neutral)
             {
@@ -204,7 +204,7 @@ public partial class MainWindow
                 mood = EyeMood.Surprised;
             }
             if (mood == EyeMood.Neutral && Pill.IsMouseOver) mood = EyeMood.Focused;               // разглядывает курсор
-            if (mood == EyeMood.Neutral && idle > 90 && DateTime.Now.Hour < 6) mood = EyeMood.Sleepy; // глубокая ночь
+            if (mood == EyeMood.Neutral && idle > 90 && _s.SleepAtNight && DateTime.Now.Hour < 6) mood = EyeMood.Sleepy; // глубокая ночь
         }
         else mood = EyeMood.Neutral;
 
@@ -221,13 +221,13 @@ public partial class MainWindow
         if (t < _gazeFreezeUntil) { gx = 0; gy = 0; }
         else if (_eyeScript) { gx = _scriptGazeX; gy = _scriptGazeY; }
         else if (sleepy) { gx = 0; gy = 0.6; }
-        else if (idle > 3.5 && mood != EyeMood.Focused)
+        else if ((idle > 3.5 || !_s.EyesFollowCursor) && mood != EyeMood.Focused)
         {
             // Мышь давно стоит — осматривается сам: короткие заметные взгляды по сторонам.
             if (t >= _nextGlanceAt)
             {
-                _glanceX = GlanceX[_rng.Next(GlanceX.Length)];
-                _glanceY = GlanceY[_rng.Next(GlanceY.Length)];
+                _glanceX = GlanceX[_rng.Next(GlanceX.Length)] * _s.GazeRange / 100.0;
+                _glanceY = GlanceY[_rng.Next(GlanceY.Length)] * _s.GazeRange / 100.0;
                 _nextGlanceAt = t + 0.7 + _rng.NextDouble() * 1.6;
             }
             gx = _glanceX; gy = _glanceY;
@@ -235,8 +235,9 @@ public partial class MainWindow
         else if (haveCenter && cd > 1)
         {
             double k = Smooth(Math.Min(1.0, cd / 240.0));
-            gx = cdx / cd * MaxGazeX * k;
-            gy = cdy / cd * MaxGazeY * k;
+            double range = _s.GazeRange / 100.0;
+            gx = cdx / cd * MaxGazeX * k * range;
+            gy = cdy / cd * MaxGazeY * k * range;
             _nextGlanceAt = t + 0.35;
         }
 
@@ -254,7 +255,7 @@ public partial class MainWindow
         {
             swayX += Math.Sin(t * 2.4) * 1.1;
             bobY += Math.Sin(t * 4.8) * 0.5;
-            if (beat)
+            if (beat && _s.BeatBounce)
                 foreach (var rig in new[] { _eyeL, _eyeR })
                 {
                     rig.Y.Velocity -= 60;            // подпрыгивают на каждый удар бочки
