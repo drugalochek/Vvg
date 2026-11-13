@@ -1,0 +1,26 @@
+name: Windows build and regression checks
+on:
+  push:
+    branches: [main, update/moku-2.12.0]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Run platform-independent regression checks
+        run: dotnet run --project Island.Tests/Island.Tests.csproj -c Release
+      - name: Publish Windows app (requires .NET 8 Desktop Runtime)
+        run: dotnet publish Island/Island.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o Island/publish
+      - name: Compile WPF installer with application payload
+        run: dotnet build Installer/Installer.csproj -c Release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moku-2.12.0-framework-dependent-win-x64
+          path: Island/publish/
+          retention-days: 14

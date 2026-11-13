@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -50,6 +50,8 @@ public class Settings
     public List<string> HiddenSteamGames { get; set; } = new();
     public bool TransparentOverNormalWindows { get; set; } = false;
     public string HomeStartupView { get; set; } = "Clipboard";
+    public string LastHomeView { get; set; } = "Clipboard";
+    public Dictionary<string, string> HiddenSteamNames { get; set; } = new();
     public bool RememberLastTab { get; set; } = false;
     public string LastTab { get; set; } = "Home";
     public Dictionary<string, string> AppTileSizes { get; set; } = new();
@@ -122,6 +124,9 @@ public class Settings
         HiddenSteamGames ??= new();
         HiddenSteamGames = HiddenSteamGames.Where(x => !string.IsNullOrWhiteSpace(x) && Regex.IsMatch(x, @"^\d+$")).Distinct(StringComparer.OrdinalIgnoreCase).Take(2000).ToList();
         if (HomeStartupView is not ("Clipboard" or "Windows")) HomeStartupView = "Clipboard";
+        if (LastHomeView is not ("Clipboard" or "Windows")) LastHomeView = HomeStartupView;
+        HiddenSteamNames ??= new();
+        Hotkey = Hotkey switch { "CtrlAltSpace" => "Ctrl+Alt+Space", "CtrlShiftSpace" => "Ctrl+Shift+Space", "WinAltI" => "Win+Alt+I", _ => Hotkey };
         if (LastTab is not ("Home" or "Clip" or "Apps" or "Set")) LastTab = "Home";
         AppTileSizes ??= new();
         AppTileSizes = AppTileSizes.Where(x => !string.IsNullOrWhiteSpace(x.Key) && (x.Value is "1x1" or "2x1" or "2x2")).Take(60).ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);

@@ -1,4 +1,4 @@
-﻿using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using System.IO;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -112,10 +112,6 @@ public partial class MainWindow : Window
     bool _ready;
     bool _allowClose;
     string? _expectedClipboardText;
-    System.Windows.Forms.NotifyIcon? _trayIcon;
-    System.Drawing.Icon? _ownedTrayIcon;
-    System.Windows.Forms.ContextMenuStrip? _trayMenu;
-    Action? _refreshTrayLanguage;
     int _fullFadeVer, _totalChars;
     NowPlaying? _now;
     string? _lastTrack;
@@ -218,8 +214,7 @@ public partial class MainWindow : Window
         SourceInitialized += OnSourceInitialized;
         Loaded += (_, _) =>
         {
-            InitializeTray();
-            StartWelcomeIntro();
+                StartWelcomeIntro();
         };
         Closing += OnWindowClosing;
         Closed += OnClosed;
@@ -234,7 +229,7 @@ public partial class MainWindow : Window
         TempText.Visibility = Visibility.Collapsed;
         ApplyPosition();
         _ready = true;
-        SetHomeView(_s.HomeStartupView, false);
+        SetHomeView(FeaturePolicies.HomeView(_s.RememberLastTab, _s.LastHomeView, _s.HomeStartupView), false);
         Log.Info("MainWindow: initialization complete");
         }
         catch (Exception ex)
@@ -253,29 +248,12 @@ public partial class MainWindow : Window
         _source.AddHook(WndProc);
         if (!AddClipboardFormatListener(hwnd))
             Log.Error("AddClipboardFormatListener не удался, код " + Marshal.GetLastWin32Error());
-        // По умолчанию Ctrl+Alt+Space (Alt+Space — системное меню окна). Сочетание выбирается в настройках.
+        // Alt+Space by default; users can record a custom combination or single key.
         RegisterIslandHotkey();
         UpdateHotkeyHint();
         ApplyPosition();
-        InitializeTray();
-        _tbCreated = RegisterWindowMessage("TaskbarCreated");
         StartGameWatch();
         PrewarmSteamArt();
-    }
-
-    // ================= Трей: пересоздание после перезапуска проводника =================
-    uint _tbCreated;
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern uint RegisterWindowMessage(string s);
-    void RecreateTray()
-    {
-        try
-        {
-            if (_trayIcon != null) { _trayIcon.Visible = false; _trayIcon.Dispose(); _trayIcon = null; }
-            _trayMenu?.Dispose(); _trayMenu = null;
-            _ownedTrayIcon?.Dispose(); _ownedTrayIcon = null;
-            InitializeTray();
-        }
-        catch (Exception ex) { Log.Error("RecreateTray", ex); }
     }
 
     // ================= В играх: полупрозрачный и не ловит клики =================
@@ -305,9 +283,9 @@ public partial class MainWindow : Window
                 bool shell = cn is "WorkerW" or "Progman" or "Shell_TrayWnd";
                 bool noCaption = (GetWindowLong(fg, -16) & 0x00C00000) == 0;
                 full = _s.GameMode && !shell && noCaption && r.L <= 0 && r.T <= 0 && r.R >= GetSystemMetrics(0) && r.B >= GetSystemMetrics(1);
-                if (_s.TransparentOverNormalWindows && !shell && !full && GetWindowRect(me, out var island))
-                    normalOverlap = r.L < island.R && r.R > island.L && r.T < island.B && r.B > island.T;
+
             }
+            if (_s.TransparentOverNormalWindows && _state == IslandState.Collapsed && !full) normalOverlap = NormalWindowUnderIsland(me);
             if (full != _gameMode)
             {
                 _gameMode = full;
@@ -329,6 +307,7 @@ public partial class MainWindow : Window
 
     void OnClosed(object? sender, EventArgs e)
     {
+        CancelHotkeyCapture();
         FlushSave();
         var hwnd = new WindowInteropHelper(this).Handle;
         RemoveClipboardFormatListener(hwnd);
@@ -346,19 +325,14 @@ public partial class MainWindow : Window
         _clock.Stop();
         _seekTimer.Stop();
         _media.Changed -= OnMediaChanged;
-        if (_trayIcon != null) { _trayIcon.Visible = false; _trayIcon.Dispose(); _trayIcon = null; }
-        _ownedTrayIcon?.Dispose();
-        _ownedTrayIcon = null;
-        _trayMenu?.Dispose();
     }
 
     IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_CLIPBOARDUPDATE) OnClipboardChanged();
-        else if (_tbCreated != 0 && (uint)msg == _tbCreated) RecreateTray();
         else if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
         {
-            if (!IsVisible) ShowFromTray();
+            if (!IsVisible) ShowIsland();
             else if (_state == IslandState.Expanded) Collapse();
             else Expand();
             handled = true;
@@ -498,7 +472,7 @@ public partial class MainWindow : Window
     {
         _s.FullscreenOpacity = Math.Clamp(value, 0, 100);
         if (FullscreenOpacitySlider != null && (int)FullscreenOpacitySlider.Value != _s.FullscreenOpacity) FullscreenOpacitySlider.Value = _s.FullscreenOpacity;
-        if (_gameMode) FadeWindowOpacity(_s.FullscreenOpacity / 100.0, 160);
+        if (_dimMode) FadeWindowOpacity(_s.FullscreenOpacity / 100.0, 160);
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         SaveSoon();
     }
@@ -656,71 +630,12 @@ public partial class MainWindow : Window
     }
 
     // ================= Системный трей =================
-    void InitializeTray()
-    {
-        if (_trayIcon != null) return;
-        try
-        {
-            // Extract the icon embedded in Moku.exe. This also works for single-file installs,
-            // where loose content files may not be present beside the executable.
-            var exePath = Environment.ProcessPath;
-            System.Drawing.Icon? icon = null;
-            if (!string.IsNullOrWhiteSpace(exePath) && File.Exists(exePath))
-                icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
-            if (icon == null)
-            {
-                var iconPath = Path.Combine(AppContext.BaseDirectory, "Moku.ico");
-                if (File.Exists(iconPath)) icon = new System.Drawing.Icon(iconPath);
-            }
-            icon ??= (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
-            _ownedTrayIcon = icon;
-            _trayMenu = new System.Windows.Forms.ContextMenuStrip();
-            var openItem = new System.Windows.Forms.ToolStripMenuItem();
-            openItem.Click += (_, _) => ShowFromTray();
-            var hideItem = new System.Windows.Forms.ToolStripMenuItem();
-            hideItem.Click += (_, _) => Hide();
-            var languageMenu = new System.Windows.Forms.ToolStripMenuItem();
-            var englishItem = new System.Windows.Forms.ToolStripMenuItem("English") { Checked = _s.Language == "en", CheckOnClick = false };
-            var russianItem = new System.Windows.Forms.ToolStripMenuItem("Русский") { Checked = _s.Language == "ru", CheckOnClick = false };
-            englishItem.Click += (_, _) => SetLanguage("en");
-            russianItem.Click += (_, _) => SetLanguage("ru");
-            languageMenu.DropDownItems.Add(englishItem);
-            languageMenu.DropDownItems.Add(russianItem);
-            var exitItem = new System.Windows.Forms.ToolStripMenuItem();
-            exitItem.Click += (_, _) => ExitApplication();
-            _trayMenu.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { openItem, hideItem, languageMenu, new System.Windows.Forms.ToolStripSeparator(), exitItem });
-            void RefreshTrayLanguage()
-            {
-                openItem.Text = _s.Language == "ru" ? "Открыть Moku" : "Open Moku";
-                hideItem.Text = _s.Language == "ru" ? "Скрыть" : "Hide";
-                languageMenu.Text = _s.Language == "ru" ? "Язык" : "Language";
-                exitItem.Text = _s.Language == "ru" ? "Выход" : "Exit";
-                englishItem.Checked = _s.Language == "en";
-                russianItem.Checked = _s.Language == "ru";
-            }
-            _refreshTrayLanguage = RefreshTrayLanguage;
-            RefreshTrayLanguage();
-            _trayIcon = new System.Windows.Forms.NotifyIcon
-            {
-                Icon = icon,
-                Text = "Moku",
-                ContextMenuStrip = _trayMenu,
-                Visible = true
-            };
-            _trayIcon.DoubleClick += (_, _) => ShowFromTray();
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Could not create the system tray icon", ex);
-        }
-    }
-
     void OnWindowClosing(object? sender, CancelEventArgs e)
     {
         // Closing the floating window should not terminate the background app.
         if (_allowClose) return;
         e.Cancel = true;
-        Hide();
+        Collapse();
     }
 
     void ExitApplication()
@@ -729,7 +644,7 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
-    internal void ShowFromTray()
+    internal void ShowIsland()
     {
         Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
@@ -778,7 +693,6 @@ public partial class MainWindow : Window
         _s.Language = language;
         _s.Save();
         ApplyLanguage();
-        _refreshTrayLanguage?.Invoke();
     }
 
     void ApplyLanguage()
@@ -792,6 +706,10 @@ public partial class MainWindow : Window
         if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
         UpdateAppsHeading();
         if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
+        if (HomeClipboardModeBtn != null) HomeClipboardModeBtn.Content = ru ? "Буфер" : "Clipboard";
+        if (HomeWindowsModeBtn != null) HomeWindowsModeBtn.Content = ru ? "Окна" : "Windows";
+        if (MinimizeAllBtn != null) MinimizeAllBtn.Content = ru ? "Свернуть всё" : "Minimize all";
+        if (RestoreAllBtn != null) RestoreAllBtn.Content = ru ? "Развернуть всё" : "Restore all";
         if (ScanSteamText != null) ScanSteamText.Text = ru ? "Найти игры Steam" : "Find Steam games";
         if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
                 if (TabSet != null) TabSet.Content = ru ? "Настройки" : "Settings";
@@ -1193,6 +1111,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        CancelHotkeyCapture();
+        StopWindowsRefresh();
+        StopAppsScanWatch();
         bool fromToast = _state == IslandState.Toast;
         _state = IslandState.Collapsed;
         _seekTimer.Stop();
@@ -1228,16 +1149,11 @@ public partial class MainWindow : Window
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
-        if (_s.RememberLastTab)
-        {
-            switch (_s.LastTab)
-            {
-                case "Clip": TabClip.IsChecked = true; break;
-                case "Apps": TabApps.IsChecked = true; break;
-                case "Set": TabSet.IsChecked = true; break;
-                default: TabHome.IsChecked = true; break;
-            }
-        }
+        UpdateHomeRefreshState();
+        TabHome.IsChecked = true;
+        SetHomeView(FeaturePolicies.HomeView(_s.RememberLastTab, _s.LastHomeView, _s.HomeStartupView), false);
+        UpdateHomeRefreshState();
+        CheckGameMode();
         Mini.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Visible;
         FadeInFull();
@@ -1496,12 +1412,14 @@ public partial class MainWindow : Window
 
     void Window_Deactivated(object? sender, EventArgs e)
     {
+        CancelHotkeyCapture();
         if (_modalOpen) return;            // открыт наш диалог (переименование, иконка, цвет) — не сворачиваемся
         if (_state == IslandState.Expanded) Collapse();
     }
 
     void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        if (_capturingHotkey) return;
         if (e.Key == Key.Escape)
         {
             if (SettingsHandleEscape()) { e.Handled = true; return; }   // v2.11: из раздела настроек — сначала в меню
@@ -1522,18 +1440,15 @@ public partial class MainWindow : Window
         FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") { UpdateAutoButton(); ShowSettingsMenu(false); }
-        if (tag == "Apps")
+        if (tag == "Apps" && _state == IslandState.Expanded)
         {
             BuildApps();
             StartAppsScanWatch();
             if (!_steamScanned) ScanSteam_Click(this, new RoutedEventArgs());
         }
         else StopAppsScanWatch();
-        if (_s.RememberLastTab && tag is "Home" or "Clip" or "Apps" or "Set")
-        {
-            _s.LastTab = tag!;
-            _s.Save();
-        }
+        UpdateHomeRefreshState();
+        CancelHotkeyCapture();
     }
 
     // ================= Плитки =================
@@ -1542,7 +1457,7 @@ public partial class MainWindow : Window
     {
         if (SteamGamesGrid == null) return;
         SteamGamesGrid.Children.Clear();
-        foreach (var game in _steamCandidates.Where(g => !_s.Apps.Any(a =>
+        foreach (var game in _steamCandidates.Where(g => !_s.HiddenSteamGames.Contains(SteamId(g.Path)) && !_s.Apps.Any(a =>
             string.Equals(a.Path, g.Path, StringComparison.OrdinalIgnoreCase))))
         {
             var add = new Button { Style = (Style)FindResource("TileBtn"), Width = 150, Height = 42,
@@ -1606,7 +1521,15 @@ public partial class MainWindow : Window
                         var data = File.ReadAllText(manifest);
                         var id = Regex.Match(data, @"""appid""\s+""(\d+)""").Groups[1].Value;
                         var name = Regex.Match(data, @"""name""\s+""([^""]+)""").Groups[1].Value;
-                        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name)) continue;
+                        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name) || _s.HiddenSteamGames.Contains(id)) continue;
+                        _s.HiddenSteamNames[id] = name;
+                        var installDir = Regex.Match(data, @"""installdir""\s+""([^""]+)""").Groups[1].Value;
+                        if (!string.IsNullOrWhiteSpace(installDir))
+                        {
+                            var baseDir = Path.GetFullPath(Path.Combine(steamApps, "common"));
+                            var gameDir = Path.GetFullPath(Path.Combine(baseDir, installDir));
+                            if (gameDir.StartsWith(baseDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) _steamInstallPaths[id] = gameDir;
+                        }
                         var link = "steam://rungameid/" + id;
                         if (_s.Apps.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
                         if (_steamCandidates.Any(a => string.Equals(a.Path, link, StringComparison.OrdinalIgnoreCase))) continue;
@@ -1615,11 +1538,15 @@ public partial class MainWindow : Window
                     catch (IOException ex) { Log.Warn("Не удалось прочитать Steam manifest: " + ex.Message); }
                 }
             }
-            BuildSteamCandidates();
+            foreach (var game in _steamCandidates)
+                if (!_s.Apps.Any(a => string.Equals(a.Path, game.Path, StringComparison.OrdinalIgnoreCase)))
+                    { if (_s.Apps.Count < 60) _s.Apps.Add(game); }
+            _s.Save();
+            BuildApps();
             var message = _steamCandidates.Count == 0
                 ? (_s.Language == "ru" ? "Установленные игры Steam не найдены" : "No installed Steam games found")
-                : (_s.Language == "ru" ? $"Найдено игр: {_steamCandidates.Count}. Нажми на игру, чтобы добавить её."
-                                       : $"Found {_steamCandidates.Count} games. Select a game to add it.");
+                : (_s.Language == "ru" ? $"Добавлено установленных игр: {_steamCandidates.Count}."
+                                       : $"Added {_steamCandidates.Count} installed games.");
             if (showResult) ShowToast("Steam", message, _steamCandidates.Count == 0 ? ColorError : ColorOk);
         }
         catch (Exception ex)
@@ -1682,44 +1609,28 @@ public partial class MainWindow : Window
     {
         try
         {
-            bool steamLink = IsSteamLink(path);
-            if (!steamLink && !File.Exists(path))
+            bool steam = IsSteamLink(path);
+            if (!steam && !File.Exists(path))
             {
-                ShowToast("Moku", _s.Language == "ru" ? "Файл не найден. Удали ярлык и добавь его снова."
-                                                       : "File not found. Remove this shortcut and add it again.", ColorError);
+                ReportAppAction(Tr("Файл не найден. Добавь приложение заново.", "File not found. Add the app again."));
                 BuildApps(); return;
             }
-            if (!steamLink)
+            string target = ResolveLaunchTarget(path);
+            if (TryActivateExistingApp(target, out bool running)) { Collapse(); return; }
+            if (running)
             {
-                if (TryActivateExistingApp(path, out bool running))
-                {
-                    Collapse();
-                    return;
-                }
-                if (running)
-                {
-                    ShowToast("Moku", Tr("Приложение уже запущено, но его окно недоступно", "The app is running, but no accessible window was found"), ColorError);
-                    return;
-                }
+                ReportAppAction(Tr("Приложение уже запущено, но доступного окна нет.", "The app is running, but no accessible window was found."));
+                return;
             }
-            if (IsLaunchDebounced(path)) return;
-            if (!steamLink)
-            {
-                if (TryActivateExistingApp(path, out bool running)) { Collapse(); return; }
-                if (running)
-                {
-                    ShowToast("Moku", Tr("Приложение уже запущено, но его окно недоступно", "The app is running, but no accessible window was found"), ColorError);
-                    return;
-                }
-            }
-            if (IsLaunchDebounced(path)) return;
+            if (!TryBeginAppLaunch(target)) return;
+            try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+            catch { _pendingAppLaunches.Remove(target); throw; }
             Collapse();
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
-            Log.Error("Не удалось запустить приложение " + path, ex);
-            ShowToast("Moku", _s.Language == "ru" ? "Не удалось запустить приложение" : "Could not launch app", ColorError);
+            Log.Error("Could not launch application", ex);
+            ReportAppAction(Tr("Не удалось запустить приложение.", "Could not launch app."));
         }
     }
 

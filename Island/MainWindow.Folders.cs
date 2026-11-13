@@ -181,6 +181,7 @@ public partial class MainWindow
     void BuildAppMenu(ContextMenu menu, AppShortcut app, FrameworkElement tile)
     {
         menu.Items.Clear();
+        AddAppActions(menu, app);
         AddMenu(menu, Tr("Переименовать…", "Rename…"), () =>
         {
             string? name = AskText(Tr("Подпись плитки", "Tile label"), app.Name);
@@ -206,7 +207,8 @@ public partial class MainWindow
         menu.Items.Add(move);
 
         menu.Items.Add(new Separator());
-        AddMenu(menu, Tr("Удалить из списка", "Remove from list"), () => RemoveAppAnimated(tile, app.Path));
+        AddMenu(menu, IsSteamLink(app.Path) ? Tr("Скрыть игру", "Hide game") : Tr("Удалить из списка", "Remove from list"),
+            () => { if (IsSteamLink(app.Path)) HideSteamGame(app); else RemoveAppAnimated(tile, app.Path); });
     }
 
     void ChooseAppIcon(AppShortcut app)

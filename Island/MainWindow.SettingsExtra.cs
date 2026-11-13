@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using Panel = System.Windows.Controls.Panel;
@@ -23,6 +23,7 @@ public partial class MainWindow
 {
     const uint MOD_SHIFT = 0x0004, MOD_WIN = 0x0008, VK_I = 0x49;
     bool _hotkeyRegistered;
+    string _lastRegisteredHotkey = "Off";
 
     /// <summary>Регистрирует горячую клавишу из настроек (старую снимает).</summary>
     void RegisterIslandHotkey(bool reportFailure = false)
@@ -80,10 +81,11 @@ public partial class MainWindow
     void BuildExtraSettings()
     {
         if (CatEyes == null) return;
+        CancelHotkeyCapture();
         bool ru = _s.Language == "ru";
         string L(string r, string e) => ru ? r : e;
         _settingsIndex.RemoveAll(x => !x.Static);
-        foreach (var cat in new Panel[] { CatEyes, CatAnim, CatMini, CatMusic, CatApps, CatGeneralExtra }) cat.Children.Clear();
+        foreach (var cat in new Panel[] { CatEyes, CatAnim, CatMini, CatMusic, CatApps, CatHome, CatGeneralExtra }) cat.Children.Clear();
 
         // ---------------- Глаза
         Panel p = CatEyes; _buildCat = "eyes";
@@ -158,17 +160,20 @@ public partial class MainWindow
         Hint(p, L("Правой кнопкой по плитке — своя подпись, иконка и папка. Перетащи плитку на папку, чтобы положить её внутрь.",
                   "Right-click a tile to set its label, icon and folder. Drag a tile onto a folder to put it inside."));
 
+        BuildHiddenSteamSettings(CatApps);
+
         // ---------------- Общие (язык, автозапуск и «Поддержать» — в разметке)
         p = CatGeneralExtra; _buildCat = "general";
-        ChoiceRow(p, L("Горячая клавиша", "Shortcut"), "hotkey",
-            new[] { ("CtrlAltSpace", "Ctrl+Alt+Space"), ("CtrlShiftSpace", "Ctrl+Shift+Space"), ("WinAltI", "Win+Alt+I"), ("Off", L("Выкл", "Off")) },
-            () => _s.Hotkey, v => { _s.Hotkey = v; RegisterIslandHotkey(true); UpdateHotkeyHint(); });
-        // v2.8: плавный ползунок вместо четырёх кнопок; лишние записи убираются, только когда ползунок отпустили
-        ChoiceRow(p, L("При открытии показывать", "Show on open"), "homeview",
+        BuildHotkeyRow(p);
+        var home = CatHome; _buildCat = "home";
+        ChoiceRow(home, L("При открытии показывать", "Show on open"), "homeview",
             new[] { ("Clipboard", L("Буфер обмена", "Clipboard")), ("Windows", L("Запущенные окна", "Running windows")) },
-            () => _s.HomeStartupView, v => { _s.HomeStartupView = v; SetHomeView(v); });
-        ToggleRow(p, L("Запоминать последнюю открытую вкладку", "Remember last opened tab"),
+            () => _s.HomeStartupView, v => { _s.HomeStartupView = v; _s.Save(); });
+        ToggleRow(home, L("Запоминать последнюю открытую вкладку", "Remember last opened tab"),
             () => _s.RememberLastTab, v => { _s.RememberLastTab = v; _s.Save(); });
+        Hint(home, L("Если включено, Главная запоминает выбор между буфером обмена и окнами. Если выключено — использует выбор выше.",
+            "When enabled, Home remembers Clipboard or Windows. Otherwise it uses the default above."));
+        _buildCat = "general";
         SliderRow(p, L("История буфера", "Clipboard history"), 5, 200, () => _s.ClipboardLimit, v => _s.ClipboardLimit = v,
             v => ru ? $"{v} {Plural(v, "запись", "записи", "записей")}" : $"{v} {(v == 1 ? "item" : "items")}", commit: TrimHistory);
         Section(p, L("ИГРЫ", "GAMES"));
@@ -219,8 +224,12 @@ public partial class MainWindow
                 _s.ToastTime = d.ToastTime;
                 break;
             case "apps":
-                _s.AppTileSize = d.AppTileSize;
+                _s.AppTileSize = d.AppTileSize; _s.AppTileSizes.Clear();
                 BuildApps();
+                break;
+            case "home":
+                _s.HomeStartupView = d.HomeStartupView; _s.LastHomeView = d.LastHomeView; _s.RememberLastTab = d.RememberLastTab;
+                SetHomeView(d.HomeStartupView, false);
                 break;
             case "general":
                 _s.Hotkey = d.Hotkey; _s.ClipboardLimit = d.ClipboardLimit; _s.GameMode = d.GameMode; _s.TransparentOverNormalWindows = d.TransparentOverNormalWindows;

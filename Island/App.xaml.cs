@@ -113,7 +113,7 @@ public partial class App : Application
                 try
                 {
                     bool vis = false;
-                    Dispatcher.Invoke(() => { if (MainWindow is MainWindow w) { w.ShowFromTray(); vis = w.IsVisible; } },
+                    Dispatcher.Invoke(() => { if (MainWindow is MainWindow w) { w.ShowIsland(); vis = w.IsVisible; } },
                         DispatcherPriority.Normal, CancellationToken.None, TimeSpan.FromSeconds(2));
                     if (vis) ackEv.Set();
                 }
@@ -126,7 +126,7 @@ public partial class App : Application
         {
             wd.Stop();
             if (MainWindow == null) Fail("Окно острова не было создано.");
-            else if (!MainWindow.IsVisible) (MainWindow as MainWindow)?.ShowFromTray();
+            else if (!MainWindow.IsVisible) (MainWindow as MainWindow)?.ShowIsland();
         };
         wd.Start();
     }

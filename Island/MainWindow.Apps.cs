@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -93,7 +93,7 @@ public partial class MainWindow
             };
         }
         BuildSteamCandidates();
-        var visible = _s.Apps.Where(a => IsSteamLink(a.Path) || File.Exists(a.Path)).ToList();
+        var visible = _s.Apps.Where(a => (IsSteamLink(a.Path) && !_s.HiddenSteamGames.Contains(SteamId(a.Path))) || File.Exists(a.Path)).ToList();
         if (_openFolder != null && !visible.Any(a => SameFolder(a.Folder, _openFolder))) _openFolder = null;   // папка опустела
         UpdateAppsHeading();
 
@@ -113,6 +113,8 @@ public partial class MainWindow
             foreach (var app in visible.Where(a => SameFolder(a.Folder, _openFolder)))
                 AppsGrid.Children.Add(CreateAppTile(app, IsSteamLink(app.Path)));
         }
+
+        LayoutAppTiles();
 
         if (AppsGrid.Children.Count == 0)
         {
@@ -187,16 +189,18 @@ public partial class MainWindow
     FrameworkElement CreateAppTile(AppShortcut app, bool steamLink)
     {
         var path = app.Path;
+        var (spanX, spanY) = FeaturePolicies.TileSpan(_s.AppTileSizes.GetValueOrDefault(path, "1x1"));
+        double tileWidth = (AppTileW + 8) * spanX - 8, tileHeight = (AppTileH + 8) * spanY - 8;
         var tile = new Grid
         {
-            Width = AppTileW, Height = AppTileH, Margin = new Thickness(4), Tag = path,
+            Width = tileWidth, Height = tileHeight, Margin = new Thickness(4), Tag = path,
             AllowDrop = true, RenderTransformOrigin = new Point(0.5, 0.5),
             RenderTransform = new ScaleTransform(1, 1), Background = Brushes.Transparent
         };
 
         var button = new Button
         {
-            Style = (Style)FindResource("TileBtn"), Width = AppTileW, Height = AppTileH, Margin = new Thickness(0),
+            Style = (Style)FindResource("TileBtn"), Width = tileWidth, Height = tileHeight, Margin = new Thickness(0),
             ToolTip = steamLink ? app.Name : app.Path
         };
         var content = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
@@ -206,7 +210,7 @@ public partial class MainWindow
         content.Children.Add(new TextBlock
         {
             Text = app.Name, FontSize = AppLabelSize, Foreground = Brushes.White,
-            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = AppTileW - 14,
+            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = tileWidth - 14,
             HorizontalAlignment = HorizontalAlignment.Center
         });
         button.Content = content;
@@ -224,7 +228,7 @@ public partial class MainWindow
 
         // Крестик в углу: появляется при наведении на плитку.
         var close = CreateRemoveButton();
-        close.Click += (_, _) => RemoveAppAnimated(tile, path);
+        close.Click += (_, _) => { if (steamLink) HideSteamGame(app); else RemoveAppAnimated(tile, path); };
         tile.Children.Add(close);
         tile.MouseEnter += (_, _) => FadeTo(close, 1, 160);
         tile.MouseLeave += (_, _) => FadeTo(close, 0, 220);
@@ -357,6 +361,7 @@ public partial class MainWindow
         // перетаскиваемая плитка — «дрожания» туда-обратно нет.
         AppsGrid.Children.RemoveAt(from);
         AppsGrid.Children.Insert(to, _dragTile);
+        LayoutAppTiles();
         Nudge(target, from < to ? -1 : 1);
     }
 
