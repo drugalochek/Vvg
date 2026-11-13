@@ -8,6 +8,8 @@ public class AppShortcut
 {
     public string Path { get; set; } = "";
     public string Name { get; set; } = "";
+    public string Folder { get; set; } = "";   // v2.10: папка на вкладке «Приложения» ("" — без папки)
+    public string Icon { get; set; } = "";     // v2.10: своя иконка (png/jpg/ico/exe), "" — стандартная
 }
 
 /// <summary>Настройки хранятся в %APPDATA%\Moku\settings.json</summary>
@@ -46,6 +48,24 @@ public class Settings
     public int ClipboardLimit { get; set; } = 50;    // 5..200 записей
     public List<AppShortcut> Apps { get; set; } = new();
 
+    // ---- v2.10: кастомизация ----
+    public string EyeStyle { get; set; } = "Oval";   // Oval | Round | Dots | Anime | Arcs | Robot | Cat
+    public int EyeSize { get; set; } = 100;           // 60..150 %
+    public int EyeSpacing { get; set; } = 12;         // 4..30 px
+    public string EyeColor { get; set; } = "#FFFFFFFF";
+    public int EyeGlow { get; set; } = 0;             // 0..100 %
+    public int BlinkRate { get; set; } = 100;         // 0..200 %, 0 — не моргают
+    public string AppearStyle { get; set; } = "Spring"; // Spring | Smooth | Drop
+    public int ExpandSpeed { get; set; } = 100;       // 50..200 %
+    public int ToastSpeed { get; set; } = 100;        // 50..200 %
+    public int ToastTime { get; set; } = 25;          // время показа уведомления, десятые доли секунды: 15..80
+    public string MiniCenter { get; set; } = "Time";  // Time | Date | TimeDate | None
+    public string MiniRight { get; set; } = "Weather"; // Weather | Battery | Cpu | Ram | Time | Date | None
+    public bool Clock24h { get; set; } = true;
+    public bool ClockSeconds { get; set; } = false;
+    public int TimerMinutes { get; set; } = 25;       // 1..180
+    public string AppTileSize { get; set; } = "Normal"; // Compact | Normal | Large
+
     static string FilePath => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Moku", "settings.json");
 
@@ -77,7 +97,28 @@ public class Settings
         ClipboardLimit = Math.Clamp(ClipboardLimit, 5, 200);
         DanceStrength = Math.Clamp(DanceStrength, 0, 200);
         if (Hotkey is not ("CtrlAltSpace" or "CtrlShiftSpace" or "AltSpace" or "WinAltI" or "Off")) Hotkey = "CtrlAltSpace";
+        if (EyeStyle is not ("Oval" or "Round" or "Dots" or "Anime" or "Arcs" or "Robot" or "Cat")) EyeStyle = "Oval";
+        EyeSize = Math.Clamp(EyeSize, 60, 150);
+        EyeSpacing = Math.Clamp(EyeSpacing, 4, 30);
+        if (EyeColor == null || !HexColor.IsMatch(EyeColor)) EyeColor = "#FFFFFFFF";
+        else if (EyeColor.Length == 9) EyeColor = "#FF" + EyeColor[3..];
+        EyeGlow = Math.Clamp(EyeGlow, 0, 100);
+        BlinkRate = Math.Clamp(BlinkRate, 0, 200);
+        if (AppearStyle is not ("Spring" or "Smooth" or "Drop")) AppearStyle = "Spring";
+        ExpandSpeed = Math.Clamp(ExpandSpeed, 50, 200);
+        ToastSpeed = Math.Clamp(ToastSpeed, 50, 200);
+        ToastTime = Math.Clamp(ToastTime, 15, 80);
+        if (MiniCenter is not ("Time" or "Date" or "TimeDate" or "None")) MiniCenter = "Time";
+        if (MiniRight is not ("Weather" or "Battery" or "Cpu" or "Ram" or "Time" or "Date" or "None")) MiniRight = "Weather";
+        TimerMinutes = Math.Clamp(TimerMinutes, 1, 180);
+        if (AppTileSize is not ("Compact" or "Normal" or "Large")) AppTileSize = "Normal";
         Apps ??= new();
+        foreach (var a in Apps.Where(a => a != null))
+        {
+            a.Folder = (a.Folder ?? "").Trim();
+            if (a.Folder.Length > 40) a.Folder = a.Folder[..40];
+            a.Icon ??= "";
+        }
         Apps = Apps.Where(a => a != null && !string.IsNullOrWhiteSpace(a.Path) &&
             !string.IsNullOrWhiteSpace(a.Name)).Take(60).ToList();
     }

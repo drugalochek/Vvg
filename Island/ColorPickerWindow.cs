@@ -28,7 +28,7 @@ public sealed class ColorPickerWindow : Window
     bool syncing;
     public Color SelectedColor { get; private set; }
 
-    public ColorPickerWindow(Color initial, bool russian = false)
+    public ColorPickerWindow(Color initial, bool russian = false, string? title = null)
     {
         SelectedColor=Color.FromRgb(initial.R,initial.G,initial.B); (h,s,v)=ToHsv(initial);
         Width=430; Height=410; ResizeMode=ResizeMode.NoResize; WindowStyle=WindowStyle.None;
@@ -49,7 +49,7 @@ public sealed class ColorPickerWindow : Window
         shell.Child=root;
         var header=new DockPanel { Margin=new Thickness(0,0,0,14) };
         var close=MakeButton("×",32,false); close.Click+=(_,_)=>{ DialogResult=false; Close(); }; DockPanel.SetDock(close,Dock.Right); header.Children.Add(close);
-        header.Children.Add(new TextBlock { Text=russian ? "ЦВЕТ ТЕМЫ" : "THEME COLOR", Foreground=Brushes.White, FontSize=13, FontWeight=FontWeights.SemiBold, VerticalAlignment=VerticalAlignment.Center });
+        header.Children.Add(new TextBlock { Text=title ?? (russian ? "ЦВЕТ ТЕМЫ" : "THEME COLOR"), Foreground=Brushes.White, FontSize=13, FontWeight=FontWeights.SemiBold, VerticalAlignment=VerticalAlignment.Center });
         root.Children.Add(header);
         var picker=new Grid { Margin=new Thickness(0,0,0,14) };
         picker.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(1,GridUnitType.Star) });

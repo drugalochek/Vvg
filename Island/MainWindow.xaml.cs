@@ -89,7 +89,10 @@ public partial class MainWindow : Window
 
     // ---- Размеры острова ----
     const double CollapsedH = 36, ToastW = 340, ToastH = 56, FullW = 652, FullH = 348;
-    const double IdleW = 204, PlayW = 312, GlowPad = 12;
+    const double GlowPad = 12;
+    // v2.10: ширина свёрнутого острова зависит от выбранных виджетов и размера глаз (см. MainWindow.Custom.cs).
+    double IdleW => _idleW;
+    double PlayW => 312 + EyesExtraWidth();
     // С треком свёрнутый остров чуть выше: волна музыки занимает низ и не наезжает на глаза.
     const double PlayH = 44, CollapsedWaveMax = 8.5;
     double MiniH => _now != null ? PlayH : CollapsedH;
@@ -183,6 +186,8 @@ public partial class MainWindow : Window
         ApplyScale();
         ApplyAppearance();
         ApplyAccent();
+        ApplyEyeStyle();
+        RecalcIdleWidth();
 
         startupStage = "initializing timers";
         _clock.Tick += (_, _) => { UpdateMini(); ScheduleClock(); };
@@ -354,7 +359,7 @@ public partial class MainWindow : Window
     // ================= Настройки: положение, размер, цвет =================
     // Окно НЕ меняет размер на каждом кадре анимации: оно один раз растёт до размера «с запасом»,
     // а Pill анимируется внутри него. После окончания анимации окно сжимается до целевого размера.
-    double _boxW = IdleW, _boxH = CollapsedH;
+    double _boxW = 204, _boxH = CollapsedH;
 
     void ApplyPosition() => SetWindowBox(_boxW, _boxH);
 
@@ -600,7 +605,7 @@ public partial class MainWindow : Window
 
     void CustomAccent_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new ColorPickerWindow(_accentColor) { Owner = this };
+        var picker = new ColorPickerWindow(_accentColor, _s.Language == "ru") { Owner = this };
         if (picker.ShowDialog() != true) return;
         _s.Accent = picker.SelectedColor.ToString();
         _s.Save();
@@ -775,7 +780,7 @@ public partial class MainWindow : Window
         if (TabHome != null) TabHome.Content = ru ? "Главная" : "Home";
         if (TabClip != null) TabClip.Content = ru ? "Буфер" : "Clipboard";
         if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
-        if (AppsHeading != null) AppsHeading.Text = ru ? "ВАШИ ПРИЛОЖЕНИЯ" : "YOUR APPS";
+        UpdateAppsHeading();
         if (AppsHint != null) AppsHint.Text = ru ? "Добавьте любимые программы для быстрого запуска." : "Add your favorite apps for one-click launch.";
         if (ScanSteamText != null) ScanSteamText.Text = ru ? "Найти игры Steam" : "Find Steam games";
         if (AddAppText != null) AddAppText.Text = ru ? "Добавить" : "Add app";
@@ -824,6 +829,7 @@ public partial class MainWindow : Window
                                  : new[] { "Region", "File Explorer", "Notepad", "Calculator", "Terminal", "Task Manager" };
             for (int i = 0; i < Math.Min(TileGrid.Children.Count, labels.Length); i++)
                 if (TileGrid.Children[i] is Button b && b.Content is StackPanel sp && sp.Children.Count > 1 && sp.Children[1] is TextBlock tb) tb.Text = labels[i];
+            UpdateTimerTiles();
         }
         BuildExtraSettings();
     }
@@ -1033,7 +1039,9 @@ public partial class MainWindow : Window
     {
         var n = DateTime.Now;
         _clock.Stop();
-        _clock.Interval = TimeSpan.FromMilliseconds(60_000 - (n.Second * 1000 + n.Millisecond) + 50);
+        _clock.Interval = NeedsSecondTicks()
+            ? TimeSpan.FromMilliseconds(1000 - n.Millisecond + 20)
+            : TimeSpan.FromMilliseconds(60_000 - (n.Second * 1000 + n.Millisecond) + 50);
         _clock.Start();
     }
 
@@ -1093,6 +1101,7 @@ public partial class MainWindow : Window
         WeatherHost.Opacity = 0;
         TempText.Opacity = 0;
         TitlePanel.Opacity = 0;
+        InfoPanel.Opacity = 0;
         ToastPanel.Visibility = Visibility.Collapsed;
         Full.Visibility = Visibility.Collapsed;
         ApplyPosition();
@@ -1150,7 +1159,7 @@ public partial class MainWindow : Window
 
     void FadeWelcomeInfo()
     {
-        foreach (UIElement element in new UIElement[] { TimeText, WeatherHost, TempText, TitlePanel })
+        foreach (UIElement element in new UIElement[] { TimeText, WeatherHost, TempText, TitlePanel, InfoPanel })
             FadeInWelcomeElement(element);
     }
 
@@ -1174,6 +1183,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        bool fromToast = _state == IslandState.Toast;
         _state = IslandState.Collapsed;
         _seekTimer.Stop();
         Mini.Visibility = Visibility.Visible;
@@ -1198,7 +1208,8 @@ public partial class MainWindow : Window
         };
         Full.BeginAnimation(OpacityProperty, fade);
 
-        Animate(_now != null ? PlayW : IdleW, MiniH, MiniR, spring: false);
+        Animate(_now != null ? PlayW : IdleW, MiniH, MiniR, spring: false,
+            speed: (fromToast ? _s.ToastSpeed : _s.ExpandSpeed) / 100.0);
         EnsureFx();
     }
 
@@ -1212,7 +1223,7 @@ public partial class MainWindow : Window
         FadeInFull();
         RefreshSeekTimeline();
         _seekTimer.Start();
-        Animate(FullW, FullH, 30, spring: true);
+        Animate(FullW, FullH, 30, spring: true, speed: _s.ExpandSpeed / 100.0);
         Activate();
     }
 
@@ -1233,8 +1244,9 @@ public partial class MainWindow : Window
         };
         TimePanel.Visibility = Visibility.Collapsed;
         ToastPanel.Visibility = Visibility.Visible;
-        Animate(ToastW, ToastH, 26, spring: true);
+        Animate(ToastW, ToastH, 26, spring: true, speed: _s.ToastSpeed / 100.0);
         _toastTimer.Stop();
+        _toastTimer.Interval = TimeSpan.FromSeconds(_s.ToastTime / 10.0);
         _toastTimer.Start();
     }
 
@@ -1247,6 +1259,7 @@ public partial class MainWindow : Window
             MiniMediaControls.Visibility = Visibility.Collapsed;
             WeatherDetails.Visibility = Visibility.Collapsed;
             TimeText.Visibility = Visibility.Collapsed;
+            InfoPanel.Visibility = Visibility.Collapsed;
             return;
         }
 
@@ -1256,7 +1269,7 @@ public partial class MainWindow : Window
 
         TitlePanel.Visibility = hasMedia ? Visibility.Visible : Visibility.Collapsed;
         MiniMediaControls.Visibility = hasMedia ? Visibility.Visible : Visibility.Collapsed;
-        WeatherDetails.Visibility = hasMedia ? Visibility.Collapsed : Visibility.Visible;
+        WeatherDetails.Visibility = !hasMedia && _s.MiniRight == "Weather" ? Visibility.Visible : Visibility.Collapsed;
         TitleText.Text = hasMedia ? _now!.Title : "";
         MiniPlayBtn.Content = playing ? "\uE769" : "\uE768";
         MiniPrevBtn.ToolTip = _s.Language == "ru" ? "Предыдущий трек" : "Previous";
@@ -1273,10 +1286,10 @@ public partial class MainWindow : Window
         WeatherHost.Visibility = !hasMedia && WeatherHost.Child != null ? Visibility.Visible : Visibility.Collapsed;
         TempText.Visibility = !hasMedia && !string.IsNullOrEmpty(TempText.Text) ? Visibility.Visible : Visibility.Collapsed;
 
-        TimeText.Text = now.ToString("HH:mm");
         TimeText.HorizontalAlignment = HorizontalAlignment.Center;
         TimeText.Margin = new Thickness(0);
-        if (FullClock != null) FullClock.Text = now.ToString("HH:mm");
+        UpdateMiniWidgets(now, hasMedia);
+        if (FullClock != null) FullClock.Text = FormatTime(now, false);
     }
 
     // ================= Жидкость: волна внизу, глазки, погода =================
@@ -1463,6 +1476,7 @@ public partial class MainWindow : Window
 
     void Window_Deactivated(object? sender, EventArgs e)
     {
+        if (_modalOpen) return;            // открыт наш диалог (переименование, иконка, цвет) — не сворачиваемся
         if (_state == IslandState.Expanded) Collapse();
     }
 
@@ -1628,7 +1642,7 @@ public partial class MainWindow : Window
             ShowToast("Moku", _s.Language == "ru" ? "Это приложение уже добавлено" : "This app is already added");
             return;
         }
-        _s.Apps.Add(new AppShortcut { Path = path, Name = name });
+        _s.Apps.Add(new AppShortcut { Path = path, Name = name, Folder = _openFolder ?? "" });
         _s.Save(); BuildApps();
         ShowToast("Moku", _s.Language == "ru" ? "Приложение добавлено" : "App added");
     }
@@ -1685,6 +1699,7 @@ public partial class MainWindow : Window
             btn.Click += (_, _) => act();
             TileGrid.Children.Add(btn);
         }
+        AddTimerTiles(style, icons);
     }
 
     void Launch(string exe)
@@ -1867,6 +1882,7 @@ public partial class MainWindow : Window
         FadeInWelcomeElement(TimeText);
         FadeInWelcomeElement(WeatherHost);
         FadeInWelcomeElement(TempText);
+        FadeInWelcomeElement(InfoPanel);
         EnsureFx();
         // Ширина меняется, только если трек появился/пропал: Animate сам пропускает ту же цель,
         // поэтому частые события плеера больше не дёргают остров.

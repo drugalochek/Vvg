@@ -425,26 +425,28 @@
 
                     <!-- Глаза-овалы: следят за курсором, моргают, засыпают -->
                     <StackPanel x:Name="Eyes" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" Margin="14,0,0,0" VerticalAlignment="Center">
-                        <Ellipse x:Name="EyeL" Width="6" Height="20" Fill="White" Margin="0,0,12,0"
+                        <Path x:Name="EyeL" Width="6" Height="20" Fill="White" Stretch="Fill" Margin="0,0,12,0"
+                              Data="M0,0.5 A0.5,0.5 0 1 1 1,0.5 A0.5,0.5 0 1 1 0,0.5 Z"
                                  RenderTransformOrigin="0.5,0.5">
-                            <Ellipse.RenderTransform>
+                            <Path.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="EyeLScale" ScaleX="1" ScaleY="1"/>
                                     <RotateTransform x:Name="EyeLRot" Angle="0"/>
                                     <TranslateTransform x:Name="EyeLShift"/>
                                 </TransformGroup>
-                            </Ellipse.RenderTransform>
-                        </Ellipse>
-                        <Ellipse x:Name="EyeR" Width="6" Height="20" Fill="White"
+                            </Path.RenderTransform>
+                        </Path>
+                        <Path x:Name="EyeR" Width="6" Height="20" Fill="White" Stretch="Fill"
+                              Data="M0,0.5 A0.5,0.5 0 1 1 1,0.5 A0.5,0.5 0 1 1 0,0.5 Z"
                                  RenderTransformOrigin="0.5,0.5">
-                            <Ellipse.RenderTransform>
+                            <Path.RenderTransform>
                                 <TransformGroup>
                                     <ScaleTransform x:Name="EyeRScale" ScaleX="1" ScaleY="1"/>
                                     <RotateTransform x:Name="EyeRRot" Angle="0"/>
                                     <TranslateTransform x:Name="EyeRShift"/>
                                 </TransformGroup>
-                            </Ellipse.RenderTransform>
-                        </Ellipse>
+                            </Path.RenderTransform>
+                        </Path>
                     </StackPanel>
 
                     <!-- v2.8: румянец — появляется, когда глаза «гладят» курсором -->
@@ -483,6 +485,19 @@
                                     FontSize="10" Content="&#xE768;" ToolTip="Play / pause" Click="MediaPlay_Click"/>
                             <Button x:Name="MiniNextBtn" Style="{StaticResource IconBtn}" Width="23" Height="23" Margin="0"
                                     FontSize="10" Content="&#xE893;" ToolTip="Next" Click="MediaNext_Click"/>
+                        </StackPanel>
+                        <!-- v2.10: виджет справа — батарея, процессор, память, время или дата -->
+                        <StackPanel x:Name="InfoPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="8,0,0,0">
+                            <Canvas x:Name="BatteryGlyph" Width="20" Height="10" Margin="0,0,4,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                <Border x:Name="BatteryShell" Width="17" Height="10" CornerRadius="2.5" BorderThickness="1.2" BorderBrush="#B3FFFFFF"/>
+                                <Border Canvas.Left="17.6" Canvas.Top="3" Width="1.8" Height="4" CornerRadius="0.9" Background="#B3FFFFFF"/>
+                                <Border x:Name="BatteryLevel" Canvas.Left="2.2" Canvas.Top="2.2" Width="12.6" Height="5.6" CornerRadius="1.2" Background="#FF30D158"/>
+                                <TextBlock x:Name="BatteryBolt" Canvas.Left="4.6" Canvas.Top="-2.6" Text="&#xE945;" FontFamily="{StaticResource Icons}"
+                                           FontSize="9" Foreground="White" Visibility="Collapsed"/>
+                            </Canvas>
+                            <TextBlock x:Name="InfoIcon" FontFamily="{StaticResource Icons}" FontSize="11" Foreground="{StaticResource Dim}"
+                                       VerticalAlignment="Center" Margin="0,0,5,0" Visibility="Collapsed"/>
+                            <TextBlock x:Name="InfoText" Foreground="{StaticResource Dim}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                         <StackPanel x:Name="WeatherDetails" Orientation="Horizontal" Visibility="Visible">
                             <Border x:Name="WeatherHost" Width="20" Height="20" Margin="8,0,0,0" Visibility="Collapsed"/>

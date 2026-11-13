@@ -54,11 +54,29 @@ public partial class MainWindow
 
     // ------------------------------------------------------------------ плитки приложений
 
-    const double AppTileW = 112, AppTileH = 88;
+    // v2.10: размер плиток — компактный, обычный или крупный.
+    double AppTileW => _s.AppTileSize switch { "Compact" => 90, "Large" => 136, _ => 112 };
+    double AppTileH => _s.AppTileSize switch { "Compact" => 72, "Large" => 108, _ => 88 };
+    double AppIconSize => _s.AppTileSize switch { "Compact" => 24, "Large" => 44, _ => 32 };
+    double AppLabelSize => _s.AppTileSize switch { "Compact" => 10, "Large" => 12, _ => 11 };
     string? _dragAppPath;
     Point _dragStart;
     bool _dragArmed, _suppressAppClick;
     FrameworkElement? _dragTile;
+    string? _openFolder;      // v2.10: открытая папка на вкладке «Приложения» (null — корень)
+
+    static bool SameFolder(string? a, string? b) => string.Equals(a ?? "", b ?? "", StringComparison.OrdinalIgnoreCase);
+
+    void UpdateAppsHeading()
+    {
+        if (AppsHeading == null) return;
+        AppsHeading.Text = _openFolder != null ? _openFolder.ToUpperInvariant() : Tr("ВАШИ ПРИЛОЖЕНИЯ", "YOUR APPS");
+        if (AppsHint != null)
+            AppsHint.Text = _openFolder != null
+                ? Tr("Перетащи плитку на «Назад», чтобы вынуть её из папки.", "Drag a tile onto Back to take it out of the folder.")
+                : Tr("Добавьте любимые программы. ПКМ по плитке — подпись, иконка, папка.",
+                     "Add your favorite apps. Right-click a tile for name, icon and folder.");
+    }
 
     void BuildApps()
     {
@@ -75,11 +93,25 @@ public partial class MainWindow
             };
         }
         BuildSteamCandidates();
-        foreach (var app in _s.Apps.ToList())
+        var visible = _s.Apps.Where(a => IsSteamLink(a.Path) || File.Exists(a.Path)).ToList();
+        if (_openFolder != null && !visible.Any(a => SameFolder(a.Folder, _openFolder))) _openFolder = null;   // папка опустела
+        UpdateAppsHeading();
+
+        if (_openFolder == null)
         {
-            bool steamLink = app.Path.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
-            if (!steamLink && !File.Exists(app.Path)) continue;
-            AppsGrid.Children.Add(CreateAppTile(app, steamLink));
+            var folders = visible.Where(a => a.Folder.Length > 0).Select(a => a.Folder)
+                                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                                 .OrderBy(f => f, StringComparer.CurrentCultureIgnoreCase).ToList();
+            foreach (var folder in folders)
+                AppsGrid.Children.Add(CreateFolderTile(folder, visible.Where(a => SameFolder(a.Folder, folder)).ToList()));
+            foreach (var app in visible.Where(a => a.Folder.Length == 0))
+                AppsGrid.Children.Add(CreateAppTile(app, IsSteamLink(app.Path)));
+        }
+        else
+        {
+            AppsGrid.Children.Add(CreateBackTile());
+            foreach (var app in visible.Where(a => SameFolder(a.Folder, _openFolder)))
+                AppsGrid.Children.Add(CreateAppTile(app, IsSteamLink(app.Path)));
         }
 
         if (AppsGrid.Children.Count == 0)
@@ -93,6 +125,63 @@ public partial class MainWindow
                 TextWrapping = TextWrapping.Wrap, MaxWidth = 440
             });
         }
+    }
+
+    /// <summary>Иконка приложения: своя (картинка, .ico, .exe) или стандартная.</summary>
+    ImageSource? AppIcon(AppShortcut app, bool steamLink)
+    {
+        if (!string.IsNullOrWhiteSpace(app.Icon))
+        {
+            var custom = LoadCustomIcon(app.Icon);
+            if (custom != null) return custom;
+        }
+        try
+        {
+            if (steamLink) return LoadSteamArtwork(app.Path.Split('/').LastOrDefault() ?? "");
+            using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
+            if (icon == null) return null;
+            var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight(48, 48));
+            source.Freeze();
+            return source;
+        }
+        catch (Exception ex) { Log.Warn("Не удалось получить иконку " + app.Path + ": " + ex.Message); return null; }
+    }
+
+    /// <summary>Своя иконка плитки: .exe/.dll/.lnk — иконка файла, остальное — картинка или .ico.</summary>
+    static ImageSource? LoadCustomIcon(string file)
+    {
+        try
+        {
+            if (!File.Exists(file)) return null;
+            string ext = System.IO.Path.GetExtension(file).ToLowerInvariant();
+            if (ext is not (".exe" or ".dll" or ".lnk")) return LoadIconFile(file) ?? LoadBitmapFile(file, 128);
+            using var icon = System.Drawing.Icon.ExtractAssociatedIcon(file);
+            if (icon == null) return null;
+            var src = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight(48, 48));
+            src.Freeze();
+            return src;
+        }
+        catch (Exception ex) { Log.Warn("Своя иконка " + file + ": " + ex.Message); return null; }
+    }
+
+    FrameworkElement IconElement(ImageSource? source, bool steamLink, double size)
+    {
+        if (source != null)
+        {
+            var img = new System.Windows.Controls.Image
+            {
+                Source = source, Width = size, Height = size, Stretch = Stretch.UniformToFill,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Clip = new RectangleGeometry(new Rect(0, 0, size, size), size * 0.22, size * 0.22)
+            };
+            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            return img;
+        }
+        return new TextBlock
+        {
+            Text = steamLink ? "\uE7FC" : "\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
+            FontSize = size * 0.78, HorizontalAlignment = HorizontalAlignment.Center
+        };
     }
 
     FrameworkElement CreateAppTile(AppShortcut app, bool steamLink)
@@ -111,45 +200,13 @@ public partial class MainWindow
             ToolTip = steamLink ? app.Name : app.Path
         };
         var content = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-
-        ImageSource? iconSource = null;
-        try
-        {
-            if (steamLink) iconSource = LoadSteamArtwork(path.Split('/').LastOrDefault() ?? "");
-            else
-            {
-                using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
-                if (icon != null)
-                {
-                    var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
-                        BitmapSizeOptions.FromWidthAndHeight(48, 48));
-                    source.Freeze();
-                    iconSource = source;
-                }
-            }
-        }
-        catch (Exception ex) { Log.Warn("Не удалось получить иконку " + path + ": " + ex.Message); }
-
-        if (iconSource != null)
-        {
-            var img = new System.Windows.Controls.Image
-            {
-                Source = iconSource, Width = 32, Height = 32, Stretch = Stretch.UniformToFill,
-                Margin = new Thickness(0, 0, 0, 7), HorizontalAlignment = HorizontalAlignment.Center,
-                Clip = new RectangleGeometry(new Rect(0, 0, 32, 32), 7, 7)
-            };
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-            content.Children.Add(img);
-        }
-        else content.Children.Add(new TextBlock
-        {
-            Text = steamLink ? "\uE7FC" : "\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
-            FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 7)
-        });
+        var iconEl = IconElement(AppIcon(app, steamLink), steamLink, AppIconSize);
+        iconEl.Margin = new Thickness(0, 0, 0, _s.AppTileSize == "Compact" ? 5 : 7);
+        content.Children.Add(iconEl);
         content.Children.Add(new TextBlock
         {
-            Text = app.Name, FontSize = 11, Foreground = Brushes.White,
-            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 98,
+            Text = app.Name, FontSize = AppLabelSize, Foreground = Brushes.White,
+            TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = AppTileW - 14,
             HorizontalAlignment = HorizontalAlignment.Center
         });
         button.Content = content;
@@ -159,12 +216,10 @@ public partial class MainWindow
             LaunchApp(path);
         };
 
-        // ПКМ-меню оставлено как запасной путь.
+        // ПКМ-меню: подпись, иконка, папка, удаление. Строится при открытии — всегда на текущем языке.
         var menu = new ContextMenu();
-        var remove = new MenuItem { Header = Tr("Удалить из списка", "Remove from list") };
-        remove.Click += (_, _) => RemoveAppAnimated(tile, path);
-        menu.Items.Add(remove);
         button.ContextMenu = menu;
+        button.ContextMenuOpening += (_, _) => BuildAppMenu(menu, app, tile);
         tile.Children.Add(button);
 
         // Крестик в углу: появляется при наведении на плитку.

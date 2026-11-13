@@ -358,14 +358,15 @@ public partial class MainWindow
         }
 
         // ---- моргание ----
-        if (!_eyeScript && mood is not (EyeMood.Surprised or EyeMood.Blissful) && t >= _nextBlinkAt && _eyeL.BlinkPhase == 0 && _eyeR.BlinkPhase == 0)
+        if (_s.BlinkRate <= 0) _nextBlinkAt = Math.Max(_nextBlinkAt, t + 1);   // v2.10: моргание выключено
+        else if (!_eyeScript && mood is not (EyeMood.Surprised or EyeMood.Blissful) && t >= _nextBlinkAt && _eyeL.BlinkPhase == 0 && _eyeR.BlinkPhase == 0)
         {
             BlinkBoth(sleepy);
             if (_blinkRepeat > 0) { _blinkRepeat--; _nextBlinkAt = t + 0.26; }
             else
             {
                 if (_rng.NextDouble() < 0.18) _blinkRepeat = 1;   // иногда двойное моргание
-                _nextBlinkAt = t + (sleepy ? 3.5 + _rng.NextDouble() * 3 : 2.2 + _rng.NextDouble() * 3.8);
+                _nextBlinkAt = t + (sleepy ? 3.5 + _rng.NextDouble() * 3 : 2.2 + _rng.NextDouble() * 3.8) * 100.0 / _s.BlinkRate;
             }
         }
 
@@ -477,7 +478,7 @@ public partial class MainWindow
             var home = EyeHome(rig);
             if (double.IsNaN(home.X)) continue;
             double cx = home.X + rig.Shift.X + rig.Side * 4.5;
-            double cy = Math.Min(home.Y + rig.Shift.Y + 6.5, room.Bottom - 3.5);
+            double cy = Math.Min(home.Y + rig.Shift.Y + Math.Max(5, rig.Element.ActualHeight * 0.33), room.Bottom - 3.5);   // v2.10: под глазом любого размера
             Point pt;
             try { pt = Pill.TranslatePoint(new Point(cx, cy), BlushLayer); }
             catch (InvalidOperationException) { continue; }

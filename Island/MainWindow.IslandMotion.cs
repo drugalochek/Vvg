@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Media;
 using Point = System.Windows.Point;
 
@@ -19,10 +19,15 @@ public partial class MainWindow
     bool _islandMoving;
 
     // Параметры «характера» движения
-    const double BouncyStiffness = 290, BouncyZeta = 0.66;   // раскрытие / тост: заметный отскок
-    const double SoftStiffness = 360, SoftZeta = 0.82;       // сворачивание: мягко, почти без перелёта
+    // v2.10: стиль появления — «Пружина» (как раньше), «Плавно» (без перелёта) и «Капля» (сильный отскок).
+    double BouncyStiffness => _s.AppearStyle switch { "Smooth" => 250, "Drop" => 330, _ => 290 };   // раскрытие / тост
+    double BouncyZeta => _s.AppearStyle switch { "Smooth" => 1.0, "Drop" => 0.46, _ => 0.66 };
+    double SoftStiffness => _s.AppearStyle switch { "Smooth" => 300, "Drop" => 380, _ => 360 };     // сворачивание
+    double SoftZeta => _s.AppearStyle switch { "Smooth" => 1.0, "Drop" => 0.62, _ => 0.82 };
+    double StyleJelly => _s.AppearStyle switch { "Smooth" => 0.35, "Drop" => 1.5, _ => 1.0 };
     const double JellyStiffness = 540, JellyZeta = 0.30;     // «желе»: 2–3 затухающих колебания
-    double JellyMax => Math.Max(0.0005, 0.065 * _s.JellyStrength / 100.0);   // максимум растяжения (±6,5 % при 100 %)
+    double JellyMax => Math.Max(0.0005, 0.065 * _s.JellyStrength / 100.0 * StyleJelly);   // максимум растяжения (±6,5 % при 100 %)
+    double _animKindSpeed = 1;        // v2.10: отдельная скорость для раскрытия и для уведомлений
 
     /// <summary>Скругление для состояния с учётом настройки «Скругление» (18 px = как в дизайне).</summary>
     double StateRadius(double baseRadius, double w, double h)
@@ -44,9 +49,10 @@ public partial class MainWindow
         _boxW = w; _boxH = h;
     }
 
-    void Animate(double w, double h, double radius, bool spring)
+    void Animate(double w, double h, double radius, bool spring, double speed = 1)
     {
         _baseRadius = radius;
+        _animKindSpeed = Math.Clamp(speed, 0.3, 3);
         double targetR = StateRadius(radius, w, h);
 
         // Уже едем к этой же цели — ничего не перезапускаем (раньше каждое медиа-событие
@@ -72,8 +78,9 @@ public partial class MainWindow
         // Предвосхищение (anticipation): перед ростом остров на миг «приседает»,
         // перед сжатием — чуть вытягивается. Делает движение живым и заметным.
         double grow = Math.Clamp((h - _ph.Value) / Math.Max(30, _ph.Value), -1, 1);
-        _jy.Velocity -= grow * 1.1;
-        _jx.Velocity += grow * 0.7;
+        double antic = _s.AppearStyle switch { "Smooth" => 0.3, "Drop" => 1.7, _ => 1.0 };
+        _jy.Velocity -= grow * 1.1 * antic;
+        _jx.Velocity += grow * 0.7 * antic;
 
         // Окно растёт один раз до размера «с запасом», остров анимируется внутри.
         SetWindowBox(Math.Max(_boxW, w), Math.Max(_boxH, h));
@@ -106,7 +113,7 @@ public partial class MainWindow
     {
         if (!_islandMoving) return false;
 
-        double speed = _s.AnimationSpeed / 100.0;                 // время анимации ∝ 1/speed → жёсткость ∝ speed²
+        double speed = _s.AnimationSpeed / 100.0 * _animKindSpeed;                 // время анимации ∝ 1/speed → жёсткость ∝ speed²
         double k = _islandStiffness * speed * speed;
         _pw.Step(dt, k, _islandZeta);
         _ph.Step(dt, k * 0.9, _islandZeta);   // высота чуть «ленивее» ширины — форма течёт, а не масштабируется
