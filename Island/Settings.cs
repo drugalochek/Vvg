@@ -47,6 +47,12 @@ public class Settings
     public string Hotkey { get; set; } = "CtrlAltSpace"; // CtrlAltSpace | CtrlShiftSpace | AltSpace | WinAltI | Off
     public int ClipboardLimit { get; set; } = 50;    // 5..200 записей
     public List<AppShortcut> Apps { get; set; } = new();
+    public List<string> HiddenSteamGames { get; set; } = new();
+    public bool TransparentOverNormalWindows { get; set; } = false;
+    public string HomeStartupView { get; set; } = "Clipboard";
+    public bool RememberLastTab { get; set; } = false;
+    public string LastTab { get; set; } = "Home";
+    public Dictionary<string, string> AppTileSizes { get; set; } = new();
 
     // ---- v2.10: кастомизация ----
     public string EyeStyle { get; set; } = "Oval";   // Oval | Round | Dots | Anime | Arcs | Robot | Cat
@@ -113,6 +119,12 @@ public class Settings
         TimerMinutes = Math.Clamp(TimerMinutes, 1, 180);
         if (AppTileSize is not ("Compact" or "Normal" or "Large")) AppTileSize = "Normal";
         Apps ??= new();
+        HiddenSteamGames ??= new();
+        HiddenSteamGames = HiddenSteamGames.Where(x => !string.IsNullOrWhiteSpace(x) && Regex.IsMatch(x, @"^\d+$")).Distinct(StringComparer.OrdinalIgnoreCase).Take(2000).ToList();
+        if (HomeStartupView is not ("Clipboard" or "Windows")) HomeStartupView = "Clipboard";
+        if (LastTab is not ("Home" or "Clip" or "Apps" or "Set")) LastTab = "Home";
+        AppTileSizes ??= new();
+        AppTileSizes = AppTileSizes.Where(x => !string.IsNullOrWhiteSpace(x.Key) && (x.Value is "1x1" or "2x1" or "2x2")).Take(60).ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
         foreach (var a in Apps.Where(a => a != null))
         {
             a.Folder = (a.Folder ?? "").Trim();

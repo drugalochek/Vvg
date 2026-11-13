@@ -1505,7 +1505,14 @@ public partial class MainWindow : Window
         if (tag == "Apps")
         {
             BuildApps();
+            StartAppsScanWatch();
             if (!_steamScanned) ScanSteam_Click(this, new RoutedEventArgs());
+        }
+        else StopAppsScanWatch();
+        if (_s.RememberLastTab && tag is "Home" or "Clip" or "Apps" or "Set")
+        {
+            _s.LastTab = tag!;
+            _s.Save();
         }
     }
 
