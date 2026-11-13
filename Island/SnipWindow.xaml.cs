@@ -1,4 +1,4 @@
-using TextDataFormat = System.Windows.TextDataFormat;
+﻿using TextDataFormat = System.Windows.TextDataFormat;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -33,7 +33,7 @@ public partial class SnipWindow : Window
     static readonly double[] Thicknesses = { 2, 3, 5, 8 };
 
     readonly double _w, _h, _sx, _sy;
-    readonly Action<string> _done;
+    readonly Action<string, bool> _done;
     readonly RectangleGeometry _selGeo = new(), _clipGeo = new();
     readonly List<UIElement> _undo = new();
 
@@ -47,7 +47,7 @@ public partial class SnipWindow : Window
     Color _color = (Color)ColorConverter.ConvertFromString(Palette[0]);
     int _thickIdx = 1;
 
-    public SnipWindow(BitmapSource shot, double sx, double sy, Action<string> done)
+    public SnipWindow(BitmapSource shot, double sx, double sy, Action<string, bool> done)
     {
         InitializeComponent();
         ApplyLanguage();
@@ -70,9 +70,12 @@ public partial class SnipWindow : Window
     }
 
 
+    bool _ru;
+    string Tr(string ru, string en) => _ru ? ru : en;
+
     void ApplyLanguage()
     {
-        bool ru = Settings.Load().Language == "ru";
+        bool ru = _ru = Settings.Load().Language == "ru";
         Title = ru ? "Moku — Снимок экрана" : "Moku — Screenshot";
         PenTool.Content = ru ? "Перо" : "Pen";
         ArrowTool.Content = ru ? "Стрелка" : "Arrow";
@@ -359,7 +362,7 @@ public partial class SnipWindow : Window
             }
         }
         // Раньше сообщение «Скопирован» показывалось даже при неудаче — теперь честный результат.
-        Finish(ok ? "Copied to clipboard" : "Error: clipboard is busy");
+        Finish(ok ? Tr("Скопировано в буфер обмена", "Copied to clipboard") : Tr("Буфер обмена занят — попробуй ещё раз", "Clipboard is busy — please try again"), ok);
     }
 
     void SaveToFile()
@@ -368,7 +371,7 @@ public partial class SnipWindow : Window
         var dlg = new SaveFileDialog
         {
             Filter = "PNG|*.png",
-            FileName = $"Island_{DateTime.Now:yyyyMMdd_HHmmss}.png",
+            FileName = $"Moku_{DateTime.Now:yyyyMMdd_HHmmss}.png",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
         };
         if (dlg.ShowDialog(this) != true) return;
@@ -378,15 +381,15 @@ public partial class SnipWindow : Window
             enc.Frames.Add(BitmapFrame.Create(RenderSelection()));
             using var fs = File.Create(dlg.FileName);
             enc.Save(fs);
-            Finish("Saved: " + System.IO.Path.GetFileName(dlg.FileName));
+            Finish(Tr("Сохранено: ", "Saved: ") + System.IO.Path.GetFileName(dlg.FileName), true);
         }
-        catch (Exception ex) { Finish("Error: " + ex.Message); }
+        catch (Exception ex) { Finish(Tr("Ошибка: ", "Error: ") + ex.Message, false); }
     }
 
-    void Finish(string message)
+    void Finish(string message, bool ok)
     {
         Close();
-        _done(message);
+        _done(message, ok);
     }
 
     void Window_KeyDown(object sender, KeyEventArgs e)

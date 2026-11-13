@@ -381,8 +381,28 @@
                 </Path.Stroke>
             </Path>
 
+            <!-- Стеклянный слой: молочный тинт, диагональный блик и светлая кромка.
+                 Проявляется тем сильнее, чем прозрачнее остров (см. ApplyAppearance). -->
+            <Path x:Name="GlassSheen" IsHitTestVisible="False" Opacity="0" StrokeThickness="1.2">
+                <Path.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#30FFFFFF" Offset="0"/>
+                        <GradientStop Color="#0DFFFFFF" Offset="0.35"/>
+                        <GradientStop Color="#06FFFFFF" Offset="0.65"/>
+                        <GradientStop Color="#18FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Path.Fill>
+                <Path.Stroke>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#80FFFFFF" Offset="0"/>
+                        <GradientStop Color="#14FFFFFF" Offset="0.5"/>
+                        <GradientStop Color="#40FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Path.Stroke>
+            </Path>
+
             <!-- Мягкий блик сверху -->
-            <Border Height="40" VerticalAlignment="Top" IsHitTestVisible="False"
+            <Border x:Name="TopSheen" Height="40" VerticalAlignment="Top" IsHitTestVisible="False"
                     CornerRadius="{Binding CornerRadius, ElementName=Pill}">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">

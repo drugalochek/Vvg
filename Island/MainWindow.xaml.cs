@@ -254,6 +254,7 @@ public partial class MainWindow : Window
         InitializeTray();
         _tbCreated = RegisterWindowMessage("TaskbarCreated");
         StartGameWatch();
+        PrewarmSteamArt();
     }
 
     // ================= Трей: пересоздание после перезапуска проводника =================
@@ -304,7 +305,7 @@ public partial class MainWindow : Window
                 _gameMode = full;
                 int ex = GetWindowLong(me, GWL_EXSTYLE);
                 SetWindowLong(me, GWL_EXSTYLE, full ? ex | 0x20 | 0x08000000 : ex & ~0x20 & ~0x08000000);
-                Opacity = full ? _s.FullscreenOpacity / 100.0 : 1.0;
+                FadeWindowOpacity(full ? _s.FullscreenOpacity / 100.0 : 1.0, full ? 450 : 380);
                 if (full && _state == IslandState.Expanded) Collapse();
             }
             if (IsVisible && ++_topTick % 5 == 0)
@@ -442,9 +443,32 @@ public partial class MainWindow : Window
         }
         if (GlassOpacityText != null) GlassOpacityText.Text = _s.GlassOpacity + "%";
         if (_ready) RetargetRadius();
-        if (Body != null) Body.Opacity = _s.GlassOpacity / 100.0;
+        ApplyGlass();
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         if (ThemeCombo != null && ThemeCombo.SelectedValue?.ToString() != _s.Theme) ThemeCombo.SelectedValue = _s.Theme;
+    }
+
+    /// <summary>
+    /// «Стеклянная» прозрачность: гаснет только заливка, а кромка остаётся; поверх проявляется
+    /// молочный тинт с диагональным бликом — остров выглядит как стекло, а не просто бледнеет.
+    /// </summary>
+    void ApplyGlass()
+    {
+        if (Body == null) return;
+        double g = Math.Clamp(_s.GlassOpacity / 100.0, 0, 1);
+        double clear = 1 - g;
+        clear = clear * clear * (3 - 2 * clear);           // плавная кривая, без резкого «включения»
+        Body.Opacity = 1.0;
+        if (_bodyBrush != null) _bodyBrush.Opacity = g;
+        if (GlassSheen != null) GlassSheen.Opacity = clear;
+        if (TopSheen != null)
+        {
+            var sheen = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+            sheen.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(12 + clear * 34), 255, 255, 255), 0));
+            sheen.GradientStops.Add(new GradientStop(Color.FromArgb(0, 255, 255, 255), 1));
+            sheen.Freeze();
+            TopSheen.Background = sheen;
+        }
     }
 
     void SetGlassOpacity(int value)
@@ -459,7 +483,7 @@ public partial class MainWindow : Window
     {
         _s.FullscreenOpacity = Math.Clamp(value, 0, 100);
         if (FullscreenOpacitySlider != null && (int)FullscreenOpacitySlider.Value != _s.FullscreenOpacity) FullscreenOpacitySlider.Value = _s.FullscreenOpacity;
-        if (_gameMode) Opacity = _s.FullscreenOpacity / 100.0;
+        if (_gameMode) FadeWindowOpacity(_s.FullscreenOpacity / 100.0, 160);
         if (FullscreenOpacityText != null) FullscreenOpacityText.Text = _s.FullscreenOpacity + "%";
         SaveSoon();
     }
@@ -826,7 +850,7 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
             Log.Error("Не удалось изменить автозапуск", ex);
-            ShowToast("Launch at startup", "Could not change the setting", ColorError);
+            ShowToast(Tr("Автозапуск", "Launch at startup"), Tr("Не удалось изменить настройку", "Could not change the setting"), ColorError);
         }
         UpdateAutoButton();
     }
@@ -917,7 +941,7 @@ public partial class MainWindow : Window
             History.RemoveAt(History.Count - 1);
         }
         SyncRecent();
-        if (_s.ToastOnCopy) ShowToast("Copied", text.Replace('\r', ' ').Replace('\n', ' '), ColorOk);
+        if (_s.ToastOnCopy) ShowToast(Tr("Скопировано", "Copied"), text.Replace('\r', ' ').Replace('\n', ' '), ColorOk);
         SetEyeMood(EyeMood.Happy, 1.6);
         Wink();
     }
@@ -957,9 +981,9 @@ public partial class MainWindow : Window
         if (await SetClipboardTextAsync(item.Text))
         {
             Collapse();
-            ShowToast("Copied", item.Preview, ColorOk);
+            ShowToast(Tr("Скопировано", "Copied"), item.Preview, ColorOk);
         }
-        else ShowToast("Clipboard busy", "Could not write text. Please try again.", ColorError);
+        else ShowToast(Tr("Буфер обмена занят", "Clipboard busy"), Tr("Не удалось записать текст. Попробуй ещё раз.", "Could not write text. Please try again."), ColorError);
     }
 
     static bool IsInsideButton(DependencyObject? element)
@@ -1386,6 +1410,7 @@ public partial class MainWindow : Window
         }
         g.Freeze();
         Body.Data = g;
+        if (GlassSheen != null) GlassSheen.Data = g;
 
         if (wave)
         {
@@ -1468,140 +1493,6 @@ public partial class MainWindow : Window
 
     // ================= Плитки =================
     // ================= Быстрый запуск приложений =================
-    void BuildApps()
-    {
-        if (AppsGrid == null) return;
-        AppsGrid.Children.Clear();
-        BuildSteamCandidates();
-        foreach (var app in _s.Apps.ToList())
-        {
-            bool steamLink = app.Path.StartsWith("steam://", StringComparison.OrdinalIgnoreCase);
-            if (!steamLink && !File.Exists(app.Path)) continue;
-            var button = new Button
-            {
-                Style = (Style)FindResource("TileBtn"),
-                Width = 112,
-                Height = 88,
-                Margin = new Thickness(4),
-                ToolTip = app.Path
-            };
-            var content = new StackPanel
-            {
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            var iconView = new System.Windows.Controls.Image { Width = 30, Height = 30, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 0, 7) };
-            try
-            {
-                if (steamLink)
-                {
-                    string appId = app.Path.Split('/').LastOrDefault() ?? "";
-                    iconView.Source = LoadSteamArtwork(appId);
-                }
-                else
-                {
-                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(app.Path);
-                    if (icon != null)
-                    {
-                        var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty,
-                            BitmapSizeOptions.FromWidthAndHeight(48, 48));
-                        source.Freeze();
-                        iconView.Source = source;
-                    }
-                }
-            }
-            catch (Exception ex) { Log.Warn("Не удалось получить иконку " + app.Path + ": " + ex.Message); }
-
-            if (iconView.Source != null) content.Children.Add(iconView);
-            else content.Children.Add(new TextBlock
-            {
-                Text = "\uE8A5", FontFamily = (FontFamily)FindResource("Icons"),
-                FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 7)
-            });
-            content.Children.Add(new TextBlock
-            {
-                Text = app.Name, FontSize = 11, Foreground = Brushes.White,
-                TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 98,
-                HorizontalAlignment = HorizontalAlignment.Center
-            });
-            button.Content = content;
-            var path = app.Path;
-            button.Click += (_, _) => LaunchApp(path);
-            var menu = new ContextMenu();
-            var remove = new MenuItem { Header = _s.Language == "ru" ? "Удалить из списка" : "Remove from list" };
-            remove.Click += (_, _) =>
-            {
-                _s.Apps.RemoveAll(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase));
-                _s.Save();
-                BuildApps();
-            };
-            menu.Items.Add(remove);
-            button.ContextMenu = menu;
-            AppsGrid.Children.Add(button);
-        }
-
-        if (AppsGrid.Children.Count == 0)
-        {
-            AppsGrid.Children.Add(new TextBlock
-            {
-                Text = _s.Language == "ru" ? "Пока пусто. Нажми «Добавить», чтобы выбрать программу."
-                                          : "No apps yet. Select Add app to get started.",
-                Foreground = (System.Windows.Media.Brush)new BrushConverter().ConvertFrom("#88FFFFFF")!,
-                FontSize = 12, Margin = new Thickness(8, 12, 8, 8),
-                TextWrapping = TextWrapping.Wrap, MaxWidth = 440
-            });
-        }
-    }
-
-    ImageSource? LoadSteamArtwork(string appId)
-    {
-        if (string.IsNullOrWhiteSpace(appId) || !Regex.IsMatch(appId, @"^\d+$")) return null;
-        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        void Add(string? p) { if (!string.IsNullOrWhiteSpace(p) && Directory.Exists(p)) roots.Add(p); }
-        Add(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) as string);
-        Add(Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath", null) as string);
-        Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"));
-        var libraries = new HashSet<string>(roots, StringComparer.OrdinalIgnoreCase);
-        foreach (var root in roots)
-        {
-            var vdf = Path.Combine(root, "steamapps", "libraryfolders.vdf");
-            try
-            {
-                if (File.Exists(vdf))
-                    foreach (Match match in Regex.Matches(File.ReadAllText(vdf), @"""path""\s+""([^""]+)"""))
-                    {
-                        var library = match.Groups[1].Value.Replace(@"\\", @"\");
-                        if (Directory.Exists(library)) libraries.Add(library);
-                    }
-            }
-            catch { }
-        }
-        var candidates = new List<string>();
-        foreach (var root in libraries)
-        {
-            var manifest = Path.Combine(root, "steamapps", "appmanifest_" + appId + ".acf");
-            try
-            {
-                if (File.Exists(manifest))
-                {
-                    var iconHash = Regex.Match(File.ReadAllText(manifest), @"""icon""\s+""([^""]+)""").Groups[1].Value;
-                    if (!string.IsNullOrWhiteSpace(iconHash))
-                    {
-                        candidates.Add(Path.Combine(root, "steam", "games", iconHash + ".jpg"));
-                        foreach (var steamRoot in roots) candidates.Add(Path.Combine(steamRoot, "steam", "games", iconHash + ".jpg"));
-                    }
-                }
-            }
-            catch { }
-            foreach (var cache in new[] { Path.Combine(root,"appcache","librarycache"), Path.Combine(root,"steamapps","librarycache") })
-                candidates.AddRange(new[] { appId+"_icon.jpg", appId+"_header.jpg", appId+"_library_600x900.jpg", appId+"_hero.jpg" }.Select(n => Path.Combine(cache,n)));
-            var games = Path.Combine(root,"steam","games");
-            try { if (Directory.Exists(games)) candidates.AddRange(Directory.EnumerateFiles(games, "*.jpg").Where(p => Path.GetFileName(p).StartsWith(appId, StringComparison.OrdinalIgnoreCase))); } catch { }
-        }
-        foreach (var path in candidates) try { if (File.Exists(path)) { var bitmap = new System.Windows.Media.Imaging.BitmapImage(); bitmap.BeginInit(); bitmap.UriSource = new Uri(path); bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; bitmap.DecodePixelWidth = 96; bitmap.EndInit(); bitmap.Freeze(); return bitmap; } } catch { }
-        return null;
-    }
-
     void BuildSteamCandidates()
     {
         if (SteamGamesGrid == null) return;
@@ -1630,6 +1521,7 @@ public partial class MainWindow : Window
     {
         _steamScanned = true;
         bool showResult = sender is Button;
+        if (showResult) ResetSteamArtCache();
         try
         {
             var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1799,7 +1691,7 @@ public partial class MainWindow : Window
     {
         Collapse();
         try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true }); }
-        catch (Exception ex) { ShowToast("Could not launch", ex.Message, ColorError); }
+        catch (Exception ex) { ShowToast(Tr("Не удалось запустить", "Could not launch"), ex.Message, ColorError); }
     }
 
     // ================= Скриншоты =================
@@ -1837,11 +1729,11 @@ public partial class MainWindow : Window
         if (shot == null)
         {
             Show();
-            ShowToast("Error", "Could not capture screenshot", ColorError);
+            ShowToast(Tr("Ошибка", "Error"), Tr("Не удалось сделать снимок экрана", "Could not capture screenshot"), ColorError);
             return;
         }
         var win = new SnipWindow(shot.Value.Img, shot.Value.Sx, shot.Value.Sy,
-            msg => { ShowToast("Screenshot", msg, ColorOk); SetEyeMood(EyeMood.Happy, 1.8); });
+            (msg, ok) => { ShowToast(Tr("Снимок экрана", "Screenshot"), msg, ok ? ColorOk : ColorError); if (ok) SetEyeMood(EyeMood.Happy, 1.8); });
         win.Closed += (_, _) => Show();
         win.Show();
     }
@@ -1964,7 +1856,7 @@ public partial class MainWindow : Window
             {
                 _lastTrack = key;
                 SetEyeMood(EyeMood.Excited, 2.4);
-                if (_s.ToastOnTrack) ShowToast("Now playing",
+                if (_s.ToastOnTrack) ShowToast(Tr("Сейчас играет", "Now playing"),
                     string.IsNullOrEmpty(np.Artist) ? np.Title : $"{np.Artist} — {np.Title}");
             }
         }
