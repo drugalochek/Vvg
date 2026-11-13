@@ -1564,6 +1564,8 @@ public partial class MainWindow : Window
 
     void ScanSteam_Click(object sender, RoutedEventArgs e)
     {
+        bool wasScanned = _steamScanned;
+        bool automaticScan = wasScanned && sender is not Button;
         _steamScanned = true;
         bool showResult = sender is Button;
         if (showResult) ResetSteamArtCache();
@@ -1614,6 +1616,14 @@ public partial class MainWindow : Window
                     }
                     catch (IOException ex) { Log.Warn("Не удалось прочитать Steam manifest: " + ex.Message); }
                 }
+            }
+            if (automaticScan)
+            {
+                var newGames = _steamCandidates.Where(g =>
+                    !_s.HiddenSteamGames.Contains(g.Path.Split('/').LastOrDefault() ?? "") &&
+                    !_s.Apps.Any(a => string.Equals(a.Path, g.Path, StringComparison.OrdinalIgnoreCase))).ToList();
+                foreach (var game in newGames) _s.Apps.Add(new AppShortcut { Path = game.Path, Name = game.Name });
+                if (newGames.Count > 0) { _s.Save(); _steamCandidates.Clear(); BuildApps(); }
             }
             BuildSteamCandidates();
             var message = _steamCandidates.Count == 0
@@ -1696,16 +1706,6 @@ public partial class MainWindow : Window
                     Collapse();
                     return;
                 }
-                if (running)
-                {
-                    ShowToast("Moku", Tr("Приложение уже запущено, но его окно недоступно", "The app is running, but no accessible window was found"), ColorError);
-                    return;
-                }
-            }
-            if (IsLaunchDebounced(path)) return;
-            if (!steamLink)
-            {
-                if (TryActivateExistingApp(path, out bool running)) { Collapse(); return; }
                 if (running)
                 {
                     ShowToast("Moku", Tr("Приложение уже запущено, но его окно недоступно", "The app is running, but no accessible window was found"), ColorError);
