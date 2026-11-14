@@ -1,3 +1,5 @@
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using System.IO;
 using Island;
 using System.Diagnostics;
@@ -113,9 +115,64 @@ internal static class Program
         capture.StopRecording();
     }
 
+    static int RunAudioProbe(string eventName, string frequency)
+    {
+        using var trigger=EventWaitHandle.OpenExisting(eventName);
+        using var player=new WaveOutEvent();
+        var tone=new SignalGenerator(44100,2) { Frequency=double.Parse(frequency,System.Globalization.CultureInfo.InvariantCulture), Gain=0.2, Type=SignalGeneratorType.Sin };
+        player.Init(tone); trigger.WaitOne(); player.Play();
+        Thread.Sleep(30000); return 0;
+    }
+    static void TestProcessAudioIsolation()
+    {
+        if(!OperatingSystem.IsWindowsVersionAtLeast(10,0,20348) || WaveOut.DeviceCount==0)
+        { Console.WriteLine("SKIP two-process audio signal isolation: runner has no audio render device"); return; }
+        string id=Guid.NewGuid().ToString("N");
+        using var musicReady=new EventWaitHandle(false,EventResetMode.ManualReset,"MokuMusic"+id);
+        using var otherReady=new EventWaitHandle(false,EventResetMode.ManualReset,"MokuOther"+id);
+        string host=Path.ChangeExtension(typeof(Program).Assembly.Location,".exe");
+        using var music=Process.Start(new ProcessStartInfo(host,"--audio-probe MokuMusic"+id+" 220") { UseShellExecute=false })!;
+        using var other=Process.Start(new ProcessStartInfo(host,"--audio-probe MokuOther"+id+" 1000") { UseShellExecute=false })!;
+        try
+        {
+            using var capture=new ProcessLoopbackCapture(music.Id);
+            double total=0; long samples=0;
+            Exception? failure=null;
+            var gate=new object();
+            capture.DataAvailable+=(_,e)=>
+            {
+                double energy=0;
+                for(int i=0;i+1<e.BytesRecorded;i+=2) { double v=BitConverter.ToInt16(e.Buffer,i)/32768.0; energy+=v*v; }
+                lock(gate) { total+=energy; samples+=e.BytesRecorded/2; }
+            };
+            capture.RecordingStopped+=(_,e)=>failure=e.Exception;
+            capture.StartRecording();
+            for(int i=0;i<40 && !capture.IsRunning && failure==null;i++) Pump();
+            if(failure!=null) throw new InvalidOperationException("Audio signal test capture",failure);
+            Check(capture.IsRunning,"isolated signal test capture started");
+            otherReady.Set();
+            for(int i=0;i<12;i++) Pump();
+            lock(gate)
+            {
+                Check(samples==0 || Math.Sqrt(total/samples)<0.001,"unrelated voice-like tone is excluded while selected music is silent");
+                total=0; samples=0;
+            }
+            musicReady.Set();
+            for(int i=0;i<18;i++) Pump();
+            lock(gate) Check(samples>0 && Math.Sqrt(total/samples)>0.01,"selected music tone is captured while unrelated tone also plays");
+            Check(!music.HasExited && !other.HasExited,"both audio-source processes stayed alive for isolation test");
+            capture.StopRecording();
+        }
+        finally
+        {
+            foreach(var p in new[] {music,other}) if(!p.HasExited) {p.Kill(true);p.WaitForExit(5000);}
+        }
+    }
+
     [STAThread]
     static int Main(string[] args)
     {
+        if (args.Length == 3 && args[0] == "--audio-probe") return RunAudioProbe(args[1],args[2]);
         if (args.Length == 1 && args[0] == "--window-probe") return RunWindowProbe();
         if (args.Length == 1 && args[0] == "--bare-window-probe") return RunWindowProbe(true);
         try
@@ -169,6 +226,7 @@ internal static class Program
             TestExternalWindowRestore();
             TestQuickAccessLookup();
             TestProcessAudioActivation();
+            TestProcessAudioIsolation();
             window.Close(); app.Shutdown();
             Console.WriteLine($"PASS: {checks} Windows window-restoration and WPF popup checks. Full application manual testing is separate.");
             return 0;

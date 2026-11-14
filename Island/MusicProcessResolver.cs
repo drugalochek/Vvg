@@ -52,7 +52,8 @@ internal static class MusicProcessResolver
                 using var parentProcess=Process.GetProcessById((int)parent.Pid);
                 if(parentProcess.StartTime>childProcess.StartTime || parentProcess.SessionId!=childProcess.SessionId) break;
                 // Equal filenames alone are not an identity boundary.
-                if(!string.Equals(parentProcess.MainModule?.FileName,childProcess.MainModule?.FileName,StringComparison.OrdinalIgnoreCase)) break;
+                string? parentExe=parentProcess.MainModule?.FileName, childExe=childProcess.MainModule?.FileName;
+                if(string.IsNullOrEmpty(parentExe) || string.IsNullOrEmpty(childExe) || !string.Equals(parentExe,childExe,StringComparison.OrdinalIgnoreCase)) break;
                 pid=(int)parent.Pid;
             }
         }
