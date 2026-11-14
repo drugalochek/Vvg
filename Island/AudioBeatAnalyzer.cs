@@ -7,7 +7,8 @@ using Timer = System.Threading.Timer;
 namespace Island;
 
 /// <summary>
-/// Measures low, mid and high output energy through WASAPI loopback.
+/// Measures low, mid and high energy from the current player process only.
+/// Application loopback requires Windows build 20348+. Never falls back to the system mix.
 /// • Захват работает только пока играет музыка (SetActive) — в простое не тратит CPU.
 /// • При смене устройства вывода (наушники, Bluetooth, HDMI) захват автоматически
 ///   пересоздаётся на новом устройстве — волна больше не «умирает» после переключения.
@@ -17,7 +18,8 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     /// <summary>Одна сессия захвата со своими фильтрами: старый поток никогда не трогает состояние нового.</summary>
     sealed class CaptureSession
     {
-        public required WasapiLoopbackCapture Capture;
+        public required ProcessLoopbackCapture Capture;
+        public int ProcessId;
         public required Biquad LowPass, MidHighPass, MidLowPass, HighPass;
         public int Channels, Bits, SampleRate;
         public bool IsFloat;
@@ -29,6 +31,8 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     CaptureSession? _session;
     Timer? _restartTimer;
     bool _wantActive, _disposed;
+    string? _sourceAppId;
+    readonly Timer _sourceTimer;
     float _bassLevel, _midLevel, _highLevel, _activityLevel;
     int _beatPending;
     long _lastBeatTicks;
@@ -40,6 +44,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
 
     public AudioBeatAnalyzer()
     {
+        _sourceTimer = new Timer(_ => CheckSource(), null, 2000, 2000);
         try
         {
             _enumerator = new MMDeviceEnumerator();
@@ -55,12 +60,13 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     public bool ConsumeBeat() => Interlocked.Exchange(ref _beatPending, 0) != 0;
 
     /// <summary>Включить/выключить анализ звука (вызывается из UI при play/pause).</summary>
-    public void SetActive(bool active)
+    public void SetActive(bool active, string? sourceAppId)
     {
         lock (_gate)
         {
-            if (_disposed || _wantActive == active) return;
+            if (_disposed || (_wantActive == active && _sourceAppId == sourceAppId)) return;
             _wantActive = active;
+            _sourceAppId = sourceAppId;
         }
         if (active) ScheduleRestart(0);
         else
@@ -100,12 +106,16 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             if (_disposed || !_wantActive || _session != null) return;
             try
             {
-                var capture = new WasapiLoopbackCapture();
+                if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)) return;
+                int pid = MusicProcessResolver.Resolve(_sourceAppId);
+                if (pid == 0) return; // Unknown music source: silence, never the Windows mix.
+                var capture = new ProcessLoopbackCapture(pid);
                 var format = capture.WaveFormat;
                 int rate = format.SampleRate;
                 var session = new CaptureSession
                 {
                     Capture = capture,
+                    ProcessId = pid,
                     Channels = Math.Max(1, format.Channels),
                     Bits = format.BitsPerSample,
                     SampleRate = rate,
@@ -132,6 +142,24 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
         }
     }
 
+    int _checkingSource;
+    void CheckSource()
+    {
+        if (Interlocked.Exchange(ref _checkingSource, 1) != 0) return;
+        try
+        {
+            lock (_gate)
+            {
+                if (_disposed || !_wantActive || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)) return;
+                int pid = MusicProcessResolver.Resolve(_sourceAppId);
+                if (pid == (_session?.ProcessId ?? 0)) return;
+                ScheduleRestart(0);
+            }
+        }
+        catch (Exception ex) { Log.Warn("Music source refresh: " + ex.Message); }
+        finally { Volatile.Write(ref _checkingSource, 0); }
+    }
+
     void StopCapture()
     {
         CaptureSession? session;
@@ -140,6 +168,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             session = _session;
             _session = null;
         }
+        Interlocked.Exchange(ref _beatPending, 0);
         Volatile.Write(ref _bassLevel, 0);
         Volatile.Write(ref _midLevel, 0);
         Volatile.Write(ref _highLevel, 0);
@@ -263,6 +292,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
         {
             if (_disposed) return;
             _disposed = true;
+            _sourceTimer.Dispose();
             _wantActive = false;
             _restartTimer?.Dispose();
             _restartTimer = null;

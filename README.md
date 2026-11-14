@@ -102,3 +102,9 @@
 ## License
 
 Moku is proprietary software. All rights are reserved by the copyright holder. See the [LICENSE](LICENSE) file for the full terms. No permission to copy, modify, redistribute, sublicense, or create derivative works is granted except where the copyright holder gives prior written permission. Third-party components remain subject to their respective licenses.
+
+
+## Звук плеера и быстрый доступ (2.12.3)
+Правила активации справа на Главной не используют фильтры списка превью. Калькулятор с недоступным HWND активируется зарегистрированной командой Windows.
+
+Частоты для волны анализируются из процесса текущего плеера, не из общего звука Windows. Нужна Windows build 20348+; при неизвестном источнике или неподдерживаемой Windows общий микс не подставляется. Если музыка и звонок идут внутри одного браузера, разделение отдельных вкладок не гарантируется. Подробнее: [особенности 2.12.3](CHANGELOG_2.12.3.md).

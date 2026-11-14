@@ -5,7 +5,7 @@ using Windows.Media.Control;
 namespace Island;
 
 /// <summary>Текущий трек. Art — байты обложки (PNG/JPEG из медиасессии), если плеер её отдаёт.</summary>
-public record NowPlaying(string Title, string Artist, bool Playing, byte[]? Art = null);
+public record NowPlaying(string Title, string Artist, bool Playing, byte[]? Art = null, string? SourceAppId = null);
 
 /// <summary>Следит за текущей медиасессией Windows (Яндекс Музыка, Spotify, браузер, AIMP и т.д.).</summary>
 public class MediaWatcher : IDisposable
@@ -111,7 +111,7 @@ public class MediaWatcher : IDisposable
                 var playing = s.GetPlaybackInfo().PlaybackStatus ==
                               GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
                 if (props != null && !string.IsNullOrWhiteSpace(props.Title))
-                    np = new NowPlaying(props.Title, props.Artist ?? "", playing, await ReadArtAsync(props));
+                    np = new NowPlaying(props.Title, props.Artist ?? "", playing, await ReadArtAsync(props), s.SourceAppUserModelId);
             }
             catch (Exception ex)
             {

@@ -1,3 +1,4 @@
+using System.IO;
 using Island;
 using System.Diagnostics;
 using System.Windows;
@@ -21,10 +22,11 @@ internal static class Program
         timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
         timer.Start(); Dispatcher.PushFrame(frame);
     }
-    static int RunWindowProbe()
+    static int RunWindowProbe(bool bare = false)
     {
         var app = new Application();
-        var window = new Window { Title = "Moku external restoration probe", Width = 320, Height = 180 };
+        var window = new Window { Title = bare ? "" : "Moku external restoration probe", Width = 320, Height = 180 };
+        if (bare) window.ShowInTaskbar=false;
         window.Loaded += (_, _) => window.WindowState = WindowState.Minimized;
         return app.Run(window);
     }
@@ -59,10 +61,63 @@ internal static class Program
         }
     }
 
+    static void TestQuickAccessLookup()
+    {
+        // Same production lookup used by the right-hand Calculator button, with a
+        // calculator-named process whose minimized window has NO title/taskbar button.
+        string host=Path.ChangeExtension(typeof(Program).Assembly.Location,".exe");
+        string probe=Path.Combine(Path.GetDirectoryName(host)!,"CalculatorApp.exe");
+        File.Copy(host,probe,true);
+        using var child=Process.Start(new ProcessStartInfo(probe,"--bare-window-probe") { UseShellExecute=false })!;
+        try
+        {
+            IntPtr hwnd=IntPtr.Zero;
+            for(int i=0;i<60 && !child.HasExited;i++)
+            {
+                hwnd=QuickWindowResolver.Find("calc.exe");
+                if(hwnd!=IntPtr.Zero && WindowActivation.IsMinimized(hwnd)) break;
+                Pump();
+            }
+            Check(hwnd!=IntPtr.Zero && WindowActivation.IsMinimized(hwnd),"Home Calculator lookup includes titleless minimized external app");
+            Check(WindowActivation.RestoreAndActivate(hwnd),"Home Calculator resolved HWND reaches production activation");
+            for(int i=0;i<30 && WindowActivation.IsMinimized(hwnd);i++) Pump();
+            Check(!WindowActivation.IsMinimized(hwnd),"Home Calculator lookup really restores the window");
+            Check(QuickWindowResolver.Find("calc.exe")==hwnd,"repeat Home Calculator lookup preserves same HWND");
+        }
+        finally
+        {
+            if(!child.HasExited) { child.Kill(true); child.WaitForExit(5000); }
+            File.Delete(probe);
+        }
+    }
+    static void TestProcessAudioActivation()
+    {
+        if(!OperatingSystem.IsWindowsVersionAtLeast(10,0,20348))
+        { Console.WriteLine("SKIP process-audio activation: unsupported Windows build"); return; }
+        using var capture=new ProcessLoopbackCapture(Environment.ProcessId);
+        Exception? failure=null;
+        capture.RecordingStopped+=(_,e)=>failure=e.Exception;
+        capture.StartRecording();
+        for(int i=0;i<50 && !capture.IsRunning && failure==null;i++) Pump();
+        if(failure!=null)
+        {
+            // Only absent Windows audio infrastructure may skip a hardware-dependent test.
+            // Interface/ABI/COM errors must fail the build rather than silently pass.
+            int code=failure.HResult;
+            if(code==unchecked((int)0x88890004) || code==unchecked((int)0x88890010)
+                || code==unchecked((int)0x80070424) || code==unchecked((int)0x800706BA))
+            { Console.WriteLine("SKIP process-audio activation: runner audio service/device unavailable: "+failure); return; }
+            throw new InvalidOperationException("Process audio activation failed",failure);
+        }
+        Check(capture.IsRunning,"process-specific WASAPI activates and starts with production COM ABI");
+        capture.StopRecording();
+    }
+
     [STAThread]
     static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--window-probe") return RunWindowProbe();
+        if (args.Length == 1 && args[0] == "--bare-window-probe") return RunWindowProbe(true);
         try
         {
             // Load the production compiled resources, without invoking Moku's OnStartup,
@@ -112,6 +167,8 @@ internal static class Program
             Check(clicked, "custom menu preserves click routing");
             tip.IsOpen = false; menu.IsOpen = false;
             TestExternalWindowRestore();
+            TestQuickAccessLookup();
+            TestProcessAudioActivation();
             window.Close(); app.Shutdown();
             Console.WriteLine($"PASS: {checks} Windows window-restoration and WPF popup checks. Full application manual testing is separate.");
             return 0;

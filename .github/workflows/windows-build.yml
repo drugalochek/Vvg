@@ -1,7 +1,7 @@
 name: Windows build and regression checks
 on:
   push:
-    branches: [main, update/moku-2.12.2]
+    branches: [main, update/moku-2.12.3]
   workflow_dispatch:
 concurrency:
   group: windows-${{ github.ref }}
@@ -27,6 +27,6 @@ jobs:
         run: dotnet build Installer/Installer.csproj -c Release
       - uses: actions/upload-artifact@v4
         with:
-          name: Moku-2.12.2-framework-dependent-win-x64
+          name: Moku-2.12.3-framework-dependent-win-x64
           path: Island/publish/
           retention-days: 14

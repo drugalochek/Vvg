@@ -207,10 +207,13 @@ public partial class MainWindow
     }
     bool TryActivateHomeQuickAction(string command, string launchPath)
     {
-        var window = GetOpenWindows().FirstOrDefault(w => QuickAccessPolicy.MatchesWindow(command, w.ProcessName, w.WindowClass));
-        if (window != null)
+        // Activation must not reuse the task-list/preview filters: minimized UWP frames
+        // can be app-cloaked, owned or temporarily titleless and still be restorable.
+        var quickHwnd = QuickWindowResolver.Find(command);
+        if (quickHwnd != IntPtr.Zero)
         {
-            _pendingAppLaunches.Remove(launchPath); ActivateWindow(window.Handle); return true;
+            _pendingAppLaunches.Remove("home:calculator");
+            _pendingAppLaunches.Remove(launchPath); ActivateWindow(quickHwnd); return true;
         }
         if (!QuickAccessPolicy.IsTerminal(command)) return false;
         using var current = Process.GetCurrentProcess();

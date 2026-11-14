@@ -142,4 +142,23 @@ Check(QuickAccessPolicy.MatchesWindow("taskmgr.exe","Taskmgr","TaskManagerWindow
 Check(QuickAccessPolicy.IsTerminal(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"),"Windows command paths normalize in portable tests");
 Check(!QuickAccessPolicy.MatchesWindow("other.exe","Notepad","Notepad"),"unrelated quick command does not activate arbitrary app");
 
+Check(MusicSourcePolicy.Matches("Spotify.exe","spotify",null), "music executable source exact match");
+Check(MusicSourcePolicy.Matches("SpotifyAB.SpotifyMusic_pkg!Spotify","Spotify","SpotifyAB.SpotifyMusic_pkg!Spotify"), "packaged music AUMID match");
+Check(!MusicSourcePolicy.Matches("Spotify.exe","Discord",null), "Discord cannot replace player source");
+Check(!MusicSourcePolicy.Matches(null,"Discord",null), "unknown media source does not select any output");
+Check(!MusicSourcePolicy.Matches("chrome.exe","Discord",null), "browser player excludes Discord app");
+Check(!MusicSourcePolicy.Matches("spotify","spotify-helper",null), "no fuzzy process name match");
+Check(MusicSourcePolicy.Matches(@"C:\Apps\Player.exe","Player",null), "full source executable path normalizes");
+string sourceRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../../Island"));
+if (Directory.Exists(sourceRoot))
+{
+    string mainCode=File.ReadAllText(Path.Combine(sourceRoot,"MainWindow.xaml.cs"));
+    string windowsCode=File.ReadAllText(Path.Combine(sourceRoot,"MainWindow.Windows.cs"));
+    string analyzerCode=File.ReadAllText(Path.Combine(sourceRoot,"AudioBeatAnalyzer.cs"));
+    string quickRoute=windowsCode[windowsCode.IndexOf("bool TryActivateHomeQuickAction")..];
+    Check(quickRoute.Contains("QuickWindowResolver.Find(command)") && !quickRoute.Contains("GetOpenWindows()"), "Home activation bypasses preview window filters");
+    Check(mainCode.Contains("_audio.SetActive(np?.Playing == true, np?.SourceAppId)"), "audio capture follows current media source identity");
+    Check(analyzerCode.Contains("new ProcessLoopbackCapture(pid)") && !analyzerCode.Contains("new WasapiLoopbackCapture"), "no system-mix capture or fallback");
+    Check(mainCode.Contains("ProcessStartInfo(\"calculator:\")"), "suspended Calculator uses registered app activation fallback");
+}
 Console.WriteLine($"PASS: {checks} checks (folders, file launch plans, Home/Steam/button UI contracts, settings and 400 randomized packing cases). Windows integration still requires Windows.");

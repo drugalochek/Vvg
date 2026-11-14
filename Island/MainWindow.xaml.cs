@@ -1672,6 +1672,23 @@ public partial class MainWindow : Window
                 : Path.Combine(Environment.SystemDirectory, exe);
         // Resolve the visible app/host first, before checking the launcher stub or its PID.
         if (TryActivateHomeQuickAction(exe, path)) return;
+        if (exe.Equals("calc.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryBeginAppLaunch("home:calculator")) return;
+            try
+            {
+                // Calculator's registered URI activates its existing/suspended instance.
+                using var activation = Process.Start(new ProcessStartInfo("calculator:") { UseShellExecute = true });
+                Collapse();
+            }
+            catch (Exception ex)
+            {
+                _pendingAppLaunches.Remove("home:calculator");
+                Log.Error("Calculator app activation failed", ex);
+                ReportAppAction(Tr("Windows не удалось открыть Калькулятор.", "Windows could not activate Calculator."));
+            }
+            return;
+        }
         LaunchApp(path);
     }
 
@@ -1816,7 +1833,7 @@ public partial class MainWindow : Window
     void OnMediaChanged(NowPlaying? np)
     {
         _now = np;
-        _audio.SetActive(np?.Playing == true);   // захват звука только пока играет музыка
+        _audio.SetActive(np?.Playing == true, np?.SourceAppId);   // захват звука только пока играет музыка
         // Cache media state silently until the welcome sequence has finished.
         if (_welcomeRunning) return;
         if (np == null)
