@@ -72,7 +72,7 @@ internal static class MusicIdentityTests
             ((dynamic)shortcut).TargetPath = Environment.ProcessPath!;
             ((dynamic)shortcut).Save();
             link = Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046"), true)!)!;
-            ((IPersistFile)link).Load(file, 0);
+            ((IPersistFile)link).Load(file, 2); // STGM_READWRITE: fixture intentionally sets the shortcut AUMID.
             SetId((IPropertyStore)link, shortcutSource);
             ((IPersistFile)link).Save(file, true);
             check(MusicAppIdentity.ShortcutExecutables(shortcutSource).Any(path => MusicSourcePolicy.MatchesExecutablePath(path, Environment.ProcessPath)),
