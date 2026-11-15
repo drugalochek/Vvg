@@ -36,7 +36,7 @@ internal static class MusicProcessResolver
     [DllImport("kernel32.dll")] static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint pid);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode)] static extern bool Process32FirstW(IntPtr h, ref Entry e);
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode)] static extern bool Process32NextW(IntPtr h, ref Entry e);
-    static int Root(int pid)
+    internal static int Root(int pid)
     {
         IntPtr h=CreateToolhelp32Snapshot(2,0);
         if(h==new IntPtr(-1)) return pid;

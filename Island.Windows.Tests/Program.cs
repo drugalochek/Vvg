@@ -169,6 +169,66 @@ internal static class Program
         }
     }
 
+    static void TestSessionLevelLifecycle()
+    {
+        // This backend is deliberately exercised even on modern Windows.
+        int callbacks = 0;
+        bool invalid = false;
+        using (var meter = new SessionPeakMonitor(Environment.ProcessId))
+        {
+            meter.LevelAvailable += level =>
+            {
+                if (!float.IsFinite(level) || level < 0 || level > 1) invalid = true;
+                Interlocked.Increment(ref callbacks);
+            };
+            meter.Start();
+            for (int i = 0; i < 15 && Volatile.Read(ref callbacks) == 0; i++) Pump();
+            Check(Volatile.Read(ref callbacks) > 0 && !invalid, "Windows 10 session-level backend publishes finite values or safe silence");
+            Check(meter.ProcessId == Environment.ProcessId, "session meter retains selected player identity");
+            meter.Dispose();
+            for (int i = 0; i < 20 && !meter.IsCompleted; i++) Pump();
+            Check(meter.IsCompleted, "session meter worker stops without blocking UI");
+            int stopped = Volatile.Read(ref callbacks);
+            Pump(); Pump();
+            Check(Volatile.Read(ref callbacks) == stopped, "disposed meter cannot publish late player levels");
+        }
+    }
+    static void TestSessionLevelIsolation()
+    {
+        if (WaveOut.DeviceCount == 0)
+        { Console.WriteLine("SKIP Windows 10 session-level two-process test: no audio render device"); return; }
+        string id = Guid.NewGuid().ToString("N");
+        using var musicReady = new EventWaitHandle(false, EventResetMode.ManualReset, "MokuMeterMusic"+id);
+        using var otherReady = new EventWaitHandle(false, EventResetMode.ManualReset, "MokuMeterOther"+id);
+        string host = Path.ChangeExtension(typeof(Program).Assembly.Location, ".exe");
+        using var music = Process.Start(new ProcessStartInfo(host, "--audio-probe MokuMeterMusic"+id+" 220") { UseShellExecute=false })!;
+        using var other = Process.Start(new ProcessStartInfo(host, "--audio-probe MokuMeterOther"+id+" 1000") { UseShellExecute=false })!;
+        try
+        {
+            using var meter = new SessionPeakMonitor(music.Id);
+            float peak = 0;
+            var gate = new object();
+            meter.LevelAvailable += level => { lock (gate) peak = Math.Max(peak, level); };
+            meter.Start();
+            otherReady.Set();
+            for (int i=0; i<18; i++) Pump();
+            Check(!other.HasExited && !music.HasExited, "both level-test source processes remain alive");
+            lock (gate)
+            {
+                Check(peak < 0.001f, "Windows 10 meter excludes unrelated audio while player is silent");
+                peak = 0;
+            }
+            musicReady.Set();
+            for (int i=0; i<25; i++) Pump();
+            lock (gate) Check(peak > 0.01f, "Windows 10 meter detects selected player alongside unrelated audio");
+        }
+        finally
+        {
+            foreach (var p in new[] { music, other })
+                if (!p.HasExited) { p.Kill(true); p.WaitForExit(5000); }
+        }
+    }
+
     [STAThread]
     static int Main(string[] args)
     {
@@ -227,6 +287,8 @@ internal static class Program
             TestQuickAccessLookup();
             TestProcessAudioActivation();
             TestProcessAudioIsolation();
+            TestSessionLevelLifecycle();
+            TestSessionLevelIsolation();
             window.Close(); app.Shutdown();
             Console.WriteLine($"PASS: {checks} Windows window-restoration and WPF popup checks. Full application manual testing is separate.");
             return 0;

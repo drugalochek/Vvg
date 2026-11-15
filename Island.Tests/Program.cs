@@ -161,4 +161,22 @@ if (Directory.Exists(sourceRoot))
     Check(analyzerCode.Contains("new ProcessLoopbackCapture(pid)") && !analyzerCode.Contains("new WasapiLoopbackCapture"), "no system-mix capture or fallback");
     Check(mainCode.Contains("ProcessStartInfo(\"calculator:\")"), "suspended Calculator uses registered app activation fallback");
 }
+Check(AudioLevelPolicy.UseSessionMeter(false, false), "Windows 10 selects session level meter");
+Check(!AudioLevelPolicy.UseSessionMeter(true, false), "modern Windows keeps isolated spectrum");
+Check(AudioLevelPolicy.UseSessionMeter(true, true), "process loopback failure uses isolated level meter");
+Check(AudioLevelPolicy.AcceptSession(42,42,false), "only selected player session accepted");
+Check(!AudioLevelPolicy.AcceptSession(42,43,false), "Discord or other process excluded");
+Check(!AudioLevelPolicy.AcceptSession(42,42,true), "system sounds excluded");
+Check(!AudioLevelPolicy.AcceptSession(0,0,false), "unknown source cannot select system audio");
+Check(!AudioLevelPolicy.AcceptSession(42,0,false), "unresolved session excluded");
+Check(AudioLevelPolicy.PeakActivity(0)==0, "silent player is silent");
+Check(AudioLevelPolicy.PeakActivity(0.25f)==0.5f, "quiet player level made visible");
+Check(AudioLevelPolicy.PeakActivity(-1)==0 && AudioLevelPolicy.PeakActivity(2)==1, "peak clamp");
+Check(AudioLevelPolicy.PeakActivity(float.NaN)==0 && AudioLevelPolicy.PeakActivity(float.PositiveInfinity)==0, "invalid samples remain finite");
+if (Directory.Exists(sourceRoot))
+{
+    string meter = File.ReadAllText(Path.Combine(sourceRoot,"SessionPeakMonitor.cs"));
+    Check(meter.Contains("session.AudioMeterInformation.MasterPeakValue") && !meter.Contains("device.AudioMeterInformation"), "meter reads player session not endpoint");
+    Check(meter.Contains("AudioLevelPolicy.AcceptSession") && meter.Contains("SameProcess()"), "session identity and PID reuse guarded");
+}
 Console.WriteLine($"PASS: {checks} checks (folders, file launch plans, Home/Steam/button UI contracts, settings and 400 randomized packing cases). Windows integration still requires Windows.");

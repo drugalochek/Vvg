@@ -8,7 +8,8 @@ namespace Island;
 
 /// <summary>
 /// Measures low, mid and high energy from the current player process only.
-/// Application loopback requires Windows build 20348+. Never falls back to the system mix.
+/// On older Windows, session peaks drive activity only; no spectrum is invented.
+/// Never falls back to the system mix.
 /// • Захват работает только пока играет музыка (SetActive) — в простое не тратит CPU.
 /// • При смене устройства вывода (наушники, Bluetooth, HDMI) захват автоматически
 ///   пересоздаётся на новом устройстве — волна больше не «умирает» после переключения.
@@ -29,6 +30,8 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     readonly object _gate = new();
     readonly MMDeviceEnumerator? _enumerator;
     CaptureSession? _session;
+    SessionPeakMonitor? _levelMonitor;
+    bool _processLoopbackFailed;
     Timer? _restartTimer;
     bool _wantActive, _disposed;
     string? _sourceAppId;
@@ -65,9 +68,11 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
         lock (_gate)
         {
             if (_disposed || (_wantActive == active && _sourceAppId == sourceAppId)) return;
+            _processLoopbackFailed = false;
             _wantActive = active;
             _sourceAppId = sourceAppId;
         }
+        StopCapture(); // Drop old player immediately; late callbacks cannot republish levels.
         if (active) ScheduleRestart(0);
         else
         {
@@ -103,12 +108,16 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     {
         lock (_gate)
         {
-            if (_disposed || !_wantActive || _session != null) return;
+            if (_disposed || !_wantActive || _session != null || _levelMonitor != null) return;
             try
             {
-                if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)) return;
                 int pid = MusicProcessResolver.Resolve(_sourceAppId);
                 if (pid == 0) return; // Unknown music source: silence, never the Windows mix.
+                if (AudioLevelPolicy.UseSessionMeter(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348), _processLoopbackFailed))
+                {
+                    StartLevelMonitor(pid);
+                    return;
+                }
                 var capture = new ProcessLoopbackCapture(pid);
                 var format = capture.WaveFormat;
                 int rate = format.SampleRate;
@@ -133,8 +142,9 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             }
             catch (Exception ex)
             {
-                _session = null;
-                Log.Warn("WASAPI loopback unavailable; retrying later: " + ex.Message);
+                _processLoopbackFailed = true;
+                StopCapture();
+                Log.Warn("Player audio unavailable; retrying with session meter: " + ex.Message);
                 // Например, нет ни одного устройства вывода. Повторим, когда оно появится, или через 5 с.
                 _restartTimer?.Dispose();
                 _restartTimer = new Timer(_ => StartCapture(), null, 5000, Timeout.Infinite);
@@ -150,9 +160,10 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
         {
             lock (_gate)
             {
-                if (_disposed || !_wantActive || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)) return;
+                if (_disposed || !_wantActive) return;
                 int pid = MusicProcessResolver.Resolve(_sourceAppId);
-                if (pid == (_session?.ProcessId ?? 0)) return;
+                if (pid != 0 && pid == (_session?.ProcessId ?? _levelMonitor?.ProcessId ?? 0) && _levelMonitor?.IsCompleted != true) return;
+                if (pid == 0 && _session == null && _levelMonitor == null) return;
                 ScheduleRestart(0);
             }
         }
@@ -160,35 +171,59 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
         finally { Volatile.Write(ref _checkingSource, 0); }
     }
 
+    void StartLevelMonitor(int pid)
+    {
+        var monitor = new SessionPeakMonitor(pid);
+        monitor.LevelAvailable += peak =>
+        {
+            lock (_gate)
+            {
+                if (_disposed || !_wantActive || !ReferenceEquals(_levelMonitor, monitor)) return;
+                Volatile.Write(ref _activityLevel, AudioLevelPolicy.PeakActivity(peak));
+                // A peak meter does not measure bass/mid/high or musical beats.
+                Volatile.Write(ref _bassLevel, 0);
+                Volatile.Write(ref _midLevel, 0);
+                Volatile.Write(ref _highLevel, 0);
+                Interlocked.Exchange(ref _beatPending, 0);
+            }
+        };
+        _levelMonitor = monitor;
+        monitor.Start();
+        Log.Info("Per-player session level mode started (Windows 10 compatible)");
+    }
+
     void StopCapture()
     {
-        CaptureSession? session;
         lock (_gate)
         {
-            session = _session;
+            var session = _session;
+            var monitor = _levelMonitor;
             _session = null;
+            _levelMonitor = null;
+            Interlocked.Exchange(ref _beatPending, 0);
+            Volatile.Write(ref _bassLevel, 0);
+            Volatile.Write(ref _midLevel, 0);
+            Volatile.Write(ref _highLevel, 0);
+            Volatile.Write(ref _activityLevel, 0);
+            monitor?.Dispose();
+            if (session == null) return;
+            try { session.Capture.StopRecording(); session.Capture.Dispose(); }
+            catch (Exception ex) { Log.Warn("Audio capture stop: " + ex.Message); }
         }
-        Interlocked.Exchange(ref _beatPending, 0);
-        Volatile.Write(ref _bassLevel, 0);
-        Volatile.Write(ref _midLevel, 0);
-        Volatile.Write(ref _highLevel, 0);
-        Volatile.Write(ref _activityLevel, 0);
-        if (session == null) return;
-        try
-        {
-            session.Capture.StopRecording();
-            session.Capture.Dispose();
-        }
-        catch (Exception ex) { Log.Warn("Audio capture stop: " + ex.Message); }
     }
 
     void OnRecordingStopped(CaptureSession session, StoppedEventArgs e)
     {
-        bool current;
-        lock (_gate) current = ReferenceEquals(_session, session) && !_disposed && _wantActive;
-        if (!current) return;                       // это мы сами остановили старую сессию
-        if (e.Exception != null) Log.Warn("WASAPI loopback stopped: " + e.Exception.Message);
-        ScheduleRestart(1000);                      // устройство пропало/сменилось — переподключаемся
+        lock (_gate)
+        {
+            if (!ReferenceEquals(_session, session) || _disposed || !_wantActive) return;
+            if (e.Exception != null)
+            {
+                Log.Warn("Process audio unavailable; using player session level: " + e.Exception.Message);
+                _processLoopbackFailed = true;
+            }
+            ScheduleRestart(1000);
+        }
     }
 
     void OnDataAvailable(CaptureSession s, WaveInEventArgs e)
@@ -228,6 +263,9 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             float mid = (float)Math.Clamp(midRms * 24.0, 0, 1);
             float high = (float)Math.Clamp(highRms * 22.0, 0, 1);
             float activity = Math.Clamp(bass * 0.40f + mid * 0.36f + high * 0.24f, 0, 1);
+            lock (_gate)
+            {
+            if (_disposed || !_wantActive || !ReferenceEquals(_session, s)) return;
             Volatile.Write(ref _bassLevel, bass);
             Volatile.Write(ref _midLevel, mid);
             Volatile.Write(ref _highLevel, high);
@@ -244,6 +282,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             {
                 Interlocked.Exchange(ref _lastBeatTicks, now);
                 Interlocked.Exchange(ref _beatPending, 1);
+            }
             }
         }
         catch (Exception ex) { Log.Warn("Audio beat analysis failed: " + ex.Message); }
