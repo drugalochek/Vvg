@@ -179,6 +179,13 @@ if (Directory.Exists(sourceRoot))
     Check(meter.Contains("session.AudioMeterInformation.MasterPeakValue") && !meter.Contains("device.AudioMeterInformation"), "meter reads player session not endpoint");
     Check(meter.Contains("AudioLevelPolicy.AcceptSession") && meter.Contains("SameProcess()"), "session identity and PID reuse guarded");
 }
+Check(MusicSourcePolicy.Matches("ru.yandex.desktop.music", "YandexMusic", null), "desktop Yandex media AUMID resolves actual EXE name without packaged identity");
+Check(MusicSourcePolicy.Matches("RU.YANDEX.DESKTOP.MUSIC", "yandexmusic", null), "Yandex desktop alias is case insensitive");
+Check(MusicSourcePolicy.Matches("ru.yandex.desktop.music", "Яндекс Музыка", null), "localized Yandex desktop executable alias resolves");
+Check(!MusicSourcePolicy.Matches("ru.yandex.desktop.music", "browser", null), "Yandex Music identity never selects Yandex Browser");
+Check(!MusicSourcePolicy.Matches("ru.yandex.desktop.music", "YandexMusicHelper", null), "Yandex alias never uses fuzzy helper matching");
+Check(!MusicSourcePolicy.Matches("unrelated.ru.yandex.desktop.music", "YandexMusic", null), "desktop alias requires complete exact media identity");
+Check(!MusicSourcePolicy.Matches("Spotify.exe", "YandexMusic", null), "Yandex alias cannot replace a different selected player");
 Check(MusicSourcePolicy.SelectRoot(new[] { 42, 42 }, new[] { 42, 99 }) == 42, "duplicate player processes collapse to one root");
 Check(MusicSourcePolicy.SelectRoot(new[] { 42, 43 }, new[] { 43, 99 }) == 43, "only matching player audio root is selected");
 Check(MusicSourcePolicy.SelectRoot(new[] { 42, 43 }, new[] { 42, 43 }) == 0, "two distinct matching player trees remain ambiguous");
