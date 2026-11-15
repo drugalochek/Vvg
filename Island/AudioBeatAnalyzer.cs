@@ -32,6 +32,10 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     CaptureSession? _session;
     SessionPeakMonitor? _levelMonitor;
     bool _processLoopbackFailed;
+    string _captureMode = AudioLevelPolicy.DefaultMode(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348));
+    internal string CaptureMode { get { lock (_gate) return _captureMode; } }
+    internal string? ActiveBackend { get { lock (_gate) return _levelMonitor != null ? AudioLevelPolicy.Windows10 :
+        _session != null ? AudioLevelPolicy.Windows11 : null; } }
     Timer? _restartTimer;
     bool _wantActive, _disposed;
     string? _sourceAppId;
@@ -61,6 +65,22 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     }
 
     public bool ConsumeBeat() => Interlocked.Exchange(ref _beatPending, 0) != 0;
+
+    /// <summary>Manual backend override; Windows 10 level mode also works on Windows 11.</summary>
+    public void SetCaptureMode(string? mode)
+    {
+        lock (_gate)
+        {
+            mode = AudioLevelPolicy.NormalizeMode(mode, OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348));
+            if (_disposed || _captureMode == mode) return;
+            _captureMode = mode;
+            _processLoopbackFailed = false;
+            CancelRestart();
+            StopCapture(); // Clear levels and detach old callbacks before applying the new mode.
+            Log.Info("Audio capture mode selected: " + mode);
+            if (_wantActive) ScheduleRestart(0);
+        }
+    }
 
     /// <summary>Включить/выключить анализ звука (вызывается из UI при play/pause).</summary>
     public void SetActive(bool active, string? sourceAppId)
@@ -113,7 +133,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             {
                 int pid = MusicProcessResolver.Resolve(_sourceAppId);
                 if (pid == 0) return; // Unknown music source: silence, never the Windows mix.
-                if (AudioLevelPolicy.UseSessionMeter(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348), _processLoopbackFailed))
+                if (AudioLevelPolicy.UseSessionMeter(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348), _processLoopbackFailed, _captureMode))
                 {
                     StartLevelMonitor(pid);
                     return;

@@ -179,4 +179,35 @@ if (Directory.Exists(sourceRoot))
     Check(meter.Contains("session.AudioMeterInformation.MasterPeakValue") && !meter.Contains("device.AudioMeterInformation"), "meter reads player session not endpoint");
     Check(meter.Contains("AudioLevelPolicy.AcceptSession") && meter.Contains("SameProcess()"), "session identity and PID reuse guarded");
 }
+Check(AudioLevelPolicy.DefaultMode(true) == "Windows11", "supported Windows defaults to 11 mode");
+Check(AudioLevelPolicy.DefaultMode(false) == "Windows10", "older Windows defaults to 10 mode");
+Check(AudioLevelPolicy.UseSessionMeter(true,false,"Windows10"), "manual 10 override on Windows 11 selects player level");
+Check(!AudioLevelPolicy.UseSessionMeter(true,false,"Windows11"), "manual 11 mode selects isolated spectrum");
+Check(AudioLevelPolicy.UseSessionMeter(false,false,"Windows11"), "11 mode cannot activate unsupported OS APIs");
+Check(AudioLevelPolicy.UseSessionMeter(true,true,"Windows11"), "11 mode retains safe isolated fallback after failure");
+Check(AudioLevelPolicy.NormalizeMode(null,true) == "Windows11", "null mode recovers OS default");
+Check(AudioLevelPolicy.NormalizeMode("broken",false) == "Windows10", "invalid mode recovers OS default");
+foreach (var mode in new[] { "Windows10", "Windows11" })
+{
+    var audioSettings = new Settings { AudioCaptureMode = mode };
+    audioSettings.Normalize();
+    var restored = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(audioSettings))!;
+    restored.Normalize();
+    Check(restored.AudioCaptureMode == mode, "manual audio mode persists: " + mode);
+}
+var migratedAudio = JsonSerializer.Deserialize<Settings>("{\"MusicWave\":true}")!;
+migratedAudio.Normalize();
+Check(migratedAudio.AudioCaptureMode == AudioLevelPolicy.DefaultMode(OperatingSystem.IsWindowsVersionAtLeast(10,0,20348)), "legacy settings migrate without losing OS default");
+var invalidAudio = new Settings { AudioCaptureMode = null! }; invalidAudio.Normalize();
+Check(invalidAudio.AudioCaptureMode == migratedAudio.AudioCaptureMode, "null saved audio mode safely normalized");
+if (Directory.Exists(sourceRoot))
+{
+    string extra = File.ReadAllText(Path.Combine(sourceRoot,"MainWindow.SettingsExtra.cs"));
+    string main = File.ReadAllText(Path.Combine(sourceRoot,"MainWindow.xaml.cs"));
+    string analyzer = File.ReadAllText(Path.Combine(sourceRoot,"AudioBeatAnalyzer.cs"));
+    Check(extra.Contains("new AudioModeSelector(_s.AudioCaptureMode") && extra.Contains("_audio.SetCaptureMode(mode)"), "production selector applies analyzer mode live");
+    Check(main.Contains("_audio.SetCaptureMode(_s.AudioCaptureMode)"), "startup applies saved backend before media events");
+    Check(extra.Contains("_s.AudioCaptureMode = d.AudioCaptureMode"), "music section reset resets audio mode too");
+    Check(analyzer.Contains("_processLoopbackFailed, _captureMode"), "backend selection consumes manual override");
+}
 Console.WriteLine($"PASS: {checks} checks (folders, file launch plans, Home/Steam/button UI contracts, settings and 400 randomized packing cases). Windows integration still requires Windows.");

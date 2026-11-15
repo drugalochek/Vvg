@@ -144,6 +144,18 @@ public partial class MainWindow
         Section(p, L("МУЗЫКА", "MUSIC"));
         ToggleRow(p, L("Волна под музыку", "Music wave"), () => _s.MusicWave, v => _s.MusicWave = v);
         SliderRow(p, L("Высота волны", "Wave height"), 30, 150, () => _s.WaveHeight, v => _s.WaveHeight = v, v => v + "%");
+        Row(p, L("Режим звука Windows", "Windows audio mode"), out var audioModeHost);
+        audioModeHost.Children.Add(new AudioModeSelector(_s.AudioCaptureMode, mode =>
+        {
+            _s.AudioCaptureMode = mode;
+            _s.Save();
+            _audio.SetCaptureMode(mode);
+            _waveBeatPulse = 0;
+            _waveAmp = 0;
+            EnsureFx();
+        }, (Style)FindResource("TabBtn")));
+        Hint(p, L("Windows 11 — анализ частот. Windows 10 — совместимый режим уровня плеера, работает и на Windows 11. Если волна не реагирует, попробуй Windows 10. Применяется сразу, без перезапуска Moku. Общий звук системы не захватывается.",
+                  "Windows 11: frequency analysis. Windows 10: compatible player-level mode, also available on Windows 11. If the wave does not respond, try Windows 10. Applies immediately without restarting Moku. System-wide audio is never captured."));
         Section(p, L("УВЕДОМЛЕНИЯ", "NOTIFICATIONS"));
         ToggleRow(p, L("При копировании", "On copy"), () => _s.ToastOnCopy, v => _s.ToastOnCopy = v);
         ToggleRow(p, L("При смене трека", "On new track"), () => _s.ToastOnTrack, v => _s.ToastOnTrack = v);
@@ -218,6 +230,10 @@ public partial class MainWindow
             case "music":
                 _s.MusicWave = d.MusicWave; _s.WaveHeight = d.WaveHeight; _s.ToastOnCopy = d.ToastOnCopy; _s.ToastOnTrack = d.ToastOnTrack;
                 _s.ToastTime = d.ToastTime;
+                _s.AudioCaptureMode = d.AudioCaptureMode;
+                _audio.SetCaptureMode(_s.AudioCaptureMode);
+                _waveBeatPulse = 0;
+                _waveAmp = 0;
                 break;
             case "apps":
                 _s.AppTileSize = d.AppTileSize; _s.AppTileSizes.Clear();
