@@ -61,36 +61,83 @@ internal static class MusicProcessResolver
         finally { CloseHandle(h); }
         return pid;
     }
+    sealed record Candidate(int Pid, string Name, string? Path, string? PackagedId);
+    static readonly object ResolveGate = new();
+    static string? _cachedSource;
+    static long _cacheUntil;
+    static int _cachedPid;
+    static long _cachedStart;
     internal static int Resolve(string? source)
     {
         if (string.IsNullOrWhiteSpace(source)) return 0;
-        // Prefer a matching process with an audio session. Search all render endpoints,
-        // not the default endpoint: a player may be routed to different headphones.
+        lock (ResolveGate)
+        {
+            if (source == _cachedSource && Stopwatch.GetTimestamp() < _cacheUntil && _cachedPid > 0)
+                try
+                {
+                    using var cached = Process.GetProcessById(_cachedPid);
+                    if (!cached.HasExited && cached.StartTime.ToUniversalTime().Ticks == _cachedStart) return _cachedPid;
+                }
+                catch { }
+            int pid = ResolveCore(source);
+            if (_cachedSource != source || _cachedPid != pid)
+            {
+                string label = source.Replace("\r", "").Replace("\n", "");
+                if (label.Length > 180) label = label[..180];
+                Log.Info($"Music source '{label}' resolved to player PID {pid}");
+            }
+            _cachedSource = source;
+            _cachedPid = pid;
+            _cacheUntil = Stopwatch.GetTimestamp() + Stopwatch.Frequency;
+            _cachedStart = 0;
+            if (pid > 0)
+                try { using var p = Process.GetProcessById(pid); _cachedStart = p.StartTime.ToUniversalTime().Ticks; }
+                catch { _cachedPid = 0; }
+            return _cachedPid;
+        }
+    }
+    static int ResolveCore(string source)
+    {
         var audible = new HashSet<int>();
         try
         {
             using var e = new MMDeviceEnumerator();
-            var devices = e.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-            foreach (var d in devices)
+            foreach (var d in e.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
                 using (d)
                 {
                     var sessions = d.AudioSessionManager.Sessions;
-                    for (int i=0; i<sessions.Count; i++)
-                        using (var session = sessions[i]) audible.Add((int)session.GetProcessID);
+                    for (int i = 0; i < sessions.Count; i++)
+                        using (var session = sessions[i])
+                            if (!session.IsSystemSoundsSession && session.GetProcessID > 0)
+                                audible.Add(Root((int)session.GetProcessID));
                 }
         }
         catch { }
         using var me = Process.GetCurrentProcess();
-        int fallback = 0;
+        var candidates = new List<Candidate>();
         foreach (var p in Process.GetProcesses())
             using (p)
                 try
                 {
-                    if (p.SessionId != me.SessionId || !MusicSourcePolicy.Matches(source, p.ProcessName, AppId(p.Id))) continue;
-                    if (audible.Contains(p.Id)) return Root(p.Id);
-                    if (fallback == 0) fallback = p.Id;
+                    if (p.SessionId != me.SessionId) continue;
+                    string? path = null;
+                    try { path = p.MainModule?.FileName; } catch { }
+                    candidates.Add(new(p.Id, p.ProcessName, path, AppId(p.Id)));
                 }
                 catch { }
-        return fallback == 0 ? 0 : Root(fallback);
+        var matches = candidates.Where(p => MusicSourcePolicy.Matches(source, p.Name, p.PackagedId)).ToList();
+        // Unpackaged Electron players (including Yandex Music) may publish an explicit
+        // desktop AUMID which GetApplicationUserModelId cannot read from the process.
+        // Read the exact window property first, registered shortcut identity second.
+        var owners = MusicAppIdentity.WindowOwners(source, candidates.Select(p => p.Pid).ToHashSet());
+        matches.AddRange(candidates.Where(p => owners.Contains(p.Pid)));
+        if (matches.Count == 0)
+        {
+            var paths = MusicAppIdentity.ShortcutExecutables(source);
+            matches.AddRange(candidates.Where(p => paths.Any(path => MusicSourcePolicy.MatchesExecutablePath(path, p.Path))));
+        }
+        int[] roots = matches.Select(p => Root(p.Pid)).Distinct().ToArray();
+        // The sound can belong to a child/helper rather than the media-control window.
+        return MusicSourcePolicy.SelectRoot(roots, audible); // Ambiguous player: never guess the loudest process.
     }
 }

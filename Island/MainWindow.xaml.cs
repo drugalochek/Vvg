@@ -138,7 +138,6 @@ public partial class MainWindow : Window
         try
         {
         InitializeComponent();
-        _audio.SetCaptureMode(_s.AudioCaptureMode);
         InitEyes();
         Log.Info("MainWindow: XAML loaded");
         startupStage = "window setup";

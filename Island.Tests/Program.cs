@@ -179,35 +179,39 @@ if (Directory.Exists(sourceRoot))
     Check(meter.Contains("session.AudioMeterInformation.MasterPeakValue") && !meter.Contains("device.AudioMeterInformation"), "meter reads player session not endpoint");
     Check(meter.Contains("AudioLevelPolicy.AcceptSession") && meter.Contains("SameProcess()"), "session identity and PID reuse guarded");
 }
-Check(AudioLevelPolicy.DefaultMode(true) == "Windows11", "supported Windows defaults to 11 mode");
-Check(AudioLevelPolicy.DefaultMode(false) == "Windows10", "older Windows defaults to 10 mode");
-Check(AudioLevelPolicy.UseSessionMeter(true,false,"Windows10"), "manual 10 override on Windows 11 selects player level");
-Check(!AudioLevelPolicy.UseSessionMeter(true,false,"Windows11"), "manual 11 mode selects isolated spectrum");
-Check(AudioLevelPolicy.UseSessionMeter(false,false,"Windows11"), "11 mode cannot activate unsupported OS APIs");
-Check(AudioLevelPolicy.UseSessionMeter(true,true,"Windows11"), "11 mode retains safe isolated fallback after failure");
-Check(AudioLevelPolicy.NormalizeMode(null,true) == "Windows11", "null mode recovers OS default");
-Check(AudioLevelPolicy.NormalizeMode("broken",false) == "Windows10", "invalid mode recovers OS default");
-foreach (var mode in new[] { "Windows10", "Windows11" })
+Check(MusicSourcePolicy.SelectRoot(new[] { 42, 42 }, new[] { 42, 99 }) == 42, "duplicate player processes collapse to one root");
+Check(MusicSourcePolicy.SelectRoot(new[] { 42, 43 }, new[] { 43, 99 }) == 43, "only matching player audio root is selected");
+Check(MusicSourcePolicy.SelectRoot(new[] { 42, 43 }, new[] { 42, 43 }) == 0, "two distinct matching player trees remain ambiguous");
+Check(MusicSourcePolicy.SelectRoot(new[] { 42, 43 }, new[] { 99 }) == 0, "unrelated loud audio never resolves ambiguous music source");
+Check(MusicSourcePolicy.SelectRoot(Array.Empty<int>(), new[] { 99 }) == 0, "no player match means silence even with other audio");
+Check(MusicSourcePolicy.SelectRoot(new[] { 42 }, Array.Empty<int>()) == 42, "known player can resolve before it opens an audio session");
+Check(MusicSourcePolicy.SelectRoot(new[] { 0, -1 }, new[] { 0, -1 }) == 0, "invalid process IDs are never accepted");
+Check(AudioLevelPolicy.ShouldFallBack(true, 0.75), "sustained player sound with silent PCM activates automatic fallback");
+Check(!AudioLevelPolicy.ShouldFallBack(false, 5), "valid PCM is never replaced merely because player meter is active");
+Check(!AudioLevelPolicy.ShouldFallBack(true, 0.2), "short sound/meter spikes do not switch backend");
+Check(!AudioLevelPolicy.ShouldFallBack(true, 0), "a paused or silent track does not trigger fallback");
+Check(MusicSourcePolicy.MatchesExecutablePath(@"C:\Music\Яндекс Музыка.exe", @"c:/music/Яндекс Музыка.exe"), "registered Unicode player path matches exact executable");
+Check(!MusicSourcePolicy.MatchesExecutablePath(@"C:\Music\Player.exe", @"C:\Other\Player.exe"), "same filename in different directory is not a player identity");
+Check(!MusicSourcePolicy.MatchesExecutablePath(null, @"C:\Discord.exe"), "missing registered target cannot match Discord");
+Check(!MusicSourcePolicy.Matches("ru.yandex.desktop.music", "Discord", null), "custom Yandex identity cannot select unrelated voice app");
+foreach (var oldMode in new[] { "Windows10", "Windows11", "broken" })
 {
-    var audioSettings = new Settings { AudioCaptureMode = mode };
-    audioSettings.Normalize();
-    var restored = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(audioSettings))!;
-    restored.Normalize();
-    Check(restored.AudioCaptureMode == mode, "manual audio mode persists: " + mode);
+    var migrated = JsonSerializer.Deserialize<Settings>("{\"MusicWave\":true,\"WaveHeight\":123,\"AudioCaptureMode\":\"" + oldMode + "\"}")!;
+    migrated.Normalize();
+    string json = JsonSerializer.Serialize(migrated);
+    Check(migrated.MusicWave && migrated.WaveHeight == 123, "legacy mode migration preserves wave preferences: " + oldMode);
+    Check(!json.Contains("AudioCaptureMode"), "obsolete Windows selector is no longer saved: " + oldMode);
 }
-var migratedAudio = JsonSerializer.Deserialize<Settings>("{\"MusicWave\":true}")!;
-migratedAudio.Normalize();
-Check(migratedAudio.AudioCaptureMode == AudioLevelPolicy.DefaultMode(OperatingSystem.IsWindowsVersionAtLeast(10,0,20348)), "legacy settings migrate without losing OS default");
-var invalidAudio = new Settings { AudioCaptureMode = null! }; invalidAudio.Normalize();
-Check(invalidAudio.AudioCaptureMode == migratedAudio.AudioCaptureMode, "null saved audio mode safely normalized");
 if (Directory.Exists(sourceRoot))
 {
     string extra = File.ReadAllText(Path.Combine(sourceRoot,"MainWindow.SettingsExtra.cs"));
-    string main = File.ReadAllText(Path.Combine(sourceRoot,"MainWindow.xaml.cs"));
     string analyzer = File.ReadAllText(Path.Combine(sourceRoot,"AudioBeatAnalyzer.cs"));
-    Check(extra.Contains("new AudioModeSelector(_s.AudioCaptureMode") && extra.Contains("_audio.SetCaptureMode(mode)"), "production selector applies analyzer mode live");
-    Check(main.Contains("_audio.SetCaptureMode(_s.AudioCaptureMode)"), "startup applies saved backend before media events");
-    Check(extra.Contains("_s.AudioCaptureMode = d.AudioCaptureMode"), "music section reset resets audio mode too");
-    Check(analyzer.Contains("_processLoopbackFailed, _captureMode"), "backend selection consumes manual override");
+    string resolver = File.ReadAllText(Path.Combine(sourceRoot,"MusicProcessResolver.cs"));
+    string identity = File.ReadAllText(Path.Combine(sourceRoot,"MusicAppIdentity.cs"));
+    Check(!extra.Contains("AudioModeSelector") && !extra.Contains("Режим звука Windows"), "music settings have no OS version selector");
+    Check(!analyzer.Contains("SetCaptureMode") && analyzer.Contains("ShouldFallBack"), "backend and silent-capture fallback selected automatically");
+    Check(resolver.Contains("MusicAppIdentity.WindowOwners") && resolver.Contains("MusicAppIdentity.ShortcutExecutables"), "production resolver reads desktop window and registered shortcut identities");
+    Check(resolver.Contains("audible.Add(Root("), "child audio session is compared with player process tree root");
+    Check(identity.Contains("SHGetPropertyStoreForWindow") && identity.Contains("IPersistFile"), "identity resolver uses actual Windows property stores");
 }
 Console.WriteLine($"PASS: {checks} checks (folders, file launch plans, Home/Steam/button UI contracts, settings and 400 randomized packing cases). Windows integration still requires Windows.");

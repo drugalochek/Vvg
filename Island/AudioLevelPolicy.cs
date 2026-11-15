@@ -3,12 +3,12 @@ namespace Island;
 /// <summary>Session peaks are level, not a frequency spectrum.</summary>
 internal static class AudioLevelPolicy
 {
-    internal const string Windows11 = "Windows11", Windows10 = "Windows10";
-    internal static string DefaultMode(bool supported) => supported ? Windows11 : Windows10;
-    internal static string NormalizeMode(string? mode, bool supported) =>
-        mode is Windows11 or Windows10 ? mode : DefaultMode(supported);
-    internal static bool UseSessionMeter(bool supported, bool failed, string? mode = null) =>
-        mode == Windows10 || !supported || failed;
+    internal const string Spectrum = "ProcessSpectrum", SessionLevel = "PlayerSessionLevel";
+    internal static bool UseSessionMeter(bool supported, bool failed) => !supported || failed;
+    // A successful activation is not proof that PCM contains the player's sound.
+    // Require sustained player-session audio, not merely elapsed time during a quiet intro.
+    internal static bool ShouldFallBack(bool pcmSilent, double secondsWithSessionAudio) =>
+        pcmSilent && secondsWithSessionAudio >= 0.75;
     internal static bool AcceptSession(int targetRoot, int sessionRoot, bool systemSounds) =>
         targetRoot > 0 && sessionRoot > 0 && targetRoot == sessionRoot && !systemSounds;
     internal static float PeakActivity(float peak) =>

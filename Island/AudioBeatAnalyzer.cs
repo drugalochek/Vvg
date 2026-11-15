@@ -25,6 +25,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
         public int Channels, Bits, SampleRate;
         public bool IsFloat;
         public double BassFloor;
+        public long StartedTicks = Stopwatch.GetTimestamp(), LastSignalTicks, MeterSoundSinceTicks;
     }
 
     readonly object _gate = new();
@@ -32,10 +33,8 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     CaptureSession? _session;
     SessionPeakMonitor? _levelMonitor;
     bool _processLoopbackFailed;
-    string _captureMode = AudioLevelPolicy.DefaultMode(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348));
-    internal string CaptureMode { get { lock (_gate) return _captureMode; } }
-    internal string? ActiveBackend { get { lock (_gate) return _levelMonitor != null ? AudioLevelPolicy.Windows10 :
-        _session != null ? AudioLevelPolicy.Windows11 : null; } }
+    internal string? ActiveBackend { get { lock (_gate) return _session != null ? AudioLevelPolicy.Spectrum :
+        _levelMonitor != null ? AudioLevelPolicy.SessionLevel : null; } }
     Timer? _restartTimer;
     bool _wantActive, _disposed;
     string? _sourceAppId;
@@ -65,22 +64,6 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     }
 
     public bool ConsumeBeat() => Interlocked.Exchange(ref _beatPending, 0) != 0;
-
-    /// <summary>Manual backend override; Windows 10 level mode also works on Windows 11.</summary>
-    public void SetCaptureMode(string? mode)
-    {
-        lock (_gate)
-        {
-            mode = AudioLevelPolicy.NormalizeMode(mode, OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348));
-            if (_disposed || _captureMode == mode) return;
-            _captureMode = mode;
-            _processLoopbackFailed = false;
-            CancelRestart();
-            StopCapture(); // Clear levels and detach old callbacks before applying the new mode.
-            Log.Info("Audio capture mode selected: " + mode);
-            if (_wantActive) ScheduleRestart(0);
-        }
-    }
 
     /// <summary>Включить/выключить анализ звука (вызывается из UI при play/pause).</summary>
     public void SetActive(bool active, string? sourceAppId)
@@ -133,11 +116,11 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             {
                 int pid = MusicProcessResolver.Resolve(_sourceAppId);
                 if (pid == 0) return; // Unknown music source: silence, never the Windows mix.
-                if (AudioLevelPolicy.UseSessionMeter(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348), _processLoopbackFailed, _captureMode))
-                {
-                    StartLevelMonitor(pid);
+                // Keep a player-only meter alongside PCM so silent/blocked loopback
+                // can be detected. Never inspect the endpoint/system volume.
+                StartLevelMonitor(pid);
+                if (AudioLevelPolicy.UseSessionMeter(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348), _processLoopbackFailed))
                     return;
-                }
                 var capture = new ProcessLoopbackCapture(pid);
                 var format = capture.WaveFormat;
                 int rate = format.SampleRate;
@@ -184,6 +167,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
                 int pid = MusicProcessResolver.Resolve(_sourceAppId);
                 if (pid != 0 && pid == (_session?.ProcessId ?? _levelMonitor?.ProcessId ?? 0) && _levelMonitor?.IsCompleted != true) return;
                 if (pid == 0 && _session == null && _levelMonitor == null) return;
+                _processLoopbackFailed = false; // New PID/backend lifecycle: retry spectrum when available.
                 ScheduleRestart(0);
             }
         }
@@ -199,8 +183,27 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             lock (_gate)
             {
                 if (_disposed || !_wantActive || !ReferenceEquals(_levelMonitor, monitor)) return;
+                var session = _session;
+                if (session != null)
+                {
+                    long now = Stopwatch.GetTimestamp();
+                    if (peak > 0.001f)
+                    {
+                        if (session.MeterSoundSinceTicks == 0) session.MeterSoundSinceTicks = now;
+                        bool silent = now - Math.Max(session.StartedTicks, session.LastSignalTicks) > Stopwatch.Frequency * 2;
+                        double audibleFor = (double)(now - session.MeterSoundSinceTicks) / Stopwatch.Frequency;
+                        if (!_processLoopbackFailed && AudioLevelPolicy.ShouldFallBack(silent, audibleFor))
+                        {
+                            _processLoopbackFailed = true;
+                            Log.Info("Player session has sound but process PCM is silent; automatically using player levels");
+                            ScheduleRestart(0);
+                        }
+                    }
+                    else session.MeterSoundSinceTicks = 0;
+                    return;
+                }
                 Volatile.Write(ref _activityLevel, AudioLevelPolicy.PeakActivity(peak));
-                // A peak meter does not measure bass/mid/high or musical beats.
+                // Session peaks are real activity, not an invented frequency spectrum.
                 Volatile.Write(ref _bassLevel, 0);
                 Volatile.Write(ref _midLevel, 0);
                 Volatile.Write(ref _highLevel, 0);
@@ -286,6 +289,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
             lock (_gate)
             {
             if (_disposed || !_wantActive || !ReferenceEquals(_session, s)) return;
+            if (activity > 0.001f) s.LastSignalTicks = Stopwatch.GetTimestamp();
             Volatile.Write(ref _bassLevel, bass);
             Volatile.Write(ref _midLevel, mid);
             Volatile.Write(ref _highLevel, high);
@@ -332,7 +336,7 @@ internal sealed class AudioBeatAnalyzer : IDisposable, IMMNotificationClient
     {
         if (flow != DataFlow.Render || role != Role.Multimedia) return;
         bool active;
-        lock (_gate) active = _wantActive && !_disposed;
+        lock (_gate) { active = _wantActive && !_disposed; if (active) _processLoopbackFailed = false; }
         if (active)
         {
             Log.Info("Default audio output changed — restarting loopback capture");

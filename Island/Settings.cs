@@ -40,8 +40,6 @@ public class Settings
     public bool BeatBounce { get; set; } = true;     // глаза танцуют под музыку (в такт и под темп)
     public int DanceStrength { get; set; } = 100;    // v2.8: размах танца, 0..200 %
     public bool MusicWave { get; set; } = true;
-    public string AudioCaptureMode { get; set; } = AudioLevelPolicy.DefaultMode(
-        OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)); // Windows11 | Windows10
     public int WaveHeight { get; set; } = 100;       // 30..150 %
     public bool ToastOnCopy { get; set; } = true;
     public bool ToastOnTrack { get; set; } = true;
@@ -107,8 +105,6 @@ public class Settings
         AnimationSpeed = Math.Clamp(AnimationSpeed, 50, 200);
         GazeRange = Math.Clamp(GazeRange, 50, 150);
         WaveHeight = Math.Clamp(WaveHeight, 30, 150);
-        AudioCaptureMode = AudioLevelPolicy.NormalizeMode(AudioCaptureMode,
-            OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348));
         ClipboardLimit = Math.Clamp(ClipboardLimit, 5, 200);
         DanceStrength = Math.Clamp(DanceStrength, 0, 200);
         if (string.IsNullOrWhiteSpace(Hotkey) || Hotkey.Length > 48) Hotkey = "Alt+Space";

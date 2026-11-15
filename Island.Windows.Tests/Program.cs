@@ -229,44 +229,24 @@ internal static class Program
         }
     }
 
-    static void TestAudioModeSwitch()
+    static void TestAutomaticAudioLifecycle()
     {
-        var settings = new Settings { AudioCaptureMode = AudioLevelPolicy.Windows11 };
         using var analyzer = new AudioBeatAnalyzer();
-        analyzer.SetCaptureMode(settings.AudioCaptureMode);
-        int changes = 0;
-        var selector = new AudioModeSelector(settings.AudioCaptureMode, mode =>
-        {
-            changes++;
-            settings.AudioCaptureMode = mode;
-            analyzer.SetCaptureMode(mode);
-        });
-        Check(changes == 0 && selector.SelectedMode == AudioLevelPolicy.Windows11, "production selector loads saved 11 mode without side effects");
-        var ten = selector.Children.OfType<RadioButton>().Single(x => (string)x.Tag == AudioLevelPolicy.Windows10);
-        var eleven = selector.Children.OfType<RadioButton>().Single(x => (string)x.Tag == AudioLevelPolicy.Windows11);
-        ten.IsChecked = true;
-        Check(changes == 1 && analyzer.CaptureMode == AudioLevelPolicy.Windows10 && eleven.IsChecked != true, "Windows 10 radio selection reaches live analyzer and unchecks 11");
-        var restored = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(settings))!;
-        restored.Normalize();
-        Check(restored.AudioCaptureMode == AudioLevelPolicy.Windows10, "selected compatibility mode survives settings JSON roundtrip");
+        Check(analyzer.ActiveBackend == null, "automatic audio backend is idle before music starts");
+        analyzer.SetActive(true, "Moku.Unrecognized.Audio.Source." + Guid.NewGuid().ToString("N"));
+        for (int i = 0; i < 4; i++) Pump();
+        Check(analyzer.ActiveBackend == null && analyzer.ActivityLevel == 0, "unknown player identity never starts system-mix capture");
         using var me = Process.GetCurrentProcess();
         analyzer.SetActive(true, me.ProcessName + ".exe");
-        for (int i = 0; i < 25 && analyzer.ActiveBackend != AudioLevelPolicy.Windows10; i++) Pump();
-        Check(analyzer.ActiveBackend == AudioLevelPolicy.Windows10, "manual Windows 10 mode starts real session backend on Windows runner");
-        eleven.IsChecked = true;
-        Check(changes == 2 && analyzer.CaptureMode == AudioLevelPolicy.Windows11 && ten.IsChecked != true, "switch back to 11 changes live mode without restarting app");
+        for (int i = 0; i < 25 && analyzer.ActiveBackend == null; i++) Pump();
+        Check(analyzer.ActiveBackend is AudioLevelPolicy.Spectrum or AudioLevelPolicy.SessionLevel,
+            "known player automatically starts an available per-player backend without a Windows selector");
         analyzer.SetActive(false, null);
-        Check(analyzer.ActiveBackend == null && analyzer.ActivityLevel == 0 && analyzer.BassLevel == 0 && !analyzer.ConsumeBeat(), "pause after backend switch detaches capture and clears levels");
-        ten.IsChecked = true;
-        Check(analyzer.ActiveBackend == null, "changing audio mode while paused does not start capture");
-        ten.IsChecked = true;
-        Check(changes == 3, "reselecting existing mode does not recreate backend");
-        analyzer.SetActive(true, "Moku.Unrecognized.Audio.Source");
-        for (int i = 0; i < 4; i++) { analyzer.SetCaptureMode(i % 2 == 0 ? "Windows11" : "Windows10"); Pump(); }
-        Check(analyzer.ActiveBackend == null && analyzer.ActivityLevel == 0, "rapid mode switching with unknown source never starts global audio capture");
+        Check(analyzer.ActiveBackend == null && analyzer.ActivityLevel == 0 && analyzer.BassLevel == 0 && !analyzer.ConsumeBeat(),
+            "pause detaches automatic capture and clears audio levels");
         analyzer.Dispose();
-        analyzer.SetCaptureMode("Windows11");
-        Check(analyzer.ActiveBackend == null, "disposed analyzer ignores later mode changes");
+        analyzer.SetActive(true, me.ProcessName + ".exe");
+        Check(analyzer.ActiveBackend == null, "disposed automatic analyzer ignores later media events");
     }
 
     [STAThread]
@@ -327,7 +307,8 @@ internal static class Program
             TestQuickAccessLookup();
             TestProcessAudioActivation();
             TestProcessAudioIsolation();
-            TestAudioModeSwitch();
+            TestAutomaticAudioLifecycle();
+            MusicIdentityTests.Run(Check);
             TestSessionLevelLifecycle();
             TestSessionLevelIsolation();
             window.Close(); app.Shutdown();
