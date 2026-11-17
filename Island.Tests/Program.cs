@@ -3,6 +3,20 @@ using System.Text.Json;
 
 int checks = 0;
 void Check(bool ok, string name) { checks++; if (!ok) throw new Exception("FAIL: " + name); }
+Check(SystemPanelPolicy.Cpu(100,200,100,120,260,140) == 80, "system CPU delta excludes idle");
+Check(SystemPanelPolicy.Cpu(0,0,0,0,0,0) == null, "system CPU zero interval unavailable");
+Check(SystemPanelPolicy.Cpu(10,20,30,1,20,30) == null, "system CPU counter reset unavailable");
+Check(SystemPanelPolicy.Cpu(0,0,0,100,20,20) == 0, "system CPU clamps inconsistent counters");
+Check(SystemPanelPolicy.Memory(16,8) == 50, "physical memory percentage");
+Check(SystemPanelPolicy.Memory(0,0) == null && SystemPanelPolicy.Memory(8,16) == null, "invalid memory unavailable");
+Check(SystemPanelPolicy.Battery(128,100) == null, "desktop has no fake battery");
+Check(SystemPanelPolicy.Battery(255,255) == null, "unknown battery stays unavailable");
+Check(SystemPanelPolicy.Battery(8,72) == 72 && SystemPanelPolicy.Battery(1,0) == 0, "charging and depleted battery valid");
+Check(!SystemPanelPolicy.Poll(false,true) && !SystemPanelPolicy.Poll(true,false) && SystemPanelPolicy.Poll(true,true), "system polling only while expanded and visible");
+Check(new[]{"sleep","restart","shutdown"}.All(SystemPanelPolicy.NeedsConfirmation), "power operations require confirmation");
+Check(!SystemPanelPolicy.NeedsConfirmation("lock") && !SystemPanelPolicy.NeedsConfirmation("wifi"), "ordinary controls do not prompt");
+Check(SystemPanelPolicy.SettingsUri("vpn") == "ms-settings:network-vpn", "VPN opens real Windows settings");
+Check(SystemPanelPolicy.SettingsUri("arbitrary") == null, "unknown system URI rejected");
 Check(FeaturePolicies.TileSpan("1x1") == (1,1), "1x1");
 Check(FeaturePolicies.TileSpan("2x1") == (2,1), "2x1");
 Check(FeaturePolicies.TileSpan("2x2") == (2,2), "2x2");

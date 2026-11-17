@@ -49,6 +49,8 @@ public partial class MainWindow
             "Буфер обмена или запущенные окна", "Clipboard or running windows"),
         new("general", "\uE713", Color.FromRgb(0xB8, 0xC2, 0xD6), "Общие", "General",
             "Язык, клавиша, автозапуск, игры", "Language, shortcut, autostart, games"),
+        new("support", "\uEB51", Color.FromRgb(0xFF, 0xA0, 0x72), "Поддержать", "Support",
+            "Поддержка разработки на Boosty", "Support development on Boosty"),
     };
 
     readonly List<SettingEntry> _settingsIndex = new();
@@ -62,7 +64,7 @@ public partial class MainWindow
     Panel? CategoryPanel(string id) => id switch
     {
         "look" => CatLook, "place" => CatPlace, "eyes" => CatEyes, "anim" => CatAnim, "mini" => CatMini,
-        "music" => CatMusic, "apps" => CatApps, "home" => CatHome, "general" => CatGeneral, _ => null
+        "music" => CatMusic, "apps" => CatApps, "home" => CatHome, "general" => CatGeneral, "support" => CatSupport, _ => null
     };
 
     /// <summary>Однократная подготовка: строки из разметки попадают в поиск, боковая кнопка мыши — «Назад».</summary>
@@ -82,7 +84,7 @@ public partial class MainWindow
         Add("place", TopOffsetLabel); Add("place", IslandSizeLabel); Add("place", CornerRadiusLabel);
         Add("general", LanguageLabel); Add("general", FullscreenOpacityLabel);
         if (AutoBtn != null) _settingsIndex.Add(new SettingEntry(() => Ru ? "Запуск при старте Windows" : "Start with Windows", "general", AutoBtn, true));
-        if (SupportBtn != null) _settingsIndex.Add(new SettingEntry(() => SupportBtn.Content?.ToString() ?? "", "general", SupportBtn, true));
+        if (SupportBtn != null) _settingsIndex.Add(new SettingEntry(() => SupportBtn.Content?.ToString() ?? "", "support", SupportBtn, true));
 
         SettingsPage.PreviewMouseDown += (_, e) =>
         {
@@ -256,6 +258,7 @@ public partial class MainWindow
         SettingsDetailBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x55, c.Tint.R, c.Tint.G, c.Tint.B));
         SettingsDetailBadge.BorderThickness = new Thickness(1);
         SettingsResetBtn.Content = new TextBlock { Text = ru ? "Сбросить" : "Reset", FontSize = 11, Margin = new Thickness(12, 0, 12, 0) };
+        SettingsResetBtn.Visibility = id == "support" ? Visibility.Collapsed : Visibility.Visible;
         SettingsResetBtn.ToolTip = ru ? "Вернуть настройки этого раздела по умолчанию" : "Restore this section's defaults";
     }
 

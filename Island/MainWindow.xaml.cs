@@ -320,6 +320,7 @@ public partial class MainWindow : Window
         _gameTimer?.Stop();
         StopWindowsRefresh();
         StopAppsScanWatch();
+        StopSystemDashboard();
         _clipboardTimer.Stop();
         _toastTimer.Stop();
         _clock.Stop();
@@ -481,7 +482,7 @@ public partial class MainWindow : Window
 
     void GlassOpacity_Minus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity - 5);
     void GlassOpacity_Plus(object sender, RoutedEventArgs e) => SetGlassOpacity(_s.GlassOpacity + 5);
-    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); RefreshPopupTheme(); SaveSoon(); }
+    void SetRadius(int value) { _s.CornerRadius = Math.Clamp(value, 0, 40); if (RadiusSlider != null && (int)RadiusSlider.Value != _s.CornerRadius) RadiusSlider.Value = _s.CornerRadius; RetargetRadius(); RadiusText.Text = _s.CornerRadius + " px"; RebuildBody(); RefreshPopupTheme(); _systemDashboard?.SetRadius(_s.CornerRadius); SaveSoon(); }
     void Radius_Minus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius - 2);
     void Radius_Plus(object sender, RoutedEventArgs e) => SetRadius(_s.CornerRadius + 2);
     void VerticalAlign_Checked(object sender, RoutedEventArgs e) { if (!_ready) return; _s.VerticalAlign = (string)((RadioButton)sender).Tag; ApplyPosition(); _s.Save(); }
@@ -704,6 +705,10 @@ public partial class MainWindow : Window
         if (LanguageLabel != null) LanguageLabel.Text = ru ? "Язык интерфейса" : "Language";
         if (TabHome != null) TabHome.Content = ru ? "Главная" : "Home";
         if (TabClip != null) TabClip.Content = ru ? "Буфер" : "Clipboard";
+        if (TabSystem != null) TabSystem.Content = ru ? "Система" : "System";
+        if (SystemPage != null && _systemDashboard != null) EnsureSystemDashboard(rebuild: true);
+        if (SupportTitle != null) SupportTitle.Text = ru ? "Нравится Moku?" : "Enjoying Moku?";
+        if (SupportDescription != null) SupportDescription.Text = ru ? "Поддержать разработку можно на Boosty. Это добровольно — для работы Moku поддержка не требуется." : "You can support development on Boosty. It is entirely optional and is not required to use Moku.";
         if (TabApps != null) TabApps.Content = ru ? "Приложения" : "Apps";
         UpdateAppsHeading();
         if (CreateFolderText != null) CreateFolderText.Text = ru ? "Создать папку" : "Create folder";
@@ -1111,6 +1116,7 @@ public partial class MainWindow : Window
         CancelHotkeyCapture();
         StopWindowsRefresh();
         StopAppsScanWatch();
+        StopSystemDashboard();
         bool fromToast = _state == IslandState.Toast;
         _state = IslandState.Collapsed;
         _seekTimer.Stop();
@@ -1146,6 +1152,7 @@ public partial class MainWindow : Window
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
         _state = IslandState.Expanded;
+        ResizeForSystemPage(false);
         UpdateHomeRefreshState();
         TabHome.IsChecked = true;
         SetHomeView(_s.HomeStartupView, false);
@@ -1428,13 +1435,16 @@ public partial class MainWindow : Window
 
     void Tab_Checked(object sender, RoutedEventArgs e)
     {
-        if (HomePage == null || ClipPage == null || SettingsPage == null) return;
+        if (HomePage == null || ClipPage == null || SettingsPage == null || AppsPage == null || SystemPage == null) return;
         var tag = (sender as RadioButton)?.Tag as string;
+        if (SystemPage != null) SystemPage.Visibility = tag == "System" ? Visibility.Visible : Visibility.Collapsed;
+        ResizeForSystemPage(tag == "System");
+        UpdateSystemDashboardState();
         HomePage.Visibility = tag == "Home" ? Visibility.Visible : Visibility.Collapsed;
         ClipPage.Visibility = tag == "Clip" ? Visibility.Visible : Visibility.Collapsed;
         AppsPage.Visibility = tag == "Apps" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = tag == "Set" ? Visibility.Visible : Visibility.Collapsed;
-        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : SettingsPage);
+        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : tag == "System" ? SystemPage : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") { UpdateAutoButton(); ShowSettingsMenu(false); }
         if (tag == "Apps" && _state == IslandState.Expanded)

@@ -512,26 +512,32 @@
                 </Grid.RowDefinitions>
 
                 <Grid Margin="0,0,0,10">
-                    <StackPanel Orientation="Horizontal">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <WrapPanel Orientation="Horizontal">
                         <RadioButton x:Name="TabHome" Style="{StaticResource TabBtn}" Content="Home"
                                      Tag="Home" GroupName="tabs" IsChecked="True" Checked="Tab_Checked"/>
                         <RadioButton x:Name="TabClip" Style="{StaticResource TabBtn}" Content="Clipboard"
                                      Tag="Clip" GroupName="tabs" Checked="Tab_Checked"/>
                         <RadioButton x:Name="TabApps" Style="{StaticResource TabBtn}" Content="Apps"
                                      Tag="Apps" GroupName="tabs" Checked="Tab_Checked"/>
+                        <RadioButton x:Name="TabSystem" Style="{StaticResource TabBtn}" Content="System"
+                                     Tag="System" GroupName="tabs" Checked="Tab_Checked"/>
                         <RadioButton x:Name="TabSet" Style="{StaticResource TabBtn}" Content="Settings"
                                      Tag="Set" GroupName="tabs" Checked="Tab_Checked"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    </WrapPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
                             <TextBlock x:Name="FullClock" Foreground="White" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             <Border x:Name="ExpandedWeatherHost" Width="20" Height="20" Margin="10,0,3,0"/>
                             <TextBlock x:Name="ExpandedTempText" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock x:Name="HotkeyHint" Text="Alt + Space" Foreground="#55FFFFFF" FontSize="11"
+                        <TextBlock x:Name="HotkeyHint" Visibility="Collapsed" Text="Alt + Space" Foreground="#55FFFFFF" FontSize="11"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
+
+                <ScrollViewer x:Name="SystemPage" Grid.Row="1" Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0"/>
 
                 <!-- Home -->
                 <Grid x:Name="HomePage" Grid.Row="1">
@@ -994,9 +1000,14 @@
                         <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                                 HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
 
+
+
+                        </StackPanel>
+                        <StackPanel x:Name="CatSupport" Visibility="Collapsed">
+                            <TextBlock x:Name="SupportTitle" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,10"/>
+                            <TextBlock x:Name="SupportDescription" Foreground="#B0B0B8" FontSize="13" TextWrapping="Wrap" MaxWidth="460" HorizontalAlignment="Left" Margin="0,0,0,16"/>
                         <Button x:Name="SupportBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                                 HorizontalAlignment="Left" Margin="0,8,0,0" Click="SupportAuthor_Click"/>
-
                         </StackPanel>
                     </StackPanel>
                   </Grid>

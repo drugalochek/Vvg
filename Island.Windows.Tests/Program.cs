@@ -261,8 +261,8 @@ internal static class Program
             // singleton handling, real MainWindow, network, hotkeys or background services.
             using var watchdog = new System.Threading.Timer(_ =>
             {
-                Console.Error.WriteLine("Windows WPF smoke test exceeded 60 seconds."); Environment.Exit(2);
-            }, null, TimeSpan.FromSeconds(60), System.Threading.Timeout.InfiniteTimeSpan);
+                Console.Error.WriteLine("Windows WPF smoke test exceeded 100 seconds."); Environment.Exit(2);
+            }, null, TimeSpan.FromSeconds(100), System.Threading.Timeout.InfiniteTimeSpan);
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             app.Resources.MergedDictionaries.Add(new ResourceDictionary
             { Source = new Uri("/Moku;component/PopupStyles.xaml", UriKind.Relative) });
@@ -303,6 +303,7 @@ internal static class Program
             nested.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, nested));
             Check(clicked, "custom menu preserves click routing");
             tip.IsOpen = false; menu.IsOpen = false;
+            SystemDashboardTests.Run(Check);
             TestExternalWindowRestore();
             TestQuickAccessLookup();
             TestProcessAudioActivation();

@@ -161,7 +161,7 @@ public partial class MainWindow
                   "Use Create folder in Apps. Drag a file into a folder; its cross returns it to the main list."));
 
 
-        // ---------------- Общие (язык, автозапуск и «Поддержать» — в разметке)
+        // ---------------- Общие (язык и автозапуск — в разметке; Boosty — отдельный раздел)
         p = CatGeneralExtra; _buildCat = "general";
         BuildHotkeyRow(p);
         var home = CatHome; _buildCat = "home";
