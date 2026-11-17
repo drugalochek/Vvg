@@ -30,6 +30,8 @@ public class Settings
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
 
+    public string VpnClient { get; set; } = "Windows"; // Windows settings | Happ connection command
+
     // ---- v2.7: расширенные настройки ----
     public int JellyStrength { get; set; } = 100;    // «желейность» острова, 0..200 %
     public int AnimationSpeed { get; set; } = 100;   // скорость пружин, 50..200 %
@@ -101,6 +103,7 @@ public class Settings
         GradientBalance = Math.Clamp(GradientBalance, 10, 90);
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
+        VpnClient = SystemPanelPolicy.VpnClient(VpnClient);
         JellyStrength = Math.Clamp(JellyStrength, 0, 200);
         AnimationSpeed = Math.Clamp(AnimationSpeed, 50, 200);
         GazeRange = Math.Clamp(GazeRange, 50, 150);

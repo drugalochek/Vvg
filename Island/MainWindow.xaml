@@ -972,6 +972,7 @@
                         <StackPanel x:Name="CatMusic" Visibility="Collapsed"/>
                         <StackPanel x:Name="CatApps" Visibility="Collapsed"/>
                         <StackPanel x:Name="CatHome" Visibility="Collapsed"/>
+                        <StackPanel x:Name="CatSystemSettings" Visibility="Collapsed"/>
 
                         <!-- Общие -->
                         <StackPanel x:Name="CatGeneral" Visibility="Collapsed">

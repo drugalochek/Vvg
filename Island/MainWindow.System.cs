@@ -10,6 +10,8 @@ namespace Island;
 public partial class MainWindow
 {
     readonly SystemMonitor _systemMonitor = new();
+    readonly HappVpnConnector _happVpn = new();
+    DateTime _lastHappRequest;
     readonly DispatcherTimer _systemTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     SystemDashboard? _systemDashboard;
     bool _systemInitialized, _systemReading;
@@ -25,7 +27,7 @@ public partial class MainWindow
         }
         if (_systemDashboard != null && !rebuild) return;
         _systemDashboard = new SystemDashboard(Ru, _s.CornerRadius, OnSystemAction,
-            TryFindResource("Card") as Brush, TryFindResource("CardRim") as Brush);
+            TryFindResource("Card") as Brush, TryFindResource("CardRim") as Brush, _s.VpnClient);
         SystemPage.Content = _systemDashboard;
     }
     void UpdateSystemDashboardState()
@@ -74,6 +76,15 @@ public partial class MainWindow
     {
         try
         {
+            if (action == "vpn" && _s.VpnClient == "Happ")
+            {
+                // Debounce protocol activations, but never confuse this with connection status.
+                if (DateTime.UtcNow - _lastHappRequest < TimeSpan.FromSeconds(3)) return;
+                var result = _happVpn.RequestConnection();
+                if (result == HappVpnRequestResult.Sent) _lastHappRequest = DateTime.UtcNow;
+                _systemDashboard?.SetVpnRequestResult(result);
+                return;
+            }
             var uri = SystemPanelPolicy.SettingsUri(action);
             if (uri != null) { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); return; }
             switch(action)

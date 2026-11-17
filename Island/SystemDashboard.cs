@@ -20,6 +20,7 @@ namespace Island;
 internal sealed class SystemDashboard : StackPanel
 {
     readonly bool ru;
+    TextBlock? vpnTitle;
     readonly Action<string> invoke;
     readonly Dictionary<string, TextBlock> captions = new();
     readonly Dictionary<string, Button> buttons = new();
@@ -29,7 +30,7 @@ internal sealed class SystemDashboard : StackPanel
     internal bool ConfirmationVisible => confirmation.Visibility == Visibility.Visible;
     string L(string r, string e) => ru ? r : e;
 
-    internal SystemDashboard(bool russian, double radius, Action<string> action, Brush? card = null, Brush? rim = null)
+    internal SystemDashboard(bool russian, double radius, Action<string> action, Brush? card = null, Brush? rim = null, string vpnClient = "Windows")
     {
         ru = russian; invoke = action;
         Resources["SystemCard"] = card ?? new LinearGradientBrush(Color.FromArgb(38,255,255,255), Color.FromArgb(13,255,255,255), 90);
@@ -79,6 +80,31 @@ internal sealed class SystemDashboard : StackPanel
             Small("lock", L("Блокировка", "Lock")), Small("sleep", L("Сон", "Sleep")),
             Small("restart", L("Перезагрузка", "Restart")), Small("shutdown", L("Выключение", "Shut down"))));
         Children.Add(confirmation);
+        SetVpnClient(vpnClient);
+    }
+    internal void SetVpnClient(string client)
+    {
+        bool happ = SystemPanelPolicy.VpnClient(client) == "Happ";
+        if (vpnTitle != null) vpnTitle.Text = happ ? "Happ VPN" : "VPN";
+        captions["vpn"].Text = happ ? L("Подключить", "Connect") : L("Параметры ↗", "Settings ↗");
+        buttons["vpn"].ToolTip = happ
+            ? L("Отправить Happ команду подключения. Профиль должен быть настроен в Happ. Статус туннеля Moku не проверяет.", "Send Happ a connection request. A profile must be configured in Happ. Moku does not verify tunnel status.")
+            : L("Открыть параметры VPN Windows", "Open Windows VPN settings");
+        AutomationProperties.SetName(buttons["vpn"], happ ? L("Happ — подключить VPN", "Happ — connect VPN") : L("Параметры VPN Windows", "Windows VPN settings"));
+    }
+    internal void SetVpnRequestResult(HappVpnRequestResult result)
+    {
+        captions["vpn"].Text = result switch
+        {
+            HappVpnRequestResult.Sent => L("Запрос отправлен", "Request sent"),
+            HappVpnRequestResult.ClientMissing => L("Happ не найден", "Happ not found"),
+            _ => L("Ошибка команды", "Request failed")
+        };
+        buttons["vpn"].ToolTip = result == HappVpnRequestResult.ClientMissing
+            ? L("Установи Happ для Windows с поддержкой ссылок happ://. Затем настрой профиль в Happ.", "Install Happ for Windows with happ:// link support. Then configure a profile in Happ.")
+            : result == HappVpnRequestResult.Sent
+                ? L("Команда передана Windows. Результат подключения смотри в Happ: отправка команды не подтверждает работу VPN.", "The request was handed to Windows. Check Happ for the result: sending a request does not confirm an active VPN.")
+                : L("Не удалось отправить команду Happ. Проверь его установку и регистрацию ссылок happ://.", "Could not send the request to Happ. Check its installation and happ:// link registration.");
     }
     internal void SetRadius(double radius) => Resources["SystemRadius"] = new CornerRadius(Math.Clamp(radius, 0, 18));
     TextBlock Text(string value, double size = 13, bool dim = false, double bottom = 0) => new()
@@ -105,6 +131,7 @@ internal sealed class SystemDashboard : StackPanel
         if (!horizontal) panel.Children.Add(icon);
         var label = Text(title, 12); label.FontWeight = FontWeights.SemiBold;
         panel.Children.Add(label);
+        if (id == "vpn") vpnTitle = label;
         var sub = Text(caption, 11, dim: true); sub.Margin = new Thickness(0,4,0,0); panel.Children.Add(sub);
         var button = new Button { Content = panel, MinHeight = horizontal ? 65 : 92 };
         captions[id] = sub; Register(id, button, title); return button;

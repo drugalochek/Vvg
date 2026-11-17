@@ -61,6 +61,40 @@ internal static class SystemDashboardTests
             check(metric.CornerRadius.TopLeft==0,"system cards honor square corner setting");
             dashboard.SetRadius(36);check(metric.CornerRadius.TopLeft==18,"system small cards cap shared rounding safely");
         }
+        // The connector dispatch is injected: CI never establishes a real VPN or touches user profiles.
+        var sent = new List<Uri>();
+        var connector = new HappVpnConnector(() => true, sent.Add);
+        check(connector.RequestConnection() == HappVpnRequestResult.Sent, "registered Happ receives connection command");
+        check(sent.Count == 1 && sent[0].OriginalString == "happ://open", "Happ uses exact documented start URI, not a guessed connect command");
+        var missing = new HappVpnConnector(() => false, _ => throw new Exception("Must not activate"));
+        check(missing.RequestConnection() == HappVpnRequestResult.ClientMissing, "missing Happ does not attempt unknown protocol activation");
+        var failed = new HappVpnConnector(() => true, _ => throw new InvalidOperationException("test dispatch failure"));
+        check(failed.RequestConnection() == HappVpnRequestResult.Failed, "failed protocol dispatch is not reported as connected");
+        foreach (bool ru in new[]{true,false})
+        {
+            var clicks = new List<string>();
+            var happ = new SystemDashboard(ru,18,clicks.Add,vpnClient:"Happ");
+            happ.Update(data);
+            var host = new Border { Background=new SolidColorBrush(Color.FromRgb(12,12,14)),Padding=new Thickness(16),Child=happ,Width=652 };
+            Layout(host);
+            var vpn = Find(happ,"System-vpn");
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text=="Happ VPN"), "selected Happ has explicit client label");
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Подключить":"Connect")), "Happ tile offers connection, not just opening a window");
+            Save(host,Path.Combine(previews,ru?"happ-ru-ready.png":"happ-en-ready.png"),1);
+            vpn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            check(clicks.SequenceEqual(new[]{"vpn"}), "Happ tile retains production VPN action routing");
+            happ.SetVpnRequestResult(HappVpnRequestResult.Sent); Layout(host);
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Запрос отправлен":"Request sent")), "Happ dispatch does not fabricate connected status");
+            Save(host,Path.Combine(previews,ru?"happ-ru-sent.png":"happ-en-sent.png"),1);
+            happ.SetVpnRequestResult(HappVpnRequestResult.ClientMissing);Layout(host);
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Happ не найден":"Happ not found")), "Happ missing installation is visible inline");
+            Save(host,Path.Combine(previews,ru?"happ-ru-missing.png":"happ-en-missing.png"),1);
+            happ.SetVpnRequestResult(HappVpnRequestResult.Failed);Layout(host);
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Ошибка команды":"Request failed")), "Happ command failure is visible inline");
+            Save(host,Path.Combine(previews,ru?"happ-ru-failed.png":"happ-en-failed.png"),1);
+            happ.SetVpnClient("Windows");
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Параметры ↗":"Settings ↗")), "switching client resets old command status");
+        }
         var native=new SystemMonitor(); var snapshot=native.Read();
         check(snapshot.Cpu==null,"first native CPU sample is unavailable, not invented");
         check(snapshot.Memory is null or >=0 and <=100,"native memory is bounded or unavailable");

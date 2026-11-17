@@ -47,6 +47,8 @@ public partial class MainWindow
             "Размер плиток, папки, иконки", "Tile size, folders, icons"),
         new("home", "\uE80F", Color.FromRgb(0x7F, 0xE3, 0xFF), "Главная", "Home",
             "Буфер обмена или запущенные окна", "Clipboard or running windows"),
+        new("system", "\uE7F4", Color.FromRgb(0x7F, 0xB8, 0xFF), "Система", "System",
+            "VPN-клиент и подключение Happ", "VPN client and Happ connection"),
         new("general", "\uE713", Color.FromRgb(0xB8, 0xC2, 0xD6), "Общие", "General",
             "Язык, клавиша, автозапуск, игры", "Language, shortcut, autostart, games"),
         new("support", "\uEB51", Color.FromRgb(0xFF, 0xA0, 0x72), "Поддержать", "Support",
@@ -64,7 +66,7 @@ public partial class MainWindow
     Panel? CategoryPanel(string id) => id switch
     {
         "look" => CatLook, "place" => CatPlace, "eyes" => CatEyes, "anim" => CatAnim, "mini" => CatMini,
-        "music" => CatMusic, "apps" => CatApps, "home" => CatHome, "general" => CatGeneral, "support" => CatSupport, _ => null
+        "music" => CatMusic, "apps" => CatApps, "home" => CatHome, "general" => CatGeneral, "support" => CatSupport, "system" => CatSystemSettings, _ => null
     };
 
     /// <summary>Однократная подготовка: строки из разметки попадают в поиск, боковая кнопка мыши — «Назад».</summary>

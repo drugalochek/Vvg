@@ -17,6 +17,13 @@ Check(new[]{"sleep","restart","shutdown"}.All(SystemPanelPolicy.NeedsConfirmatio
 Check(!SystemPanelPolicy.NeedsConfirmation("lock") && !SystemPanelPolicy.NeedsConfirmation("wifi"), "ordinary controls do not prompt");
 Check(SystemPanelPolicy.SettingsUri("vpn") == "ms-settings:network-vpn", "VPN opens real Windows settings");
 Check(SystemPanelPolicy.SettingsUri("arbitrary") == null, "unknown system URI rejected");
+Check(new Settings().VpnClient == "Windows", "existing installations keep Windows VPN action");
+Check(SystemPanelPolicy.VpnClient("happ") == "Happ" && SystemPanelPolicy.VpnClient("Happ") == "Happ", "Happ client choice normalizes");
+Check(SystemPanelPolicy.VpnClient(null) == "Windows" && SystemPanelPolicy.VpnClient("unknown") == "Windows", "unknown VPN client falls back safely");
+var happSettings = new Settings { VpnClient = "Happ" }; happSettings.Normalize();
+var persistedHapp = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(happSettings))!; persistedHapp.Normalize();
+Check(persistedHapp.VpnClient == "Happ", "Happ client choice persists");
+happSettings.VpnClient = "bad"; happSettings.Normalize(); Check(happSettings.VpnClient == "Windows", "invalid saved client normalized");
 Check(FeaturePolicies.TileSpan("1x1") == (1,1), "1x1");
 Check(FeaturePolicies.TileSpan("2x1") == (2,1), "2x1");
 Check(FeaturePolicies.TileSpan("2x2") == (2,2), "2x2");

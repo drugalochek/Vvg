@@ -3,6 +3,7 @@ namespace Island;
 /// <summary>Pure calculations: unavailable counters stay unavailable, never a made-up zero.</summary>
 internal static class SystemPanelPolicy
 {
+    internal static string VpnClient(string? value) => string.Equals(value, "Happ", StringComparison.OrdinalIgnoreCase) ? "Happ" : "Windows";
     internal static double? Cpu(ulong oldIdle, ulong oldKernel, ulong oldUser, ulong idle, ulong kernel, ulong user)
     {
         if (idle < oldIdle || kernel < oldKernel || user < oldUser) return null;

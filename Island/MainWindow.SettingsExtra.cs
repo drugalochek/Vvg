@@ -85,7 +85,7 @@ public partial class MainWindow
         bool ru = _s.Language == "ru";
         string L(string r, string e) => ru ? r : e;
         _settingsIndex.RemoveAll(x => !x.Static);
-        foreach (var cat in new Panel[] { CatEyes, CatAnim, CatMini, CatMusic, CatApps, CatHome, CatGeneralExtra }) cat.Children.Clear();
+        foreach (var cat in new Panel[] { CatEyes, CatAnim, CatMini, CatMusic, CatApps, CatHome, CatSystemSettings, CatGeneralExtra }) cat.Children.Clear();
 
         // ---------------- Глаза
         Panel p = CatEyes; _buildCat = "eyes";
@@ -161,6 +161,17 @@ public partial class MainWindow
                   "Use Create folder in Apps. Drag a file into a folder; its cross returns it to the main list."));
 
 
+        // ---------------- Система
+        p = CatSystemSettings; _buildCat = "system";
+        Section(p, "VPN");
+        ChoiceRow(p, L("VPN-клиент", "VPN client"), "vpnclient",
+            new[] { ("Windows", L("Параметры Windows", "Windows settings")), ("Happ", "Happ") },
+            () => _s.VpnClient, v => { _s.VpnClient = v; _s.Save(); _systemDashboard?.SetVpnClient(v); });
+        Hint(p, L("Happ: плитка VPN отправляет команду подключения, а не просто открывает окно. Установи актуальный Happ и заранее настрой в нём рабочий профиль.",
+                  "Happ: the VPN tile requests a connection, rather than just opening its window. Install an up-to-date Happ and configure a working profile first."));
+        Hint(p, L("Статус туннеля не отслеживается. Отключение — в самом Happ. Ключи и подписки остаются в Happ, Moku их не читает.",
+                  "Tunnel status is not tracked. Disconnect in Happ itself. Keys and subscriptions stay in Happ; Moku does not read them."));
+
         // ---------------- Общие (язык и автозапуск — в разметке; Boosty — отдельный раздел)
         p = CatGeneralExtra; _buildCat = "general";
         BuildHotkeyRow(p);
@@ -228,6 +239,9 @@ public partial class MainWindow
             case "home":
                 _s.HomeStartupView = d.HomeStartupView; _s.LastHomeView = d.LastHomeView; _s.RememberLastTab = d.RememberLastTab;
                 SetHomeView(d.HomeStartupView, false);
+                break;
+            case "system":
+                _s.VpnClient = d.VpnClient; _systemDashboard?.SetVpnClient(_s.VpnClient);
                 break;
             case "general":
                 _s.Hotkey = d.Hotkey; _s.ClipboardLimit = d.ClipboardLimit; _s.GameMode = d.GameMode; _s.TransparentOverNormalWindows = d.TransparentOverNormalWindows;
