@@ -78,8 +78,6 @@ internal sealed class SystemDashboard : StackPanel
             Small("lock", L("Блокировка", "Lock")), Small("sleep", L("Сон", "Sleep")),
             Small("restart", L("Перезагрузка", "Restart")), Small("shutdown", L("Выключение", "Shut down"))));
         Children.Add(confirmation);
-        Children.Add(Text(L("↗ — параметры Windows. Переключатели здесь не имитируются.",
-            "↗ opens Windows settings. These are links, not pretend toggles."), 11, dim: true));
     }
     internal void SetRadius(double radius) => Resources["SystemRadius"] = new CornerRadius(Math.Clamp(radius, 0, 18));
     TextBlock Text(string value, double size = 13, bool dim = false, double bottom = 0) => new()
