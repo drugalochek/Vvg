@@ -1000,8 +1000,6 @@
                         <Button x:Name="AutoBtn" Style="{StaticResource TileBtn}" Height="38" Width="230"
                                 HorizontalAlignment="Left" Margin="0" Click="AutoBtn_Click"/>
 
-
-
                         </StackPanel>
                         <StackPanel x:Name="CatSupport" Visibility="Collapsed">
                             <TextBlock x:Name="SupportTitle" Foreground="White" FontSize="18" FontWeight="SemiBold" Margin="0,4,0,10"/>

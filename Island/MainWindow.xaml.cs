@@ -1444,7 +1444,7 @@ public partial class MainWindow : Window
         ClipPage.Visibility = tag == "Clip" ? Visibility.Visible : Visibility.Collapsed;
         AppsPage.Visibility = tag == "Apps" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = tag == "Set" ? Visibility.Visible : Visibility.Collapsed;
-        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : tag == "System" ? SystemPage : SettingsPage);
+        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : tag == "System" ? SystemPage! : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") { UpdateAutoButton(); ShowSettingsMenu(false); }
         if (tag == "Apps" && _state == IslandState.Expanded)

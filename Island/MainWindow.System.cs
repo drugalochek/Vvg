@@ -61,7 +61,11 @@ public partial class MainWindow
     void ResizeForSystemPage(bool system)
     {
         if (Full == null) return;
-        double height = system ? 464 : 316;
+        // Keep the taller dashboard within the work area at large island scales.
+        // Its ScrollViewer retains all controls, including power confirmation.
+        double scale = Math.Max(0.1, _s.Scale / 100.0);
+        double room = (SystemParameters.WorkArea.Height - 36 - Math.Max(0,_s.OffsetY)) / (scale * 1.16) - 32;
+        double height = system ? Math.Clamp(room,240,464) : 316;
         if (Math.Abs(Full.Height-height) < 0.1) return;
         Full.Height = height;
         if (_state == IslandState.Expanded) Animate(FullW,height+32,30,spring:false,speed:_s.ExpandSpeed/100.0);

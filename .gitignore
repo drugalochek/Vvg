@@ -4,3 +4,6 @@ publish/
 release/
 .vs/
 *.user
+
+# Rendered Windows UI regression previews
+ui-preview/

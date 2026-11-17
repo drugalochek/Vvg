@@ -70,6 +70,7 @@ internal sealed class SystemDashboard : StackPanel
             Tile("sound", "\uE767", L("Звук", "Sound"), L("Параметры ↗", "Settings ↗"), horizontal: true),
             Tile("microphone", "\uE720", L("Микрофон", "Microphone"), L("Проверяю…", "Checking…"), horizontal: true),
             Tile("notifications", "\uE708", L("Уведомления", "Notifications"), L("Не беспокоить ↗", "Do not disturb ↗"), horizontal: true)));
+        buttons["microphone"].IsEnabled = false;
         Children.Add(Row(
             Small("microphone-settings", L("Доступ к микрофону ↗", "Microphone access ↗")),
             Small("camera", L("Камера ↗", "Camera ↗")),
