@@ -19,13 +19,13 @@ internal static class SystemPanelPolicy
     internal static bool NeedsConfirmation(string action) => action is "sleep" or "restart" or "shutdown";
 
     /// <summary>The only actions the System tab exposes. Everything else was removed on purpose.</summary>
-    internal static readonly string[] Toggles = { "wifi", "bluetooth", "vpn", "microphone" };
+    internal static readonly string[] Toggles = { "internet", "bluetooth", "vpn", "microphone" };
     internal static readonly string[] PowerActions = { "sleep", "restart", "shutdown" };
 
     /// <summary>Settings page opened only when Windows refuses a direct toggle.</summary>
     internal static string? FallbackUri(string action) => action switch
     {
-        "wifi" => "ms-settings:network-wifi", "bluetooth" => "ms-settings:bluetooth",
+        "internet" => "ms-settings:network-status", "bluetooth" => "ms-settings:bluetooth",
         "vpn" => "ms-settings:network-vpn", "microphone" => "ms-settings:sound",
         _ => null
     };
@@ -99,4 +99,35 @@ internal static class SystemPanelPolicy
 
     /// <summary>A pending toggle shows "connecting…" until the real state flips or the wait expires.</summary>
     internal static bool PendingExpired(DateTime started, DateTime now, double seconds = 12) => (now - started).TotalSeconds >= seconds;
+
+    // ---------------- Internet: all physical network adapters (Ethernet + Wi-Fi), not only the Wi-Fi radio
+    static readonly string[] PhysicalTypes = { "Ethernet", "Wireless80211", "GigabitEthernet", "FastEthernetT", "FastEthernetFx", "Ethernet3Megabit" };
+
+    /// <summary>Real wired / wireless adapters. Virtual switches, VPN tunnels and debug adapters are never touched.</summary>
+    internal static bool IsPhysicalNetwork(string? type, string? name, string? description)
+    {
+        if (type == null || !PhysicalTypes.Contains(type)) return false;
+        string s = (name ?? "") + " " + (description ?? "");
+        return !Regex.IsMatch(s, @"virtual|vEthernet|Hyper-V|VirtualBox|VMware|Loopback|Bluetooth|WAN Miniport|Npcap|Kernel Debug|TAP-|Wintun|\btun\d*\b|happ|xray|sing-?box|WireGuard|OpenVPN|ZeroTier|Tailscale|Hamachi|Radmin|Wi-Fi Direct|Microsoft Wi-Fi Direct", RegexOptions.IgnoreCase);
+    }
+
+    /// <summary>On = some physical adapter is enabled; Off = Moku switched them off; null = no adapter at all.</summary>
+    internal static bool? InternetState(bool anyPhysicalEnabled, bool disabledByMoku) =>
+        anyPhysicalEnabled ? true : disabledByMoku ? false : null;
+
+    /// <summary>
+    /// PowerShell run elevated (Windows asks for administrator approval). Turning off disables exactly the listed
+    /// adapters; turning on re-enables the ones Moku switched off, or every disabled physical adapter if that list is lost.
+    /// </summary>
+    internal static string InternetScript(IReadOnlyList<string> names, bool enable)
+    {
+        string list = string.Join(",", names.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => "'" + n.Replace("'", "''") + "'"));
+        const string head = "$ErrorActionPreference='Stop'; ";
+        if (enable)
+            return list.Length > 0
+                ? head + "Enable-NetAdapter -Name @(" + list + ") -Confirm:$false"
+                : head + "Get-NetAdapter -Physical | Where-Object Status -eq 'Disabled' | Enable-NetAdapter -Confirm:$false";
+        if (list.Length == 0) throw new ArgumentException("No adapters to disable", nameof(names));
+        return head + "Disable-NetAdapter -Name @(" + list + ") -Confirm:$false";
+    }
 }

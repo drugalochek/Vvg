@@ -10,9 +10,9 @@ namespace Island;
 
 /// <summary>Radio state as Windows reports it. Null = no such adapter.</summary>
 internal sealed record SystemSnapshot(double? Cpu, double? Memory, ulong UsedMemory, ulong TotalMemory,
-    double? Gpu, string? GpuName, bool? Wifi, bool WifiConnected, bool? Bluetooth, bool? Vpn, string? VpnEntry, bool? MicMuted);
+    double? Gpu, string? GpuName, bool? Internet, bool InternetConnected, bool? Bluetooth, bool? Vpn, string? VpnEntry, bool? MicMuted);
 
-internal enum ToggleResult { Done, Denied, Unavailable, NoProfile, Failed }
+internal enum ToggleResult { Done, Denied, Unavailable, NoProfile, Failed, Cancelled }
 
 /// <summary>
 /// Sampled only while the System tab is open (every 2 s). No WMI, no resident polling, no helper processes:
@@ -28,7 +28,7 @@ internal sealed class SystemMonitor
 
     internal void Reset() => previous = null;
 
-    internal SystemSnapshot Read(string vpnClient)
+    internal SystemSnapshot Read(string vpnClient, bool internetDisabledByMoku = false)
     {
         double? cpu = null, memory = null; ulong used = 0, total = 0;
         if (GetSystemTimes(out var idle, out var kernel, out var user))
@@ -45,12 +45,13 @@ internal sealed class SystemMonitor
         if (!gpuNameRead) { gpuNameRead = true; gpuName = ReadGpuName(); }
         double? gpuLoad = gpu.Read();
 
-        bool? wifi = RadioOn(RadioKind.WiFi), bluetooth = RadioOn(RadioKind.Bluetooth);
+        bool? bluetooth = RadioOn(RadioKind.Bluetooth);
         NetworkInterface[] interfaces = Array.Empty<NetworkInterface>();
         try { interfaces = NetworkInterface.GetAllNetworkInterfaces(); } catch { }
-        bool wifiConnected = interfaces.Any(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && n.OperationalStatus == OperationalStatus.Up);
-        // No radio API (old driver) but a Wi-Fi adapter exists: report what the adapter shows.
-        if (wifi == null && interfaces.Any(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)) wifi = wifiConnected;
+        // Disabled adapters are not enumerated at all, so "present" = enabled.
+        var physical = interfaces.Where(IsPhysical).ToArray();
+        bool? internet = SystemPanelPolicy.InternetState(physical.Length > 0, internetDisabledByMoku);
+        bool internetConnected = physical.Any(HasRoute);
 
         var (vpn, entry) = VpnState(vpnClient, interfaces);
 
@@ -62,10 +63,51 @@ internal sealed class SystemMonitor
             mic = device.AudioEndpointVolume.Mute;
         }
         catch { }
-        return new(cpu, memory, used, total, gpuLoad, gpuName, wifi, wifiConnected, bluetooth, vpn, entry, mic);
+        return new(cpu, memory, used, total, gpuLoad, gpuName, internet, internetConnected, bluetooth, vpn, entry, mic);
     }
 
-    // ---------------- Wi-Fi / Bluetooth: real radio switches, like the Windows quick settings
+    static bool IsPhysical(NetworkInterface n)
+    {
+        try { return SystemPanelPolicy.IsPhysicalNetwork(n.NetworkInterfaceType.ToString(), n.Name, n.Description); } catch { return false; }
+    }
+    static bool HasRoute(NetworkInterface n)
+    {
+        try { return n.OperationalStatus == OperationalStatus.Up && n.GetIPProperties().GatewayAddresses.Any(g => g.Address is { } a && !a.Equals(System.Net.IPAddress.Any) && !a.Equals(System.Net.IPAddress.IPv6Any)); }
+        catch { return false; }
+    }
+    internal static List<string> PhysicalAdapterNames()
+    {
+        try { return NetworkInterface.GetAllNetworkInterfaces().Where(IsPhysical).Select(n => n.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList(); }
+        catch { return new(); }
+    }
+
+    /// <summary>
+    /// Internet on/off = enable/disable the physical adapters. Windows requires administrator rights for this,
+    /// so the change runs in an elevated, hidden PowerShell and Windows shows its UAC prompt.
+    /// </summary>
+    internal static ToggleResult SetInternet(bool on, IReadOnlyList<string> remembered, out List<string> disabled)
+    {
+        disabled = new();
+        List<string> names = on ? remembered.ToList() : PhysicalAdapterNames();
+        if (!on && names.Count == 0) return ToggleResult.Unavailable;
+        string script = SystemPanelPolicy.InternetScript(names, on);
+        try
+        {
+            string ps = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+            string encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+            using var process = Process.Start(new ProcessStartInfo(ps, "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + encoded)
+            { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
+            if (process == null) return ToggleResult.Failed;
+            if (!process.WaitForExit(60000)) return ToggleResult.Failed;
+            if (process.ExitCode != 0) { Log.Error("Internet switch exited with " + process.ExitCode, null); return ToggleResult.Failed; }
+            if (!on) disabled = names;
+            return ToggleResult.Done;
+        }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) { return ToggleResult.Cancelled; }   // UAC declined
+        catch (Exception ex) { Log.Error("Internet switch failed", ex); return ToggleResult.Failed; }
+    }
+
+    // ---------------- Bluetooth: real radio switch, like the Windows quick settings
     Radio[] Radios(bool refresh = false)
     {
         lock (radioLock)

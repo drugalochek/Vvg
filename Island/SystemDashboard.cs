@@ -16,7 +16,7 @@ using Orientation = System.Windows.Controls.Orientation;
 namespace Island;
 
 /// <summary>
-/// System tab: real Wi-Fi / Bluetooth / VPN / microphone switches, sleep / restart / shut down,
+/// System tab: real Internet / Bluetooth / VPN / microphone switches, sleep / restart / shut down,
 /// CPU / GPU / RAM. Nothing else — the same production surface is rendered by Windows tests.
 /// </summary>
 internal sealed class SystemDashboard : StackPanel
@@ -60,7 +60,7 @@ internal sealed class SystemDashboard : StackPanel
         // ---- Switches + power, one card
         var panel = new StackPanel();
         panel.Children.Add(Row(
-            MakeToggle("wifi", "\uE701", "\uE701", "Wi-Fi"),
+            MakeToggle("internet", "\uE774", "\uE774", L("Интернет", "Internet")),
             MakeToggle("bluetooth", "\uE702", "\uE702", "Bluetooth"),
             MakeToggle("vpn", "\uE705", "\uE705", "VPN"),
             MakeToggle("microphone", "\uE720", "\uEC54", L("Микрофон", "Microphone"))));
@@ -80,6 +80,8 @@ internal sealed class SystemDashboard : StackPanel
             Metric("gpu", L("ВИДЕОКАРТА", "GPU"), Color.FromRgb(0x30, 0xD1, 0x58)),
             Metric("memory", L("ПАМЯТЬ", "MEMORY"), Color.FromRgb(0xBF, 0x5A, 0xF2))));
         Children.Add(confirmation);
+        toggles["internet"].Button.ToolTip = L("Включает и выключает всю сеть: кабель и Wi-Fi. Windows попросит подтверждение администратора.",
+                                               "Turns the whole network on and off: cable and Wi-Fi. Windows asks for administrator approval.");
         SetVpnClient(vpnClient);
         foreach (var id in SystemPanelPolicy.Toggles) Render(id);
     }
@@ -159,6 +161,7 @@ internal sealed class SystemDashboard : StackPanel
             ToggleResult.Denied => L("Windows запретила", "Blocked by Windows"),
             ToggleResult.Unavailable => L("Нет адаптера", "No adapter"),
             ToggleResult.NoProfile => L("Нет профиля VPN", "No VPN profile"),
+            ToggleResult.Cancelled => L("Отменено", "Cancelled"),
             _ => L("Не удалось", "Failed")
         });
     }
@@ -256,7 +259,7 @@ internal sealed class SystemDashboard : StackPanel
 
     bool? State(string id) => lastSnapshot == null ? null : id switch
     {
-        "wifi" => lastSnapshot.Wifi, "bluetooth" => lastSnapshot.Bluetooth, "vpn" => lastSnapshot.Vpn,
+        "internet" => lastSnapshot.Internet, "bluetooth" => lastSnapshot.Bluetooth, "vpn" => lastSnapshot.Vpn,
         "microphone" => lastSnapshot.MicMuted is bool muted ? !muted : null, _ => null
     };
 
@@ -289,7 +292,7 @@ internal sealed class SystemDashboard : StackPanel
             "vpn" => "—",
             _ => L("Нет адаптера", "No adapter")
         };
-        else if (id == "wifi" && on == true && lastSnapshot.WifiConnected) caption = L("Подключено", "Connected");
+        else if (id == "internet" && on == true) caption = lastSnapshot.InternetConnected ? L("Подключено", "Connected") : L("Нет сети", "No network");
         else caption = on == true ? L("Вкл.", "On") : L("Выкл.", "Off");
         t.Caption.Text = caption;
         AutomationProperties.SetItemStatus(t.Button, caption);

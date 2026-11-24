@@ -53,7 +53,8 @@ public partial class MainWindow
         {
             bool reset = _systemResetPending; _systemResetPending = false;
             string client = _s.VpnClient;
-            var data = await Task.Run(() => { if (reset) _systemMonitor.Reset(); return _systemMonitor.Read(client); });
+            bool mokuOff = _s.InternetDisabledAdapters.Count > 0;
+            var data = await Task.Run(() => { if (reset) _systemMonitor.Reset(); return _systemMonitor.Read(client, mokuOff); });
             if (generation != _systemGeneration || !_systemTimer.IsEnabled) return;
             _systemLast = data;
             _systemDashboard?.Update(data);
@@ -95,8 +96,10 @@ public partial class MainWindow
         {
             switch (action)
             {
-                case "wifi": case "bluetooth":
-                    await ToggleRadio(action, action == "wifi" ? RadioKind.WiFi : RadioKind.Bluetooth); break;
+                case "internet":
+                    await ToggleInternet(); break;
+                case "bluetooth":
+                    await ToggleRadio(action, RadioKind.Bluetooth); break;
                 case "vpn":
                     await ToggleVpn(); break;
                 case "microphone":
@@ -123,7 +126,7 @@ public partial class MainWindow
         if (!_systemBusy.Add(id)) return;
         try
         {
-            bool target = (id == "wifi" ? _systemLast?.Wifi : _systemLast?.Bluetooth) != true;
+            bool target = _systemLast?.Bluetooth != true;
             _systemDashboard?.SetPending(id, target);
             var result = await Task.Run(() => _systemMonitor.SetRadio(kind, target));
             _systemDashboard?.SetResult(id, result);
@@ -131,6 +134,27 @@ public partial class MainWindow
             _ = ReadSystemDashboard();
         }
         finally { _systemBusy.Remove(id); }
+    }
+
+    async Task ToggleInternet()
+    {
+        if (!_systemBusy.Add("internet")) return;
+        _modalOpen = true;   // the UAC prompt takes focus: keep the island open
+        try
+        {
+            bool target = _systemLast?.Internet != true;
+            var remembered = _s.InternetDisabledAdapters.ToList();
+            var (result, disabled) = await Task.Run(() => (SystemMonitor.SetInternet(target, remembered, out var off), off));
+            if (result == ToggleResult.Done)
+            {
+                _s.InternetDisabledAdapters = target ? new() : disabled;
+                _s.Save();
+                _systemDashboard?.SetPending("internet", target);
+            }
+            else _systemDashboard?.SetResult("internet", result);
+            _ = ReadSystemDashboard();
+        }
+        finally { _systemBusy.Remove("internet"); _modalOpen = false; }
     }
 
     async Task ToggleVpn()

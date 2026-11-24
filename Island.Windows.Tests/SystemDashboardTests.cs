@@ -20,7 +20,7 @@ internal static class SystemDashboardTests
         string previews = Path.Combine(Environment.CurrentDirectory,"ui-preview"); Directory.CreateDirectory(previews);
         // CPU 23 %, RAM 8.6 / 16 GB, GPU 41 %, Wi-Fi on + connected, Bluetooth on, VPN off, microphone on.
         var data = new SystemSnapshot(23,53.75,9234179686,17179869184,41,"GeForce RTX 4060",true,true,true,false,null,false);
-        string[] allowed = { "System-wifi","System-bluetooth","System-vpn","System-microphone","System-sleep","System-restart","System-shutdown" };
+        string[] allowed = { "System-internet","System-bluetooth","System-vpn","System-microphone","System-sleep","System-restart","System-shutdown" };
         foreach(bool ru in new[]{true,false})
         {
             var actions = new List<string>();
@@ -31,7 +31,7 @@ internal static class SystemDashboardTests
             check(dashboard.ActualWidth==620,"system production page uses 620 DIP / "+ru);
             var ids = Descendants(dashboard).OfType<Button>().Select(b=>AutomationProperties.GetAutomationId(b)).ToArray();
             check(ids.OrderBy(i=>i).SequenceEqual(allowed.OrderBy(i=>i)),"System tab has only Wi-Fi, Bluetooth, VPN, microphone and power buttons: "+string.Join(",",ids));
-            foreach(var removed in new[]{"taskmanager","camera","notifications","sound","desktop","airplane","lock","microphone-settings","battery"})
+            foreach(var removed in new[]{"taskmanager","camera","notifications","sound","desktop","airplane","lock","microphone-settings","battery","wifi"})
                 check(!ids.Contains("System-"+removed),"removed control is gone: "+removed);
             foreach(var button in Descendants(dashboard).OfType<Button>())
             {
@@ -47,18 +47,18 @@ internal static class SystemDashboardTests
             string[] texts() => Descendants(dashboard).OfType<TextBlock>().Select(t=>t.Text).ToArray();
             check(texts().Contains("GEFORCE RTX 4060") && texts().Contains("41%") && texts().Contains("23%"),"GPU model, GPU and CPU load are shown");
             check(texts().Contains(ru?"8,6 / 16 ГБ":"8.6 / 16 GB") || texts().Any(t=>t.StartsWith("8") && t.Contains("16")),"memory used / total is shown");
-            check(Descendants(Find(dashboard,"System-wifi")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Подключено":"Connected")),"connected Wi-Fi is reported");
+            check(Descendants(Find(dashboard,"System-internet")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Подключено":"Connected")),"connected internet is reported");
             check(Descendants(Find(dashboard,"System-vpn")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Выкл.":"Off")),"VPN reports its real off state");
             check(Descendants(Find(dashboard,"System-microphone")).OfType<TextBlock>().Any(t=>t.Text=="\uE720"),"live microphone shows the microphone icon");
-            Find(dashboard,"System-wifi").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            check(actions.SequenceEqual(new[]{"wifi"}),"Wi-Fi switch dispatches the real toggle without a settings link");
+            Find(dashboard,"System-internet").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            check(actions.SequenceEqual(new[]{"internet"}),"Internet switch dispatches the real toggle without a settings link");
             var restart=Find(dashboard,"System-restart"); restart.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check(dashboard.ConfirmationVisible && dashboard.PendingAction=="restart" && actions.Count==1,"restart cannot execute on first click");
             Find(dashboard,"System-cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check(!dashboard.ConfirmationVisible && actions.Count==1,"cancel does not dispatch power action");
             restart.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Find(dashboard,"System-confirm").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            check(actions.SequenceEqual(new[]{"wifi","restart"}) && !dashboard.ConfirmationVisible,"power action dispatches exactly once after confirmation");
+            check(actions.SequenceEqual(new[]{"internet","restart"}) && !dashboard.ConfirmationVisible,"power action dispatches exactly once after confirmation");
             var shutdown=Find(dashboard,"System-shutdown");shutdown.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             dashboard.CancelConfirmation(); check(!dashboard.ConfirmationVisible && dashboard.PendingAction==null,"leaving System clears armed power action");
 
@@ -70,13 +70,13 @@ internal static class SystemDashboardTests
             check(!dashboard.IsPending("bluetooth",out _,out _) && Descendants(Find(dashboard,"System-bluetooth")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Выкл.":"Off")),"pending clears once the radio really changed");
             dashboard.SetPending("vpn", true); clock = clock.AddSeconds(20); dashboard.Update(data);
             check(!dashboard.IsPending("vpn",out _,out _),"VPN that never connected does not stay 'connecting' forever");
-            dashboard.SetResult("wifi", ToggleResult.Denied);
-            check(Descendants(Find(dashboard,"System-wifi")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Windows запретила":"Blocked by Windows")),"refused radio switch is reported, not faked");
+            dashboard.SetResult("internet", ToggleResult.Denied);
+            check(Descendants(Find(dashboard,"System-internet")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Windows запретила":"Blocked by Windows")),"refused radio switch is reported, not faked");
             dashboard.Clock = () => DateTime.UtcNow;
 
             dashboard.Update(new(null,null,0,0,null,null,null,false,null,null,null,null));
             check(!Find(dashboard,"System-microphone").IsEnabled,"missing microphone is unavailable, not fake enabled");
-            check(!Find(dashboard,"System-wifi").IsEnabled && !Find(dashboard,"System-bluetooth").IsEnabled,"missing radios are unavailable, not fake switches");
+            check(!Find(dashboard,"System-internet").IsEnabled && !Find(dashboard,"System-bluetooth").IsEnabled,"missing radios are unavailable, not fake switches");
             Layout(host); Save(host,Path.Combine(previews,ru?"system-ru-unavailable.png":"system-en-unavailable.png"),1);
             dashboard.Update(data with { MicMuted = true, Vpn = true });Layout(host);
             check(Descendants(Find(dashboard,"System-microphone")).OfType<TextBlock>().Any(t=>t.Text=="\uEC54"),"muted microphone shows the crossed-out icon");
@@ -130,7 +130,7 @@ internal static class SystemDashboardTests
         Thread.Sleep(600); var second=native.Read("Windows");
         check(second.Cpu is null or >=0 and <=100,"second native CPU sample is bounded");
         check(second.Gpu is null or >=0 and <=100,"second native GPU sample is bounded");
-        Console.WriteLine($"native sample: cpu={second.Cpu} gpu={second.Gpu} gpuName={second.GpuName} wifi={second.Wifi} bt={second.Bluetooth} vpn={second.Vpn} mic={second.MicMuted}");
+        Console.WriteLine($"native sample: cpu={second.Cpu} gpu={second.Gpu} gpuName={second.GpuName} internet={second.Internet} bt={second.Bluetooth} vpn={second.Vpn} mic={second.MicMuted}");
         var xml=XDocument.Load(Path.Combine(AppContext.BaseDirectory,"MainWindow.source.xaml"));
         XNamespace x="http://schemas.microsoft.com/winfx/2006/xaml";
         var support=xml.Descendants().Single(e=>(string?)e.Attribute(x+"Name")=="SupportBtn");

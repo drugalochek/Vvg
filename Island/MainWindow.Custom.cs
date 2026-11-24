@@ -18,7 +18,7 @@ namespace Island;
 
 /// <summary>
 /// v2.10: кастомизация — форма, размер, цвет и свечение глаз; что показывать в свёрнутом острове
-/// (время, дата, погода, батарея, процессор, память, таймер); формат часов; таймер и секундомер.
+/// (время, дата, погода, батарея, процессор, память, таймер); формат часов; таймер и корзина.
 /// </summary>
 public partial class MainWindow
 {
@@ -146,14 +146,14 @@ public partial class MainWindow
 
     /// <summary>Нужен ли тик часов раз в секунду (секунды, таймер, процессор/память/батарея).</summary>
     bool NeedsSecondTicks() =>
-        TimerActive || StopwatchActive ||
+        TimerActive ||
         _s.MiniRight is "Cpu" or "Ram" or "Battery" ||
         (_s.ClockSeconds && (_s.MiniCenter is "Time" or "TimeDate" || _s.MiniRight == "Time"));
 
     // ================================================================ свёрнутый вид
 
-    /// <summary>Что сейчас показывать справа: запущенный таймер/секундомер важнее выбранного виджета.</summary>
-    string RightKind() => TimerActive ? "Timer" : StopwatchActive ? "Stopwatch" : _s.MiniRight;
+    /// <summary>Что сейчас показывать справа: запущенный таймер важнее выбранного виджета.</summary>
+    string RightKind() => TimerActive ? "Timer" : _s.MiniRight;
 
     void UpdateMiniWidgets(DateTime now, bool hasMedia)
     {
@@ -176,7 +176,7 @@ public partial class MainWindow
     void FillInfo(string kind, DateTime now)
     {
         BatteryGlyph.Visibility = kind == "Battery" ? Visibility.Visible : Visibility.Collapsed;
-        InfoIcon.Visibility = kind is "Timer" or "Stopwatch" ? Visibility.Visible : Visibility.Collapsed;
+        InfoIcon.Visibility = kind is "Timer" ? Visibility.Visible : Visibility.Collapsed;
         InfoText.Foreground = (System.Windows.Media.Brush)FindResource("Dim");
         InfoPanel.ToolTip = null;
         switch (kind)
@@ -198,12 +198,6 @@ public partial class MainWindow
                 InfoText.Text = FormatSpan(TimerLeft(now)) + (_timerPaused ? " ❚❚" : "");
                 InfoText.Foreground = Brushes.White;
                 InfoPanel.ToolTip = Tr("Таймер — управление на главной вкладке", "Timer — controls are on the Home tab");
-                break;
-            case "Stopwatch":
-                InfoIcon.Text = "\uE916";
-                InfoText.Text = FormatSpan(StopwatchElapsed(now)) + (_swStart == null ? " ❚❚" : "");
-                InfoText.Foreground = Brushes.White;
-                InfoPanel.ToolTip = Tr("Секундомер", "Stopwatch");
                 break;
         }
     }
@@ -320,7 +314,6 @@ public partial class MainWindow
             "Time" => 8 + TextW(Zeros(FormatTime(now, _s.ClockSeconds)), 12),
             "Date" => 8 + TextW(FormatDate(now), 12),
             "Timer" => 8 + 16 + TextW(Zeros(FormatSpan(TimerLeft(now))) + (_timerPaused ? " ❚❚" : ""), 12),
-            "Stopwatch" => 8 + 16 + TextW(Zeros(FormatSpan(StopwatchElapsed(now))) + (_swStart == null ? " ❚❚" : ""), 12),
             _ => 0
         };
         if (right > 0) right += 9;
@@ -338,26 +331,22 @@ public partial class MainWindow
         Animate(target, MiniH, MiniR, spring: false);
     }
 
-    // ================================================================ таймер и секундомер
+    // ================================================================ таймер и корзина
 
     DateTime? _timerEnd;
     TimeSpan _timerLeft;
     bool _timerPaused;
-    DateTime? _swStart;
-    TimeSpan _swAccum;
-    TextBlock? _timerLabel, _swLabel;
-    Button? _timerTile, _swTile;
+    TextBlock? _timerLabel, _binLabel;
+    Button? _timerTile, _binTile;
+    long _binItems = -1;
 
     bool TimerActive => _timerEnd != null || _timerPaused;
-    bool StopwatchActive => _swStart != null || _swAccum > TimeSpan.Zero;
 
     TimeSpan TimerLeft(DateTime now)
     {
         var left = _timerEnd is DateTime end ? end - now : _timerPaused ? _timerLeft : TimeSpan.FromMinutes(_s.TimerMinutes);
         return TimeSpan.FromSeconds(Math.Max(0, Math.Ceiling(left.TotalSeconds)));
     }
-
-    TimeSpan StopwatchElapsed(DateTime now) => _swAccum + (_swStart is DateTime s ? now - s : TimeSpan.Zero);
 
     void AddTimerTiles(Style style, FontFamily icons)
     {
@@ -368,18 +357,22 @@ public partial class MainWindow
         _timerTile.ContextMenuOpening += (_, _) => BuildTimerMenu(_timerTile.ContextMenu);
         TileGrid.Children.Add(_timerTile);
 
-        _swTile = MakeTile(style, icons, "\uE916", out _swLabel);
-        _swTile.Click += (_, _) => ToggleStopwatch();
-        _swTile.ContextMenu = new ContextMenu();
-        _swTile.ContextMenuOpening += (_, _) =>
+        _binTile = MakeTile(style, icons, "\uE74D", out _binLabel);
+        _binTile.Click += (_, _) => OpenRecycleBin();
+        _binTile.MouseEnter += (_, _) => _ = RefreshRecycleBinAsync();
+        _binTile.ContextMenu = new ContextMenu();
+        _binTile.ContextMenuOpening += (_, _) =>
         {
-            var m = _swTile.ContextMenu!;
+            var m = _binTile.ContextMenu!;
             m.Items.Clear();
-            var reset = new MenuItem { Header = Tr("Сбросить", "Reset"), IsEnabled = StopwatchActive };
-            reset.Click += (_, _) => { _swStart = null; _swAccum = TimeSpan.Zero; TimersChanged(); };
-            m.Items.Add(reset);
+            var open = new MenuItem { Header = Tr("Открыть корзину", "Open Recycle Bin") };
+            open.Click += (_, _) => OpenRecycleBin();
+            var empty = new MenuItem { Header = Tr("Очистить корзину", "Empty Recycle Bin"), IsEnabled = _binItems != 0 };
+            empty.Click += async (_, _) => await EmptyRecycleBinAsync();
+            m.Items.Add(open); m.Items.Add(empty);
+            _ = RefreshRecycleBinAsync();
         };
-        TileGrid.Children.Add(_swTile);
+        TileGrid.Children.Add(_binTile);
 
         // 8 плиток в 2 столбца — чуть ниже обычного, чтобы всё поместилось в раскрытый остров.
         foreach (var child in TileGrid.Children.OfType<Button>()) child.Height = 56;
@@ -449,13 +442,53 @@ public partial class MainWindow
         TimersChanged();
     }
 
-    void ToggleStopwatch()
+    // ---- Корзина: клик открывает, ПКМ — очистить (Windows сама спрашивает подтверждение)
+    void OpenRecycleBin()
     {
-        var now = DateTime.Now;
-        if (_swStart is DateTime s) { _swAccum += now - s; _swStart = null; }
-        else _swStart = now;
-        TimersChanged();
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), "shell:RecycleBinFolder") { UseShellExecute = false });
+            Collapse();
+        }
+        catch (Exception ex) { Log.Error("Could not open Recycle Bin", ex); ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Не удалось открыть", "Could not open"), ColorError); }
     }
+
+    async Task RefreshRecycleBinAsync()
+    {
+        long items = await Task.Run(RecycleBinItemCount);
+        _binItems = items;
+        UpdateTimerTiles();
+    }
+
+    async Task EmptyRecycleBinAsync()
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        _modalOpen = true;
+        int hr;
+        try { hr = SHEmptyRecycleBin(hwnd, null, 0); }   // 0: Windows shows its own confirmation and progress
+        finally { _modalOpen = false; }
+        await RefreshRecycleBinAsync();
+        // S_OK = очищено; E_UNEXPECTED приходит, когда корзина уже пуста; 0x800704C7 — пользователь отменил.
+        if (hr == 0) ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Очищена", "Emptied"), ColorOk);
+        else if (hr != unchecked((int)0x800704C7) && hr != unchecked((int)0x8000FFFF))
+            ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Не удалось очистить", "Could not empty"), ColorError);
+    }
+
+    static long RecycleBinItemCount()
+    {
+        try
+        {
+            var info = new ShQueryRbInfo { Size = Marshal.SizeOf<ShQueryRbInfo>() };
+            return SHQueryRecycleBin(null, ref info) == 0 ? info.NumItems : -1;
+        }
+        catch { return -1; }
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    struct ShQueryRbInfo { public int Size; public long SizeBytes; public long NumItems; }
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHQueryRecycleBin(string? rootPath, ref ShQueryRbInfo info);
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHEmptyRecycleBin(IntPtr hwnd, string? rootPath, uint flags);
 
     void TimersChanged()
     {
@@ -480,17 +513,17 @@ public partial class MainWindow
 
     void UpdateTimerTiles()
     {
-        if (_timerLabel == null || _swLabel == null) return;
+        if (_timerLabel == null || _binLabel == null) return;
         var now = DateTime.Now;
         _timerLabel.Text = TimerActive
             ? FormatSpan(TimerLeft(now)) + (_timerPaused ? Tr(" · пауза", " · paused") : "")
             : Tr($"Таймер · {_s.TimerMinutes} мин", $"Timer · {_s.TimerMinutes} min");
-        _swLabel.Text = StopwatchActive
-            ? FormatSpan(StopwatchElapsed(now)) + (_swStart == null ? Tr(" · пауза", " · paused") : "")
-            : Tr("Секундомер", "Stopwatch");
+        _binLabel.Text = _binItems > 0
+            ? Tr($"Корзина · {_binItems}", $"Recycle Bin · {_binItems}")
+            : _binItems == 0 ? Tr("Корзина · пусто", "Recycle Bin · empty") : Tr("Корзина", "Recycle Bin");
         if (_timerTile != null)
             _timerTile.ToolTip = Tr("Клик — старт/пауза, колесо — минуты (Shift — по 5), ПКМ — ещё",
                                     "Click — start/pause, wheel — minutes (Shift — by 5), right-click — more");
-        if (_swTile != null) _swTile.ToolTip = Tr("Клик — старт/пауза, ПКМ — сброс", "Click — start/pause, right-click — reset");
+        if (_binTile != null) _binTile.ToolTip = Tr("Клик — открыть корзину, ПКМ — очистить", "Click — open Recycle Bin, right-click — empty it");
     }
 }

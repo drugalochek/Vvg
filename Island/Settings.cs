@@ -53,6 +53,7 @@ public class Settings
     public List<string> RootTileOrder { get; set; } = new();
     public bool SteamSuggestionsExpanded { get; set; } = true;
     public List<string> HiddenSteamGames { get; set; } = new();
+    public List<string> InternetDisabledAdapters { get; set; } = new();   // adapters Moku itself switched off
     public bool TransparentOverNormalWindows { get; set; } = false;
     public string HomeStartupView { get; set; } = "Clipboard";
     public string LastHomeView { get; set; } = "Clipboard";
@@ -104,6 +105,7 @@ public class Settings
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
         VpnClient = SystemPanelPolicy.VpnClient(VpnClient);
+        InternetDisabledAdapters = (InternetDisabledAdapters ?? new()).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         JellyStrength = Math.Clamp(JellyStrength, 0, 200);
         AnimationSpeed = Math.Clamp(AnimationSpeed, 50, 200);
         GazeRange = Math.Clamp(GazeRange, 50, 150);

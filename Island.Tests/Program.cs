@@ -2,6 +2,7 @@ using Island;
 using System.Text.Json;
 
 int checks = 0;
+bool Throws(Action a) { try { a(); return false; } catch { return true; } }
 void Check(bool ok, string name) { checks++; if (!ok) throw new Exception("FAIL: " + name); }
 Check(SystemPanelPolicy.Cpu(100,200,100,120,260,140) == 80, "system CPU delta excludes idle");
 Check(SystemPanelPolicy.Cpu(0,0,0,0,0,0) == null, "system CPU zero interval unavailable");
@@ -12,10 +13,18 @@ Check(SystemPanelPolicy.Memory(0,0) == null && SystemPanelPolicy.Memory(8,16) ==
 Check(SystemPanelPolicy.Battery(128,100) == null, "desktop has no fake battery");
 Check(!SystemPanelPolicy.Poll(false,true) && !SystemPanelPolicy.Poll(true,false) && SystemPanelPolicy.Poll(true,true), "system polling only while expanded and visible");
 Check(new[]{"sleep","restart","shutdown"}.All(SystemPanelPolicy.NeedsConfirmation), "power operations require confirmation");
-Check(!SystemPanelPolicy.NeedsConfirmation("wifi") && !SystemPanelPolicy.NeedsConfirmation("vpn") && !SystemPanelPolicy.NeedsConfirmation("microphone"), "switches do not prompt");
-Check(SystemPanelPolicy.Toggles.SequenceEqual(new[]{"wifi","bluetooth","vpn","microphone"}), "System tab exposes only the four real switches");
+Check(!SystemPanelPolicy.NeedsConfirmation("internet") && !SystemPanelPolicy.NeedsConfirmation("vpn") && !SystemPanelPolicy.NeedsConfirmation("microphone"), "switches do not prompt");
+Check(SystemPanelPolicy.Toggles.SequenceEqual(new[]{"internet","bluetooth","vpn","microphone"}), "System tab exposes only the four real switches");
 Check(SystemPanelPolicy.PowerActions.SequenceEqual(new[]{"sleep","restart","shutdown"}), "System tab exposes only sleep, restart and shut down");
-Check(SystemPanelPolicy.FallbackUri("wifi") == "ms-settings:network-wifi" && SystemPanelPolicy.FallbackUri("vpn") == "ms-settings:network-vpn", "refused toggles fall back to the matching Windows page");
+Check(SystemPanelPolicy.FallbackUri("internet") == "ms-settings:network-status" && SystemPanelPolicy.FallbackUri("wifi") == null && SystemPanelPolicy.FallbackUri("vpn") == "ms-settings:network-vpn", "refused toggles fall back to the matching Windows page");
+Check(SystemPanelPolicy.IsPhysicalNetwork("Ethernet","Ethernet","Realtek PCIe GbE Family Controller") && SystemPanelPolicy.IsPhysicalNetwork("Wireless80211","Wi-Fi","Intel(R) Wi-Fi 6 AX201"), "cable and Wi-Fi adapters count as internet");
+Check(!SystemPanelPolicy.IsPhysicalNetwork("Ethernet","vEthernet (Default Switch)","Hyper-V Virtual Ethernet Adapter") && !SystemPanelPolicy.IsPhysicalNetwork("Unknown","happ-tun","Wintun Userspace Tunnel") && !SystemPanelPolicy.IsPhysicalNetwork("Ethernet","Bluetooth Network Connection","Bluetooth Device (PAN)") && !SystemPanelPolicy.IsPhysicalNetwork("Wireless80211","Local Area Connection* 1","Microsoft Wi-Fi Direct Virtual Adapter") && !SystemPanelPolicy.IsPhysicalNetwork(null,"x","y"), "virtual, VPN and Bluetooth adapters are never switched off");
+Check(SystemPanelPolicy.InternetState(true,false) == true && SystemPanelPolicy.InternetState(false,true) == false && SystemPanelPolicy.InternetState(false,false) == null, "internet state: on / off by Moku / unavailable");
+Check(SystemPanelPolicy.InternetScript(new[]{"Ethernet","Wi-Fi"}, false).Contains("Disable-NetAdapter -Name @('Ethernet','Wi-Fi')") && SystemPanelPolicy.InternetScript(new[]{"Bob's LAN"}, true).Contains("Enable-NetAdapter -Name @('Bob''s LAN')"), "internet script switches exactly the named adapters with quoting");
+Check(SystemPanelPolicy.InternetScript(Array.Empty<string>(), true).Contains("Get-NetAdapter -Physical") && Throws(() => SystemPanelPolicy.InternetScript(Array.Empty<string>(), false)), "internet restore fallback; nothing to disable is an error");
+{ string root = AppContext.BaseDirectory; while (!File.Exists(Path.Combine(root, "Island", "MainWindow.Custom.cs")) && Directory.GetParent(root) is { } up) root = up.FullName;
+  string custom = File.ReadAllText(Path.Combine(root, "Island", "MainWindow.Custom.cs"));
+  Check(!custom.Contains("Stopwatch", StringComparison.OrdinalIgnoreCase) && !custom.Contains("секундомер", StringComparison.OrdinalIgnoreCase) && custom.Contains("shell:RecycleBinFolder") && custom.Contains("SHEmptyRecycleBin"), "Home: stopwatch replaced by the Recycle Bin tile"); }
 Check(SystemPanelPolicy.FallbackUri("taskmanager") == null && SystemPanelPolicy.FallbackUri("arbitrary") == null, "removed / unknown actions have no URI");
 Check(SystemPanelPolicy.GpuLoad(new[]{
     ("pid_1_luid_0x00000000_0x0000D1B4_phys_0_eng_0_engtype_3D", 30.0),
