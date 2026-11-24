@@ -36,3 +36,16 @@ jobs:
           name: Moku-2.13.3-framework-dependent-win-x64
           path: Island/publish/
           retention-days: 14
+      - name: Build self-contained release installer
+        run: |
+          dotnet publish Island/Island.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:InvariantGlobalization=false -p:DebugType=None -p:DebugSymbols=false -o Island/publish
+          dotnet publish Installer/Installer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o Installer/publish
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item Installer/publish/Moku-Setup.exe release/Moku-Setup-2.13.3-x64.exe
+          if ((Get-Item release/Moku-Setup-2.13.3-x64.exe).Length -lt 50MB) { throw "installer looks incomplete" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Moku-Setup-2.13.3-x64
+          path: release/Moku-Setup-2.13.3-x64.exe
+          retention-days: 14
+          compression-level: 0

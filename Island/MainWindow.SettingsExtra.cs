@@ -138,8 +138,8 @@ public partial class MainWindow
         Section(p, L("ТАЙМЕР", "TIMER"));
         SliderRow(p, L("Таймер по умолчанию", "Default timer"), 1, 180, () => _s.TimerMinutes, v => { _s.TimerMinutes = v; UpdateTimerTiles(); },
             v => v + L(" мин", " min"));
-        Hint(p, L("Плитки «Таймер» и «Секундомер» — на главной вкладке. Пока они идут, отсчёт виден справа в свёрнутом острове.",
-                  "Timer and Stopwatch tiles are on the Home tab. While running, the countdown shows on the right of the compact island."));
+        Hint(p, L("Плитки «Таймер» и «Корзина» — на главной вкладке. Пока идёт таймер, отсчёт виден справа в свёрнутом острове.",
+                  "Timer and Recycle Bin tiles are on the Home tab. While the timer runs, the countdown shows on the right of the compact island."));
 
         // ---------------- Музыка и уведомления
         p = CatMusic; _buildCat = "music";
