@@ -51,6 +51,8 @@ public partial class MainWindow
 
     void Animate(double w, double h, double radius, bool spring, double speed = 1)
     {
+        // Спрятанный островок остаётся тонкой линией, что бы ни меняло размер (трек, виджеты, тосты).
+        if (_stowed && _state != IslandState.Expanded) { w = StowW; h = StowH; radius = StowH / 2; }
         _baseRadius = radius;
         _animKindSpeed = Math.Clamp(speed, 0.3, 3);
         double targetR = StateRadius(radius, w, h);

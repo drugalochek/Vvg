@@ -10,13 +10,39 @@ Check(SystemPanelPolicy.Cpu(0,0,0,100,20,20) == 0, "system CPU clamps inconsiste
 Check(SystemPanelPolicy.Memory(16,8) == 50, "physical memory percentage");
 Check(SystemPanelPolicy.Memory(0,0) == null && SystemPanelPolicy.Memory(8,16) == null, "invalid memory unavailable");
 Check(SystemPanelPolicy.Battery(128,100) == null, "desktop has no fake battery");
-Check(SystemPanelPolicy.Battery(255,255) == null, "unknown battery stays unavailable");
-Check(SystemPanelPolicy.Battery(8,72) == 72 && SystemPanelPolicy.Battery(1,0) == 0, "charging and depleted battery valid");
 Check(!SystemPanelPolicy.Poll(false,true) && !SystemPanelPolicy.Poll(true,false) && SystemPanelPolicy.Poll(true,true), "system polling only while expanded and visible");
 Check(new[]{"sleep","restart","shutdown"}.All(SystemPanelPolicy.NeedsConfirmation), "power operations require confirmation");
-Check(!SystemPanelPolicy.NeedsConfirmation("lock") && !SystemPanelPolicy.NeedsConfirmation("wifi"), "ordinary controls do not prompt");
-Check(SystemPanelPolicy.SettingsUri("vpn") == "ms-settings:network-vpn", "VPN opens real Windows settings");
-Check(SystemPanelPolicy.SettingsUri("arbitrary") == null, "unknown system URI rejected");
+Check(!SystemPanelPolicy.NeedsConfirmation("wifi") && !SystemPanelPolicy.NeedsConfirmation("vpn") && !SystemPanelPolicy.NeedsConfirmation("microphone"), "switches do not prompt");
+Check(SystemPanelPolicy.Toggles.SequenceEqual(new[]{"wifi","bluetooth","vpn","microphone"}), "System tab exposes only the four real switches");
+Check(SystemPanelPolicy.PowerActions.SequenceEqual(new[]{"sleep","restart","shutdown"}), "System tab exposes only sleep, restart and shut down");
+Check(SystemPanelPolicy.FallbackUri("wifi") == "ms-settings:network-wifi" && SystemPanelPolicy.FallbackUri("vpn") == "ms-settings:network-vpn", "refused toggles fall back to the matching Windows page");
+Check(SystemPanelPolicy.FallbackUri("taskmanager") == null && SystemPanelPolicy.FallbackUri("arbitrary") == null, "removed / unknown actions have no URI");
+Check(SystemPanelPolicy.GpuLoad(new[]{
+    ("pid_1_luid_0x00000000_0x0000D1B4_phys_0_eng_0_engtype_3D", 30.0),
+    ("pid_2_luid_0x00000000_0x0000D1B4_phys_0_eng_0_engtype_3D", 11.0),
+    ("pid_2_luid_0x00000000_0x0000D1B4_phys_0_eng_3_engtype_VideoDecode", 20.0)}) == 41, "GPU load sums processes per engine and takes the busiest engine");
+Check(SystemPanelPolicy.GpuLoad(new[]{
+    ("pid_1_luid_0x00000000_0x0000AAAA_phys_0_eng_0_engtype_3D", 70.0),
+    ("pid_1_luid_0x00000000_0x0000BBBB_phys_0_eng_0_engtype_3D", 70.0)}) == 70, "two adapters are not added together");
+Check(SystemPanelPolicy.GpuLoad(new[]{("pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 80.0),("pid_2_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 60.0)}) == 100, "GPU load clamps at 100 %");
+Check(SystemPanelPolicy.GpuLoad(Array.Empty<(string,double)>()) == null, "no GPU samples is unavailable, not 0 %");
+Check(SystemPanelPolicy.GpuName("NVIDIA GeForce RTX 4060") == "GeForce RTX 4060", "GPU name drops vendor prefix");
+Check(SystemPanelPolicy.GpuName("Intel(R) UHD Graphics 630") == "Intel UHD Graphics 630", "GPU name drops trademark marks");
+Check(SystemPanelPolicy.GpuName("Microsoft Basic Render Driver") == null && SystemPanelPolicy.GpuName(null) == null, "software adapter is not a GPU");
+Check(SystemPanelPolicy.LooksLikeTunnel("happ-tun","Wintun Userspace Tunnel") && SystemPanelPolicy.LooksLikeTunnel("xray0","Xray TUN"), "Happ tunnel adapters recognised");
+Check(!SystemPanelPolicy.LooksLikeTunnel("Ethernet","Realtek PCIe GbE") && !SystemPanelPolicy.LooksLikeTunnel("Teredo Tunneling Pseudo-Interface","Teredo"), "ordinary and Teredo adapters are not a VPN");
+Check(SystemPanelPolicy.IsLocalProxy(1,"127.0.0.1:10809") && SystemPanelPolicy.IsLocalProxy(1,"http=localhost:2080;https=localhost:2080"), "Happ system proxy recognised");
+Check(!SystemPanelPolicy.IsLocalProxy(0,"127.0.0.1:10809") && !SystemPanelPolicy.IsLocalProxy(1,"proxy.corp.local:8080"), "disabled / corporate proxy is not Happ");
+Check(SystemPanelPolicy.HappConnected(true,true,false) && SystemPanelPolicy.HappConnected(true,false,true), "Happ on through tunnel or proxy");
+Check(!SystemPanelPolicy.HappConnected(false,true,true), "closed Happ is never reported as connected");
+Check(SystemPanelPolicy.PhonebookEntries("[Work VPN]\r\nType=2\r\n\r\n[Home]\r\nType=2\r\n[work vpn]\r\n").SequenceEqual(new[]{"Work VPN","Home"}), "Windows VPN profiles read from phonebook");
+Check(SystemPanelPolicy.PhonebookEntries(null).Count == 0, "missing phonebook has no profiles");
+Check(SystemPanelPolicy.PendingExpired(DateTime.UnixEpoch, DateTime.UnixEpoch.AddSeconds(13)) && !SystemPanelPolicy.PendingExpired(DateTime.UnixEpoch, DateTime.UnixEpoch.AddSeconds(3)), "pending switch state expires");
+Check(IslandSwipePolicy.HideDirection("Top") == -1 && IslandSwipePolicy.HideDirection("Bottom") == 1 && IslandSwipePolicy.HideDirection("Center") == -1, "island hides toward its screen edge");
+Check(IslandSwipePolicy.Resolve(-30,-1,false) == SwipeAction.Stow && IslandSwipePolicy.Resolve(-10,-1,false) == SwipeAction.None, "swipe up hides top island after a deliberate distance");
+Check(IslandSwipePolicy.Resolve(30,-1,true) == SwipeAction.Restore && IslandSwipePolicy.Resolve(-30,-1,true) == SwipeAction.None, "swipe down restores, swiping further up does nothing");
+Check(IslandSwipePolicy.Resolve(30,-1,false) == SwipeAction.None, "swiping down on a visible top island does not hide it");
+Check(IslandSwipePolicy.Resolve(30,1,false) == SwipeAction.Stow && IslandSwipePolicy.Resolve(-30,1,true) == SwipeAction.Restore, "bottom island mirrors the gesture");
 Check(new Settings().VpnClient == "Windows", "existing installations keep Windows VPN action");
 Check(SystemPanelPolicy.VpnClient("happ") == "Happ" && SystemPanelPolicy.VpnClient("Happ") == "Happ", "Happ client choice normalizes");
 Check(SystemPanelPolicy.VpnClient(null) == "Windows" && SystemPanelPolicy.VpnClient("unknown") == "Windows", "unknown VPN client falls back safely");

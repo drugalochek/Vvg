@@ -122,6 +122,8 @@ public partial class MainWindow
 
         // ---------------- Свёрнутый вид
         p = CatMini; _buildCat = "mini";
+        Hint(p, L("Зажми островок левой кнопкой и потяни к краю экрана (вверх) — он спрячется в тонкую линию, Moku продолжит работать. Потяни линию обратно или нажми на неё — островок вернётся.",
+                  "Hold the island with the left button and swipe toward the screen edge (up) — it hides into a thin line while Moku keeps running. Swipe the line back or click it to bring the island back."));
         Section(p, L("ЧТО ПОКАЗЫВАТЬ", "WHAT TO SHOW"));
         ChoiceRow(p, L("В центре", "Center"), "minicenter",
             new[] { ("Time", L("Время", "Time")), ("Date", L("Дата", "Date")), ("TimeDate", L("Дата и время", "Date & time")), ("None", L("Ничего", "Nothing")) },
@@ -164,13 +166,13 @@ public partial class MainWindow
         // ---------------- Система
         p = CatSystemSettings; _buildCat = "system";
         Section(p, "VPN");
-        ChoiceRow(p, L("VPN-клиент", "VPN client"), "vpnclient",
-            new[] { ("Windows", L("Параметры Windows", "Windows settings")), ("Happ", "Happ") },
+        ChoiceRow(p, L("Кнопка VPN управляет", "VPN button controls"), "vpnclient",
+            new[] { ("Windows", L("VPN Windows", "Windows VPN")), ("Happ", "Happ") },
             () => _s.VpnClient, v => { _s.VpnClient = v; _s.Save(); _systemDashboard?.SetVpnClient(v); });
-        Hint(p, L("Happ: плитка VPN отправляет команду подключения, а не просто открывает окно. Установи актуальный Happ и заранее настрой в нём рабочий профиль.",
-                  "Happ: the VPN tile requests a connection, rather than just opening its window. Install an up-to-date Happ and configure a working profile first."));
-        Hint(p, L("Статус туннеля не отслеживается. Отключение — в самом Happ. Ключи и подписки остаются в Happ, Moku их не читает.",
-                  "Tunnel status is not tracked. Disconnect in Happ itself. Keys and subscriptions stay in Happ; Moku does not read them."));
+        Hint(p, L("Happ: кнопка включает и выключает подключение Happ. Нужен актуальный Happ с настроенным профилем. Состояние берётся из реального туннеля или системного прокси Happ.",
+                  "Happ: the button turns the Happ connection on and off. Requires an up-to-date Happ with a configured profile. State comes from Happ's real tunnel or system proxy."));
+        Hint(p, L("VPN Windows: подключается первый VPN из «Параметры → Сеть → VPN» с сохранённым входом. Ключи и пароли Moku не читает и не хранит.",
+                  "Windows VPN: connects the first VPN from Settings → Network → VPN with saved sign-in. Moku never reads or stores keys and passwords."));
 
         // ---------------- Общие (язык и автозапуск — в разметке; Boosty — отдельный раздел)
         p = CatGeneralExtra; _buildCat = "general";

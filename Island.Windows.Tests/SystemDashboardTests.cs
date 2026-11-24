@@ -18,7 +18,9 @@ internal static class SystemDashboardTests
     internal static void Run(Action<bool,string> check)
     {
         string previews = Path.Combine(Environment.CurrentDirectory,"ui-preview"); Directory.CreateDirectory(previews);
-        var data = new SystemSnapshot(23,53.75,9234179686,17179869184,82,true,true,true,false,65,false);
+        // CPU 23 %, RAM 8.6 / 16 GB, GPU 41 %, Wi-Fi on + connected, Bluetooth on, VPN off, microphone on.
+        var data = new SystemSnapshot(23,53.75,9234179686,17179869184,41,"GeForce RTX 4060",true,true,true,false,null,false);
+        string[] allowed = { "System-wifi","System-bluetooth","System-vpn","System-microphone","System-sleep","System-restart","System-shutdown" };
         foreach(bool ru in new[]{true,false})
         {
             var actions = new List<string>();
@@ -27,30 +29,58 @@ internal static class SystemDashboardTests
             dashboard.Update(data);
             Layout(host);
             check(dashboard.ActualWidth==620,"system production page uses 620 DIP / "+ru);
+            var ids = Descendants(dashboard).OfType<Button>().Select(b=>AutomationProperties.GetAutomationId(b)).ToArray();
+            check(ids.OrderBy(i=>i).SequenceEqual(allowed.OrderBy(i=>i)),"System tab has only Wi-Fi, Bluetooth, VPN, microphone and power buttons: "+string.Join(",",ids));
+            foreach(var removed in new[]{"taskmanager","camera","notifications","sound","desktop","airplane","lock","microphone-settings","battery"})
+                check(!ids.Contains("System-"+removed),"removed control is gone: "+removed);
             foreach(var button in Descendants(dashboard).OfType<Button>())
             {
                 check(button.ActualHeight>=44,"system input target >=44 DIP: "+AutomationProperties.GetAutomationId(button));
                 check(button.ActualWidth>60,"system input has usable width: "+AutomationProperties.GetAutomationId(button));
+                check(Descendants(button).OfType<TextBlock>().Any(t=>t.FontFamily.Source.Contains("Segoe")),"every system button has an icon: "+AutomationProperties.GetAutomationId(button));
             }
             foreach(var text in Descendants(dashboard).OfType<TextBlock>().Where(t=>t.IsVisible || t.ActualWidth>0))
             {
                 var bounds=text.TransformToAncestor(host).TransformBounds(new Rect(0,0,text.ActualWidth,text.ActualHeight));
                 check(bounds.Left>=0 && bounds.Right<=652.1,"system label stays in panel: "+text.Text);
             }
+            string[] texts() => Descendants(dashboard).OfType<TextBlock>().Select(t=>t.Text).ToArray();
+            check(texts().Contains("GEFORCE RTX 4060") && texts().Contains("41%") && texts().Contains("23%"),"GPU model, GPU and CPU load are shown");
+            check(texts().Contains(ru?"8,6 / 16 ГБ":"8.6 / 16 GB") || texts().Any(t=>t.StartsWith("8") && t.Contains("16")),"memory used / total is shown");
+            check(Descendants(Find(dashboard,"System-wifi")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Подключено":"Connected")),"connected Wi-Fi is reported");
+            check(Descendants(Find(dashboard,"System-vpn")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Выкл.":"Off")),"VPN reports its real off state");
+            check(Descendants(Find(dashboard,"System-microphone")).OfType<TextBlock>().Any(t=>t.Text=="\uE720"),"live microphone shows the microphone icon");
+            Find(dashboard,"System-wifi").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            check(actions.SequenceEqual(new[]{"wifi"}),"Wi-Fi switch dispatches the real toggle without a settings link");
             var restart=Find(dashboard,"System-restart"); restart.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            check(dashboard.ConfirmationVisible && dashboard.PendingAction=="restart" && actions.Count==0,"restart cannot execute on first click");
+            check(dashboard.ConfirmationVisible && dashboard.PendingAction=="restart" && actions.Count==1,"restart cannot execute on first click");
             Find(dashboard,"System-cancel").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            check(!dashboard.ConfirmationVisible && actions.Count==0,"cancel does not dispatch power action");
+            check(!dashboard.ConfirmationVisible && actions.Count==1,"cancel does not dispatch power action");
             restart.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Find(dashboard,"System-confirm").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            check(actions.SequenceEqual(new[]{"restart"}) && !dashboard.ConfirmationVisible,"power action dispatches exactly once after confirmation");
-            Find(dashboard,"System-wifi").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            check(actions.Last()=="wifi","system settings link routes real action");
+            check(actions.SequenceEqual(new[]{"wifi","restart"}) && !dashboard.ConfirmationVisible,"power action dispatches exactly once after confirmation");
             var shutdown=Find(dashboard,"System-shutdown");shutdown.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             dashboard.CancelConfirmation(); check(!dashboard.ConfirmationVisible && dashboard.PendingAction==null,"leaving System clears armed power action");
-            dashboard.Update(new(null,null,0,0,null,false,true,null,null,null,null));
+
+            // Pending switch: "turning off…" until Windows reports the new state, then the real state.
+            var clock = DateTime.UtcNow; dashboard.Clock = () => clock;
+            dashboard.SetPending("bluetooth", false);
+            check(Descendants(Find(dashboard,"System-bluetooth")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Выключаю…":"Turning off…")),"pending switch is visible");
+            dashboard.Update(data with { Bluetooth = false });
+            check(!dashboard.IsPending("bluetooth",out _,out _) && Descendants(Find(dashboard,"System-bluetooth")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Выкл.":"Off")),"pending clears once the radio really changed");
+            dashboard.SetPending("vpn", true); clock = clock.AddSeconds(20); dashboard.Update(data);
+            check(!dashboard.IsPending("vpn",out _,out _),"VPN that never connected does not stay 'connecting' forever");
+            dashboard.SetResult("wifi", ToggleResult.Denied);
+            check(Descendants(Find(dashboard,"System-wifi")).OfType<TextBlock>().Any(t=>t.Text==(ru?"Windows запретила":"Blocked by Windows")),"refused radio switch is reported, not faked");
+            dashboard.Clock = () => DateTime.UtcNow;
+
+            dashboard.Update(new(null,null,0,0,null,null,null,false,null,null,null,null));
             check(!Find(dashboard,"System-microphone").IsEnabled,"missing microphone is unavailable, not fake enabled");
+            check(!Find(dashboard,"System-wifi").IsEnabled && !Find(dashboard,"System-bluetooth").IsEnabled,"missing radios are unavailable, not fake switches");
             Layout(host); Save(host,Path.Combine(previews,ru?"system-ru-unavailable.png":"system-en-unavailable.png"),1);
+            dashboard.Update(data with { MicMuted = true, Vpn = true });Layout(host);
+            check(Descendants(Find(dashboard,"System-microphone")).OfType<TextBlock>().Any(t=>t.Text=="\uEC54"),"muted microphone shows the crossed-out icon");
+            Save(host,Path.Combine(previews,ru?"system-ru-mic-off-vpn-on.png":"system-en-mic-off-vpn-on.png"),1);
             dashboard.Update(data);Layout(host);
             foreach(double scale in new[]{1.0,1.5,2.0}) Save(host,Path.Combine(previews,$"system-{(ru?"ru":"en")}-{scale:0.0}.png"),scale);
             shutdown.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Layout(host);
@@ -64,12 +94,13 @@ internal static class SystemDashboardTests
         // The connector dispatch is injected: CI never establishes a real VPN or touches user profiles.
         var sent = new List<Uri>();
         var connector = new HappVpnConnector(() => true, sent.Add);
-        check(connector.RequestConnection() == HappVpnRequestResult.Sent, "registered Happ receives connection command");
-        check(sent.Count == 1 && sent[0].OriginalString == "happ://open", "Happ uses exact documented start URI, not a guessed connect command");
+        check(connector.RequestConnection() == HappVpnRequestResult.Sent && connector.RequestDisconnection() == HappVpnRequestResult.Sent, "registered Happ receives connect and disconnect");
+        check(sent.Select(u=>u.OriginalString).SequenceEqual(new[]{"happ://connect","happ://disconnect"}), "Happ uses its own connect / disconnect links");
+        connector.RequestLegacyConnection(); check(sent.Last().OriginalString == "happ://open", "older Happ fallback uses documented happ://open");
         var missing = new HappVpnConnector(() => false, _ => throw new Exception("Must not activate"));
         check(missing.RequestConnection() == HappVpnRequestResult.ClientMissing, "missing Happ does not attempt unknown protocol activation");
         var failed = new HappVpnConnector(() => true, _ => throw new InvalidOperationException("test dispatch failure"));
-        check(failed.RequestConnection() == HappVpnRequestResult.Failed, "failed protocol dispatch is not reported as connected");
+        check(failed.RequestDisconnection() == HappVpnRequestResult.Failed, "failed protocol dispatch is not reported as done");
         foreach (bool ru in new[]{true,false})
         {
             var clicks = new List<string>();
@@ -79,25 +110,27 @@ internal static class SystemDashboardTests
             Layout(host);
             var vpn = Find(happ,"System-vpn");
             check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text=="Happ VPN"), "selected Happ has explicit client label");
-            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Подключить":"Connect")), "Happ tile offers connection, not just opening a window");
-            Save(host,Path.Combine(previews,ru?"happ-ru-ready.png":"happ-en-ready.png"),1);
             vpn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             check(clicks.SequenceEqual(new[]{"vpn"}), "Happ tile retains production VPN action routing");
-            happ.SetVpnRequestResult(HappVpnRequestResult.Sent); Layout(host);
-            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Запрос отправлен":"Request sent")), "Happ dispatch does not fabricate connected status");
-            Save(host,Path.Combine(previews,ru?"happ-ru-sent.png":"happ-en-sent.png"),1);
+            happ.SetPending("vpn", true); Layout(host);
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Подключаю…":"Connecting…")), "Happ request shows connecting, not connected");
+            Save(host,Path.Combine(previews,ru?"happ-ru-connecting.png":"happ-en-connecting.png"),1);
+            happ.Update(data with { Vpn = true }); Layout(host);
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Вкл.":"On")), "Happ on only after the tunnel is really up");
+            Save(host,Path.Combine(previews,ru?"happ-ru-on.png":"happ-en-on.png"),1);
             happ.SetVpnRequestResult(HappVpnRequestResult.ClientMissing);Layout(host);
             check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Happ не найден":"Happ not found")), "Happ missing installation is visible inline");
-            Save(host,Path.Combine(previews,ru?"happ-ru-missing.png":"happ-en-missing.png"),1);
-            happ.SetVpnRequestResult(HappVpnRequestResult.Failed);Layout(host);
-            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Ошибка команды":"Request failed")), "Happ command failure is visible inline");
-            Save(host,Path.Combine(previews,ru?"happ-ru-failed.png":"happ-en-failed.png"),1);
             happ.SetVpnClient("Windows");
-            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text==(ru?"Параметры ↗":"Settings ↗")), "switching client resets old command status");
+            check(Descendants(vpn).OfType<TextBlock>().Any(t=>t.Text=="VPN"), "switching client resets the label");
         }
-        var native=new SystemMonitor(); var snapshot=native.Read();
+        var native=new SystemMonitor(); var snapshot=native.Read("Windows");
         check(snapshot.Cpu==null,"first native CPU sample is unavailable, not invented");
         check(snapshot.Memory is null or >=0 and <=100,"native memory is bounded or unavailable");
+        check(snapshot.Gpu is null or >=0 and <=100,"native GPU load is bounded or unavailable");
+        Thread.Sleep(600); var second=native.Read("Windows");
+        check(second.Cpu is null or >=0 and <=100,"second native CPU sample is bounded");
+        check(second.Gpu is null or >=0 and <=100,"second native GPU sample is bounded");
+        Console.WriteLine($"native sample: cpu={second.Cpu} gpu={second.Gpu} gpuName={second.GpuName} wifi={second.Wifi} bt={second.Bluetooth} vpn={second.Vpn} mic={second.MicMuted}");
         var xml=XDocument.Load(Path.Combine(AppContext.BaseDirectory,"MainWindow.source.xaml"));
         XNamespace x="http://schemas.microsoft.com/winfx/2006/xaml";
         var support=xml.Descendants().Single(e=>(string?)e.Attribute(x+"Name")=="SupportBtn");

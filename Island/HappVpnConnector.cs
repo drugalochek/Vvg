@@ -6,13 +6,16 @@ namespace Island;
 internal enum HappVpnRequestResult { Sent, ClientMissing, Failed }
 
 /// <summary>
-/// Happ Desktop documents happ://open as starting the connection (fixed in 4.6.1).
-/// Delivering a protocol activation is NOT evidence of an established VPN tunnel.
-/// No guessed disconnect/status commands, simulated clicks, config edits or process kills.
+/// Happ Desktop deep links handled by its runtime (present in Happ 4.8.x): happ://connect, happ://disconnect.
+/// happ://open (documented, 4.6.1+) also starts the connection and is used as a fallback for older builds.
+/// Delivering a link is NOT evidence of a tunnel: the tile state comes from the real adapter / system proxy.
+/// No simulated clicks, config edits or process kills.
 /// </summary>
 internal sealed class HappVpnConnector
 {
-    internal static readonly Uri ConnectUri = new("happ://open");
+    internal static readonly Uri ConnectUri = new("happ://connect");
+    internal static readonly Uri DisconnectUri = new("happ://disconnect");
+    internal static readonly Uri LegacyConnectUri = new("happ://open");
     readonly Func<bool> registered;
     readonly Action<Uri> activate;
     internal HappVpnConnector(Func<bool>? registered = null, Action<Uri>? activate = null)
@@ -20,17 +23,21 @@ internal sealed class HappVpnConnector
         this.registered = registered ?? IsRegistered;
         this.activate = activate ?? Activate;
     }
-    internal HappVpnRequestResult RequestConnection()
+    internal HappVpnRequestResult RequestConnection() => Send(ConnectUri);
+    internal HappVpnRequestResult RequestDisconnection() => Send(DisconnectUri);
+    internal HappVpnRequestResult RequestLegacyConnection() => Send(LegacyConnectUri);
+    internal bool Installed { get { try { return registered(); } catch { return false; } } }
+    HappVpnRequestResult Send(Uri uri)
     {
         try
         {
             if (!registered()) return HappVpnRequestResult.ClientMissing;
-            activate(ConnectUri);
+            activate(uri);
             return HappVpnRequestResult.Sent;
         }
         catch (Exception ex)
         {
-            Log.Error("Could not send Happ connection request", ex);
+            Log.Error("Could not send Happ request " + uri, ex);
             return HappVpnRequestResult.Failed;
         }
     }

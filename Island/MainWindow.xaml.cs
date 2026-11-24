@@ -209,6 +209,7 @@ public partial class MainWindow : Window
 
         startupStage = "initializing visual effects and weather";
         InitLiquid();
+        InitStowGesture();
 
         startupStage = "registering window events";
         SourceInitialized += OnSourceInitialized;
@@ -1151,6 +1152,7 @@ public partial class MainWindow : Window
     {
         ++_fullFadeVer; // cancel any pending collapse fade before showing the panel again
         _toastTimer.Stop();
+        RestoreIsland(animate: false);   // hotkey on a hidden island opens it as usual
         _state = IslandState.Expanded;
         ResizeForSystemPage(false);
         UpdateHomeRefreshState();
@@ -1170,7 +1172,7 @@ public partial class MainWindow : Window
     /// <summary>Тост. Цветная точка — единственное, что красит остров (кроме музыки).</summary>
     void ShowToast(string title, string sub, string? colorHex = null)
     {
-        if (_welcomeRunning || _state == IslandState.Expanded) return;
+        if (_welcomeRunning || _state == IslandState.Expanded || _stowed) return;
         if (colorHex == ColorError) SetEyeMood(EyeMood.Sad, 2.2);   // ошибка — немного грустит, а не пугается
         _state = IslandState.Toast;
         ToastTitle.Text = title;
@@ -1278,7 +1280,7 @@ public partial class MainWindow : Window
         double dt = _lastRenderTime == TimeSpan.Zero ? 1.0 / 60.0 :
             Math.Clamp((args.RenderingTime - _lastRenderTime).TotalSeconds, 0.001, 0.05);
         _lastRenderTime = args.RenderingTime;
-        bool playing = !_welcomeRunning && _now?.Playing == true;
+        bool playing = !_welcomeRunning && !_stowed && _now?.Playing == true;
         bool beat = playing && _audio.ConsumeBeat();
         TrackTempo(dt, playing, beat);
         if (beat)
