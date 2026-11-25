@@ -18,7 +18,7 @@ namespace Island;
 
 /// <summary>
 /// v2.10: кастомизация — форма, размер, цвет и свечение глаз; что показывать в свёрнутом острове
-/// (время, дата, погода, батарея, процессор, память, таймер); формат часов; таймер и корзина.
+/// (время, дата, погода, батарея, процессор, память, таймер); формат часов; таймер и плитка «Настройки».
 /// </summary>
 public partial class MainWindow
 {
@@ -331,14 +331,13 @@ public partial class MainWindow
         Animate(target, MiniH, MiniR, spring: false);
     }
 
-    // ================================================================ таймер и корзина
+    // ================================================================ таймер и плитка настроек
 
     DateTime? _timerEnd;
     TimeSpan _timerLeft;
     bool _timerPaused;
-    TextBlock? _timerLabel, _binLabel;
-    Button? _timerTile, _binTile;
-    long _binItems = -1;
+    TextBlock? _timerLabel, _settingsTileLabel;
+    Button? _timerTile, _settingsTile;
 
     bool TimerActive => _timerEnd != null || _timerPaused;
 
@@ -357,22 +356,11 @@ public partial class MainWindow
         _timerTile.ContextMenuOpening += (_, _) => BuildTimerMenu(_timerTile.ContextMenu);
         TileGrid.Children.Add(_timerTile);
 
-        _binTile = MakeTile(style, icons, "\uE74D", out _binLabel);
-        _binTile.Click += (_, _) => OpenRecycleBin();
-        _binTile.MouseEnter += (_, _) => _ = RefreshRecycleBinAsync();
-        _binTile.ContextMenu = new ContextMenu();
-        _binTile.ContextMenuOpening += (_, _) =>
-        {
-            var m = _binTile.ContextMenu!;
-            m.Items.Clear();
-            var open = new MenuItem { Header = Tr("Открыть корзину", "Open Recycle Bin") };
-            open.Click += (_, _) => OpenRecycleBin();
-            var empty = new MenuItem { Header = Tr("Очистить корзину", "Empty Recycle Bin"), IsEnabled = _binItems != 0 };
-            empty.Click += async (_, _) => await EmptyRecycleBinAsync();
-            m.Items.Add(open); m.Items.Add(empty);
-            _ = RefreshRecycleBinAsync();
-        };
-        TileGrid.Children.Add(_binTile);
+        // Плитка «Настройки»: один клик открывает раздел настроек острова.
+        _settingsTile = MakeTile(style, icons, "\uE713", out _settingsTileLabel);
+        _settingsTile.Focusable = false; _settingsTile.IsTabStop = false;
+        _settingsTile.Click += (_, _) => { Expand(); TabSet.IsChecked = true; };
+        TileGrid.Children.Add(_settingsTile);
 
         // 8 плиток в 2 столбца — чуть ниже обычного, чтобы всё поместилось в раскрытый остров.
         foreach (var child in TileGrid.Children.OfType<Button>()) child.Height = 56;
@@ -442,54 +430,6 @@ public partial class MainWindow
         TimersChanged();
     }
 
-    // ---- Корзина: клик открывает, ПКМ — очистить (Windows сама спрашивает подтверждение)
-    void OpenRecycleBin()
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
-                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), "shell:RecycleBinFolder") { UseShellExecute = false });
-            Collapse();
-        }
-        catch (Exception ex) { Log.Error("Could not open Recycle Bin", ex); ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Не удалось открыть", "Could not open"), ColorError); }
-    }
-
-    async Task RefreshRecycleBinAsync()
-    {
-        long items = await Task.Run(RecycleBinItemCount);
-        _binItems = items;
-        UpdateTimerTiles();
-    }
-
-    async Task EmptyRecycleBinAsync()
-    {
-        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-        _modalOpen = true;
-        int hr;
-        try { hr = SHEmptyRecycleBin(hwnd, null, 0); }   // 0: Windows shows its own confirmation and progress
-        finally { _modalOpen = false; }
-        await RefreshRecycleBinAsync();
-        // S_OK = очищено; E_UNEXPECTED приходит, когда корзина уже пуста; 0x800704C7 — пользователь отменил.
-        if (hr == 0) ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Очищена", "Emptied"), ColorOk);
-        else if (hr != unchecked((int)0x800704C7) && hr != unchecked((int)0x8000FFFF))
-            ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Не удалось очистить", "Could not empty"), ColorError);
-    }
-
-    static long RecycleBinItemCount()
-    {
-        try
-        {
-            var info = new ShQueryRbInfo { Size = Marshal.SizeOf<ShQueryRbInfo>() };
-            return SHQueryRecycleBin(null, ref info) == 0 ? info.NumItems : -1;
-        }
-        catch { return -1; }
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    struct ShQueryRbInfo { public int Size; public long SizeBytes; public long NumItems; }
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHQueryRecycleBin(string? rootPath, ref ShQueryRbInfo info);
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHEmptyRecycleBin(IntPtr hwnd, string? rootPath, uint flags);
-
     void TimersChanged()
     {
         UpdateMini();
@@ -513,17 +453,15 @@ public partial class MainWindow
 
     void UpdateTimerTiles()
     {
-        if (_timerLabel == null || _binLabel == null) return;
+        if (_timerLabel == null || _settingsTileLabel == null) return;
         var now = DateTime.Now;
         _timerLabel.Text = TimerActive
             ? FormatSpan(TimerLeft(now)) + (_timerPaused ? Tr(" · пауза", " · paused") : "")
             : Tr($"Таймер · {_s.TimerMinutes} мин", $"Timer · {_s.TimerMinutes} min");
-        _binLabel.Text = _binItems > 0
-            ? Tr($"Корзина · {_binItems}", $"Recycle Bin · {_binItems}")
-            : _binItems == 0 ? Tr("Корзина · пусто", "Recycle Bin · empty") : Tr("Корзина", "Recycle Bin");
+        _settingsTileLabel.Text = Tr("Настройки", "Settings");
         if (_timerTile != null)
             _timerTile.ToolTip = Tr("Клик — старт/пауза, колесо — минуты (Shift — по 5), ПКМ — ещё",
                                     "Click — start/pause, wheel — minutes (Shift — by 5), right-click — more");
-        if (_binTile != null) _binTile.ToolTip = Tr("Клик — открыть корзину, ПКМ — очистить", "Click — open Recycle Bin, right-click — empty it");
+        if (_settingsTile != null) _settingsTile.ToolTip = Tr("Открыть настройки Moku", "Open Moku settings");
     }
 }

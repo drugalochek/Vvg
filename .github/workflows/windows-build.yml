@@ -1,7 +1,7 @@
 name: Windows build and regression checks
 on:
   push:
-    branches: [main, update/moku-2.14.0]
+    branches: [main, update/moku-2.14.1]
   workflow_dispatch:
 concurrency:
   group: windows-${{ github.ref }}
@@ -33,7 +33,7 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: Moku-2.14.0-framework-dependent-win-x64
+          name: Moku-2.14.1-framework-dependent-win-x64
           path: Island/publish/
           retention-days: 14
       - name: Build self-contained release installer
@@ -41,11 +41,11 @@ jobs:
           dotnet publish Island/Island.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:InvariantGlobalization=false -p:DebugType=None -p:DebugSymbols=false -o Island/publish
           dotnet publish Installer/Installer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o Installer/publish
           New-Item -ItemType Directory -Force release | Out-Null
-          Copy-Item Installer/publish/Moku-Setup.exe release/Moku-Setup-2.14.0-x64.exe
-          if ((Get-Item release/Moku-Setup-2.14.0-x64.exe).Length -lt 50MB) { throw "installer looks incomplete" }
+          Copy-Item Installer/publish/Moku-Setup.exe release/Moku-Setup-2.14.1-x64.exe
+          if ((Get-Item release/Moku-Setup-2.14.1-x64.exe).Length -lt 50MB) { throw "installer looks incomplete" }
       - uses: actions/upload-artifact@v4
         with:
-          name: Moku-Setup-2.14.0-x64
-          path: release/Moku-Setup-2.14.0-x64.exe
+          name: Moku-Setup-2.14.1-x64
+          path: release/Moku-Setup-2.14.1-x64.exe
           retention-days: 14
           compression-level: 0

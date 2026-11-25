@@ -24,7 +24,7 @@ Check(SystemPanelPolicy.InternetScript(new[]{"Ethernet","Wi-Fi"}, false).Contain
 Check(SystemPanelPolicy.InternetScript(Array.Empty<string>(), true).Contains("Get-NetAdapter -Physical") && Throws(() => SystemPanelPolicy.InternetScript(Array.Empty<string>(), false)), "internet restore fallback; nothing to disable is an error");
 { string root = AppContext.BaseDirectory; while (!File.Exists(Path.Combine(root, "Island", "MainWindow.Custom.cs")) && Directory.GetParent(root) is { } up) root = up.FullName;
   string custom = File.ReadAllText(Path.Combine(root, "Island", "MainWindow.Custom.cs"));
-  Check(!custom.Contains("Stopwatch", StringComparison.OrdinalIgnoreCase) && !custom.Contains("секундомер", StringComparison.OrdinalIgnoreCase) && custom.Contains("shell:RecycleBinFolder") && custom.Contains("SHEmptyRecycleBin"), "Home: stopwatch replaced by the Recycle Bin tile"); }
+  Check(!custom.Contains("Stopwatch", StringComparison.OrdinalIgnoreCase) && !custom.Contains("секундомер", StringComparison.OrdinalIgnoreCase) && !custom.Contains("RecycleBin") && !custom.Contains("Корзина") && custom.Contains("_settingsTile") && custom.Contains("TabSet.IsChecked = true"), "Home: Recycle Bin removed, Settings tile opens settings"); }
 Check(SystemPanelPolicy.FallbackUri("taskmanager") == null && SystemPanelPolicy.FallbackUri("arbitrary") == null, "removed / unknown actions have no URI");
 Check(SystemPanelPolicy.GpuLoad(new[]{
     ("pid_1_luid_0x00000000_0x0000D1B4_phys_0_eng_0_engtype_3D", 30.0),
