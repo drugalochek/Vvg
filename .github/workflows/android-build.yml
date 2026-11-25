@@ -18,7 +18,15 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          SM=$(ls -d "$SDK"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          echo "sdkmanager: $SM"
+          yes | "$SM" --licenses > /dev/null || true
+          "$SM" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools" > /dev/null || true
+          ls "$SDK/platforms" "$SDK/build-tools"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
@@ -40,7 +48,7 @@ jobs:
       - name: Verify signature
         run: |
           APK=Mobile/app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" | head -5 || true
+          "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --print-certs "$APK" | head -5 || true
           cp "$APK" MokuMobile-1.0.0.apk
           ls -l MokuMobile-1.0.0.apk
       - uses: actions/upload-artifact@v4
