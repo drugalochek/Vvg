@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Moku Link talks to the PC on the local network only (no internet servers). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

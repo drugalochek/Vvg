@@ -174,6 +174,25 @@ public partial class MainWindow
         Hint(p, L("VPN Windows: подключается первый VPN из «Параметры → Сеть → VPN» с сохранённым входом. Ключи и пароли Moku не читает и не хранит.",
                   "Windows VPN: connects the first VPN from Settings → Network → VPN with saved sign-in. Moku never reads or stores keys and passwords."));
 
+        Section(p, L("Телефон · Moku Mobile", "Phone · Moku Mobile"));
+        ToggleRow(p, L("Передача файлов с телефоном", "File transfer with phone"),
+            () => _s.TransferEnabled, v => { _s.TransferEnabled = v; _s.Save(); ApplyLinkState(); });
+        ChoiceRow(p, L("Сохранять файлы с телефона", "Save files from phone to"), "linkfolder",
+            new[] { ("default", L("Загрузки → Moku", "Downloads → Moku")), ("custom", L("Своя папка…", "Custom folder…")) },
+            () => string.IsNullOrWhiteSpace(_s.TransferFolder) ? "default" : "custom",
+            v =>
+            {
+                if (v == "default") { _s.TransferFolder = ""; }
+                else
+                {
+                    using var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = L("Папка для файлов с телефона", "Folder for files from the phone"), UseDescriptionForTitle = true };
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK && !string.IsNullOrWhiteSpace(dlg.SelectedPath)) _s.TransferFolder = dlg.SelectedPath;
+                }
+                _s.Save(); RestartLinkIfRunning();
+            });
+        Hint(p, L("Работает только в одной сети Wi-Fi, без облака. Пока переключатель выключен, Moku ничего не слушает в сети. Приложение Moku Mobile для Android подключается по QR-коду на вкладке с иконкой телефона.",
+                  "Works only on the same Wi-Fi network, no cloud. While the switch is off Moku does not listen on the network. The Moku Mobile Android app connects via the QR code on the phone-icon tab."));
+
         // ---------------- Общие (язык и автозапуск — в разметке; Boosty — отдельный раздел)
         p = CatGeneralExtra; _buildCat = "general";
         BuildHotkeyRow(p);

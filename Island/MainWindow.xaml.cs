@@ -216,6 +216,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) =>
         {
                 StartWelcomeIntro();
+                ApplyLinkState();
         };
         Closing += OnWindowClosing;
         Closed += OnClosed;
@@ -308,6 +309,7 @@ public partial class MainWindow : Window
 
     void OnClosed(object? sender, EventArgs e)
     {
+        StopLink();
         CancelHotkeyCapture();
         FlushSave();
         var hwnd = new WindowInteropHelper(this).Handle;
@@ -707,6 +709,8 @@ public partial class MainWindow : Window
         if (TabHome != null) TabHome.Content = ru ? "Главная" : "Home";
         if (TabClip != null) TabClip.Content = ru ? "Буфер" : "Clipboard";
         if (TabSystem != null) TabSystem.Content = ru ? "Система" : "System";
+        if (TabLink != null) TabLink.ToolTip = ru ? "Телефон — передача файлов" : "Phone — file transfer";
+        if (TransferPage != null && _linkDashboard != null) RebuildLinkDashboard();
         if (SystemPage != null && _systemDashboard != null) EnsureSystemDashboard(rebuild: true);
         if (SupportTitle != null) SupportTitle.Text = ru ? "Нравится Moku?" : "Enjoying Moku?";
         if (SupportDescription != null) SupportDescription.Text = ru ? "Поддержать разработку можно на Boosty. Это добровольно — для работы Moku поддержка не требуется." : "You can support development on Boosty. It is entirely optional and is not required to use Moku.";
@@ -1440,13 +1444,15 @@ public partial class MainWindow : Window
         if (HomePage == null || ClipPage == null || SettingsPage == null || AppsPage == null || SystemPage == null) return;
         var tag = (sender as RadioButton)?.Tag as string;
         if (SystemPage != null) SystemPage.Visibility = tag == "System" ? Visibility.Visible : Visibility.Collapsed;
-        ResizeForSystemPage(tag == "System");
+        if (TransferPage != null) TransferPage.Visibility = tag == "Link" ? Visibility.Visible : Visibility.Collapsed;
+        UpdateLinkPageState(tag == "Link");
+        ResizeForSystemPage(tag == "System" || tag == "Link");
         UpdateSystemDashboardState();
         HomePage.Visibility = tag == "Home" ? Visibility.Visible : Visibility.Collapsed;
         ClipPage.Visibility = tag == "Clip" ? Visibility.Visible : Visibility.Collapsed;
         AppsPage.Visibility = tag == "Apps" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = tag == "Set" ? Visibility.Visible : Visibility.Collapsed;
-        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : tag == "System" ? SystemPage! : SettingsPage);
+        FadePage(tag == "Home" ? HomePage : tag == "Clip" ? ClipPage : tag == "Apps" ? AppsPage : tag == "System" ? SystemPage! : tag == "Link" ? TransferPage! : SettingsPage);
         if (tag == "Clip") SearchBox.Focus();
         if (tag == "Set") { UpdateAutoButton(); ShowSettingsMenu(false); }
         if (tag == "Apps" && _state == IslandState.Expanded)

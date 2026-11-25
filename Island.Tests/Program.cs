@@ -277,4 +277,76 @@ if (Directory.Exists(sourceRoot))
     Check(resolver.Contains("audible.Add(Root("), "child audio session is compared with player process tree root");
     Check(identity.Contains("SHGetPropertyStoreForWindow") && identity.Contains("IPersistFile"), "identity resolver uses actual Windows property stores");
 }
+
+// ---------------- Moku Link (передача файлов с Moku Mobile)
+Check(TransferPolicy.SafeFileName("../../evil.exe") == "evil.exe", "link: path traversal stripped");
+Check(TransferPolicy.SafeFileName("C:\\Windows\\a:b?.txt") == "a_b_.txt", "link: invalid characters replaced");
+Check(TransferPolicy.SafeFileName("CON.txt") == "_CON.txt", "link: reserved device names");
+Check(TransferPolicy.SafeFileName("   ...  ") == "file", "link: empty names get a default");
+Check(TransferPolicy.UniqueName("a.jpg", n => n is "a.jpg" or "a (1).jpg") == "a (2).jpg", "link: unique names do not overwrite");
+Check(TransferPolicy.NewPairCode().Length == 6, "link: six-digit pair code");
+Check(TransferPolicy.SameSecret("123456", "123456") && !TransferPolicy.SameSecret("123456", "123457") && !TransferPolicy.SameSecret(null, "1"), "link: constant-time compare");
+{
+    var uri = TransferPolicy.PairUri(new[] { "192.168.1.5", "10.0.0.2" }, 47820, "pcid", "My PC", "042137");
+    var info = TransferPolicy.ParsePairUri(uri);
+    Check(info != null && info.Hosts.Length == 2 && info.Port == 47820 && info.Code == "042137" && info.Name == "My PC", "link: QR uri roundtrip");
+    Check(TransferPolicy.ParsePairUri("https://evil/pair?h=1") == null && TransferPolicy.ParsePairUri("moku://pair?h=1&p=0&id=x&c=123456") == null, "link: bad QR rejected");
+}
+{
+    var bad = System.Text.Json.JsonSerializer.Deserialize<Settings>("{\"LinkedPhones\":[{\"Id\":\"\",\"TokenHash\":\"x\"},{\"Id\":\"phone1234\",\"Name\":\"\",\"TokenHash\":\"" + new string('A', 64) + "\"}]}")!;
+    bad.Normalize();
+    Check(bad.LinkedPhones.Count == 1 && bad.LinkedPhones[0].Name == "Phone" && !bad.TransferEnabled && bad.TransferPcId.Length > 0, "link: settings normalized, transfer off by default");
+}
+{
+    // Реальный обмен по сети с локальным сервером: сопряжение, загрузка с телефона, отправка на телефон, подтверждение.
+    string dir = Path.Combine(Path.GetTempPath(), "moku-link-test-" + Guid.NewGuid().ToString("N"));
+    using var server = new TransferServer("pc-test-id", () => dir) { PcName = "TestPC" };
+    TransferServer.Received? got = null; TransferServer.Outgoing? delivered = null; TransferServer.Phone? paired = null;
+    server.Paired += p => paired = p; server.FileReceived += f => got = f; server.Delivered += o => delivered = o;
+    server.Start();
+    using var http = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{server.Port}"), Timeout = TimeSpan.FromSeconds(20) };
+    var hello = http.GetStringAsync("/api/hello").Result;
+    Check(hello.Contains("\"app\":\"Moku\"") && hello.Contains("pc-test-id"), "link: hello identifies PC");
+    Check((int)http.GetAsync("/api/ping").Result.StatusCode == 401, "link: unpaired phone rejected");
+    Check((int)http.PostAsync("/api/pair?code=000000&phone=phone-abcdef&device=Pixel", null).Result.StatusCode == 403, "link: pairing needs active code");
+    string code = server.NewPairCode();
+    string wrong = code == "111111" ? "222222" : "111111";
+    Check((int)http.PostAsync($"/api/pair?code={wrong}&phone=phone-abcdef&device=Pixel", null).Result.StatusCode == 403, "link: wrong code rejected");
+    var pairResp = http.PostAsync($"/api/pair?code={code}&phone=phone-abcdef&device=Pixel%208", null).Result;
+    string pairJson = pairResp.Content.ReadAsStringAsync().Result;
+    Check(pairResp.IsSuccessStatusCode && paired?.Name == "Pixel 8", "link: pairing succeeds with QR code");
+    string token = System.Text.Json.JsonDocument.Parse(pairJson).RootElement.GetProperty("token").GetString()!;
+    Check((int)http.PostAsync($"/api/pair?code={code}&phone=phone-zzz999&device=X", null).Result.StatusCode == 403, "link: pair code is one-time");
+    http.DefaultRequestHeaders.Add("X-Moku-Token", token);
+    Check(http.GetAsync("/api/ping").Result.IsSuccessStatusCode && server.IsOnline("phone-abcdef"), "link: paired phone online");
+    var payload = new byte[300_000]; new Random(7).NextBytes(payload);
+    var up = http.PostAsync("/api/upload?name=" + Uri.EscapeDataString("../фото 1.jpg"), new ByteArrayContent(payload)).Result;
+    Check(up.IsSuccessStatusCode && got != null && got.Name == "фото 1.jpg" && File.ReadAllBytes(got.Path).SequenceEqual(payload), "link: upload from phone saved intact");
+    var up2 = http.PostAsync("/api/upload?name=" + Uri.EscapeDataString("фото 1.jpg"), new ByteArrayContent(new byte[] { 1, 2, 3 })).Result;
+    Check(up2.IsSuccessStatusCode && got!.Name == "фото 1 (2).jpg" && Directory.GetFiles(dir).Length == 2, "link: second upload does not overwrite, no temp files left");
+    string src = Path.Combine(Path.GetTempPath(), "moku-out-" + Guid.NewGuid().ToString("N") + ".bin");
+    File.WriteAllBytes(src, payload);
+    var waitInbox = http.GetStringAsync("/api/inbox?wait=10");
+    Thread.Sleep(300);
+    var o = server.Enqueue("phone-abcdef", src);
+    string inbox = waitInbox.Result;
+    Check(inbox.Contains(o.Id) && server.Pending("phone-abcdef") == 1, "link: long-poll inbox wakes on new file");
+    var dl = http.GetAsync("/api/file?id=" + o.Id).Result;
+    Check(dl.IsSuccessStatusCode && dl.Content.ReadAsByteArrayAsync().Result.SequenceEqual(payload) && dl.Headers.GetValues("X-Moku-Name").First() == Uri.EscapeDataString(o.Name), "link: download to phone intact");
+    Check(http.PostAsync("/api/ack?id=" + o.Id, null).Result.IsSuccessStatusCode && delivered?.Id == o.Id && server.Pending("phone-abcdef") == 0, "link: ack marks delivered");
+    using (var other = new HttpClient { BaseAddress = http.BaseAddress })
+    {
+        other.DefaultRequestHeaders.Add("X-Moku-Token", "not-a-real-token-123456");
+        Check((int)other.GetAsync("/api/inbox").Result.StatusCode == 401, "link: foreign token cannot read inbox");
+    }
+    var udp = new System.Net.Sockets.UdpClient();
+    udp.Client.ReceiveTimeout = 3000;
+    var msg = System.Text.Encoding.UTF8.GetBytes(TransferPolicy.DiscoverMessage);
+    udp.Send(msg, msg.Length, new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, TransferPolicy.DiscoveryPort));
+    var ep = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0);
+    string disc = System.Text.Encoding.UTF8.GetString(udp.Receive(ref ep));
+    Check(disc.Contains("pc-test-id") && disc.Contains("\"port\":" + server.Port), "link: UDP discovery answers");
+    Check(http.PostAsync("/api/unpair", null).Result.IsSuccessStatusCode && (int)http.GetAsync("/api/ping").Result.StatusCode == 401, "link: unpair revokes token");
+    try { Directory.Delete(dir, true); File.Delete(src); } catch { }
+}
 Console.WriteLine($"PASS: {checks} checks (folders, file launch plans, Home/Steam/button UI contracts, settings and 400 randomized packing cases). Windows integration still requires Windows.");

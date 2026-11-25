@@ -12,6 +12,15 @@ public class AppShortcut
     public string Icon { get; set; } = "";     // v2.10: своя иконка (png/jpg/ico/exe), "" — стандартная
 }
 
+/// <summary>Телефон, подключённый к Moku Link по QR-коду. Хранится только хеш токена.</summary>
+public class LinkedPhone
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string TokenHash { get; set; } = "";
+    public DateTime LastSeenUtc { get; set; }
+}
+
 /// <summary>Настройки хранятся в %APPDATA%\Moku\settings.json</summary>
 public class Settings
 {
@@ -30,6 +39,10 @@ public class Settings
     public string Accent { get; set; } = "#FF7C5CFF"; // цвет для музыки и событий
     public string Language { get; set; } = "en"; // en | ru
 
+    public bool TransferEnabled { get; set; } = false;   // Moku Link: приём и отправка файлов на телефон
+    public string TransferFolder { get; set; } = "";      // "" — Загрузки\\Moku
+    public string TransferPcId { get; set; } = "";
+    public List<LinkedPhone> LinkedPhones { get; set; } = new();
     public string VpnClient { get; set; } = "Windows"; // Windows settings | Happ connection command
 
     // ---- v2.7: расширенные настройки ----
@@ -105,6 +118,11 @@ public class Settings
         if (Accent == null || !HexColor.IsMatch(Accent)) Accent = "#FF7C5CFF";
         if (Language is not ("en" or "ru")) Language = "en";
         VpnClient = SystemPanelPolicy.VpnClient(VpnClient);
+        TransferFolder ??= "";
+        if (string.IsNullOrWhiteSpace(TransferPcId) || TransferPcId.Length > 64) TransferPcId = Guid.NewGuid().ToString("N");
+        LinkedPhones = (LinkedPhones ?? new()).Where(p => p != null && !string.IsNullOrWhiteSpace(p.Id) && p.TokenHash?.Length == 64)
+            .GroupBy(p => p.Id).Select(g => g.Last()).Take(10).ToList();
+        foreach (var p in LinkedPhones) p.Name = string.IsNullOrWhiteSpace(p.Name) ? "Phone" : p.Name.Trim()[..Math.Min(p.Name.Trim().Length, 60)];
         InternetDisabledAdapters = (InternetDisabledAdapters ?? new()).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         JellyStrength = Math.Clamp(JellyStrength, 0, 200);
         AnimationSpeed = Math.Clamp(AnimationSpeed, 50, 200);
@@ -135,7 +153,7 @@ public class Settings
         if (LastHomeView is not ("Clipboard" or "Windows")) LastHomeView = HomeStartupView;
         HiddenSteamNames ??= new();
         Hotkey = Hotkey switch { "CtrlAltSpace" => "Ctrl+Alt+Space", "CtrlShiftSpace" => "Ctrl+Shift+Space", "WinAltI" => "Win+Alt+I", _ => Hotkey };
-        if (LastTab is not ("Home" or "Clip" or "Apps" or "Set")) LastTab = "Home";
+        if (LastTab is not ("Home" or "Clip" or "Apps" or "System" or "Link" or "Set")) LastTab = "Home";
         AppTileSizes ??= new();
         AppTileSizes = AppTileSizes.Where(x => !string.IsNullOrWhiteSpace(x.Key) && (x.Value is "1x1" or "2x1" or "2x2")).Take(60).ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
         foreach (var a in Apps.Where(a => a != null))

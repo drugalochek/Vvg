@@ -1,0 +1,51 @@
+name: Moku Mobile (Android)
+on:
+  push:
+    branches: [main]
+    paths: ['Mobile/**', '.github/workflows/android-build.yml']
+  workflow_dispatch:
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Signing key
+        env:
+          KS: ${{ secrets.MOKU_MOBILE_KEYSTORE }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/moku.p12"
+            echo "MOKU_KEYSTORE_FILE=$RUNNER_TEMP/moku.p12" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No signing key secret, APK is debug-signed"
+          fi
+      - name: Build release APK
+        working-directory: Mobile
+        env:
+          MOKU_KEY_PASSWORD: ${{ secrets.MOKU_MOBILE_KEY_PASSWORD }}
+        run: gradle --no-daemon --stacktrace assembleRelease
+      - name: Verify signature
+        run: |
+          APK=Mobile/app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs "$APK" | head -5 || true
+          cp "$APK" MokuMobile-1.0.0.apk
+          ls -l MokuMobile-1.0.0.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MokuMobile-1.0.0
+          path: MokuMobile-1.0.0.apk
+          compression-level: 0
+          retention-days: 30

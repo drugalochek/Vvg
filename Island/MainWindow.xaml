@@ -187,13 +187,13 @@
             <Setter Property="Foreground" Value="{StaticResource Dim}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="b" CornerRadius="15" Background="Transparent"
-                                BorderBrush="Transparent" BorderThickness="1" Padding="13,5">
+                                BorderBrush="Transparent" BorderThickness="1" Padding="10,5">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -522,6 +522,10 @@
                                      Tag="Apps" GroupName="tabs" Checked="Tab_Checked"/>
                         <RadioButton x:Name="TabSystem" Style="{StaticResource TabBtn}" Content="System"
                                      Tag="System" GroupName="tabs" Checked="Tab_Checked"/>
+                        <RadioButton x:Name="TabLink" Style="{StaticResource TabBtn}" ToolTip="Phone"
+                                     Tag="Link" GroupName="tabs" Checked="Tab_Checked">
+                            <TextBlock Text="&#xE8EA;" FontFamily="{StaticResource Icons}" FontSize="14" Margin="0,1,0,0"/>
+                        </RadioButton>
                         <RadioButton x:Name="TabSet" Style="{StaticResource TabBtn}" Content="Settings"
                                      Tag="Set" GroupName="tabs" Checked="Tab_Checked"/>
                     </WrapPanel>
@@ -537,6 +541,9 @@
                 </Grid>
 
                 <ScrollViewer x:Name="SystemPage" Grid.Row="1" Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0"/>
+
+                <ScrollViewer x:Name="TransferPage" Grid.Row="1" Visibility="Collapsed"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0"/>
 
                 <!-- Home -->

@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.Moku" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:colorBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:colorAccent">#FF0A84FF</item>
+    </style>
+    <style name="Theme.Moku.Transparent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

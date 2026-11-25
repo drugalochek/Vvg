@@ -16,6 +16,8 @@
     <Compile Include="../Island/FileLaunchPolicy.cs" Link="FileLaunchPolicy.cs" />
     <Compile Include="../Island/Settings.cs" Link="Settings.cs" />
     <Compile Include="../Island/Log.cs" Link="Log.cs" />
+    <Compile Include="../Island/TransferPolicy.cs" Link="TransferPolicy.cs" />
+    <Compile Include="../Island/TransferServer.cs" Link="TransferServer.cs" />
     <None Include="../Island/PopupStyles.xaml" Link="PopupStyles.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../Island/MainWindow.xaml" Link="MainWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
