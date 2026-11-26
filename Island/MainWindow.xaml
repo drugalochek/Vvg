@@ -625,7 +625,10 @@
                         </ScrollViewer>
                     </Grid>
 
-                    <UniformGrid x:Name="TileGrid" Grid.Column="1" Columns="2"/>
+                    <DockPanel Grid.Column="1" LastChildFill="True">
+                        <Button x:Name="HomeSettingsTile" DockPanel.Dock="Bottom" Style="{StaticResource TileBtn}" Height="32" Focusable="False" IsTabStop="False"/>
+                        <UniformGrid x:Name="TileGrid" Columns="2"/>
+                    </DockPanel>
                 </Grid>
 
                 <!-- Буфер -->

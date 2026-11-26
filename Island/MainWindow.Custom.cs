@@ -18,7 +18,7 @@ namespace Island;
 
 /// <summary>
 /// v2.10: кастомизация — форма, размер, цвет и свечение глаз; что показывать в свёрнутом острове
-/// (время, дата, погода, батарея, процессор, память, таймер); формат часов; таймер и плитка «Настройки».
+/// (время, дата, погода, батарея, процессор, память, таймер); формат часов; таймер, секундомер и кнопка «Настройки».
 /// </summary>
 public partial class MainWindow
 {
@@ -146,14 +146,14 @@ public partial class MainWindow
 
     /// <summary>Нужен ли тик часов раз в секунду (секунды, таймер, процессор/память/батарея).</summary>
     bool NeedsSecondTicks() =>
-        TimerActive ||
+        TimerActive || StopwatchActive ||
         _s.MiniRight is "Cpu" or "Ram" or "Battery" ||
         (_s.ClockSeconds && (_s.MiniCenter is "Time" or "TimeDate" || _s.MiniRight == "Time"));
 
     // ================================================================ свёрнутый вид
 
     /// <summary>Что сейчас показывать справа: запущенный таймер важнее выбранного виджета.</summary>
-    string RightKind() => TimerActive ? "Timer" : _s.MiniRight;
+    string RightKind() => TimerActive ? "Timer" : StopwatchActive ? "Stopwatch" : _s.MiniRight;
 
     void UpdateMiniWidgets(DateTime now, bool hasMedia)
     {
@@ -176,7 +176,7 @@ public partial class MainWindow
     void FillInfo(string kind, DateTime now)
     {
         BatteryGlyph.Visibility = kind == "Battery" ? Visibility.Visible : Visibility.Collapsed;
-        InfoIcon.Visibility = kind is "Timer" ? Visibility.Visible : Visibility.Collapsed;
+        InfoIcon.Visibility = kind is "Timer" or "Stopwatch" ? Visibility.Visible : Visibility.Collapsed;
         InfoText.Foreground = (System.Windows.Media.Brush)FindResource("Dim");
         InfoPanel.ToolTip = null;
         switch (kind)
@@ -198,6 +198,12 @@ public partial class MainWindow
                 InfoText.Text = FormatSpan(TimerLeft(now)) + (_timerPaused ? " ❚❚" : "");
                 InfoText.Foreground = Brushes.White;
                 InfoPanel.ToolTip = Tr("Таймер — управление на главной вкладке", "Timer — controls are on the Home tab");
+                break;
+            case "Stopwatch":
+                InfoIcon.Text = "\uE916";
+                InfoText.Text = FormatSpan(StopwatchElapsed(now)) + (_swStart == null ? " ❚❚" : "");
+                InfoText.Foreground = Brushes.White;
+                InfoPanel.ToolTip = Tr("Секундомер — управление на главной вкладке", "Stopwatch — controls are on the Home tab");
                 break;
         }
     }
@@ -314,6 +320,7 @@ public partial class MainWindow
             "Time" => 8 + TextW(Zeros(FormatTime(now, _s.ClockSeconds)), 12),
             "Date" => 8 + TextW(FormatDate(now), 12),
             "Timer" => 8 + 16 + TextW(Zeros(FormatSpan(TimerLeft(now))) + (_timerPaused ? " ❚❚" : ""), 12),
+            "Stopwatch" => 8 + 16 + TextW(Zeros(FormatSpan(StopwatchElapsed(now))) + (_swStart == null ? " ❚❚" : ""), 12),
             _ => 0
         };
         if (right > 0) right += 9;
@@ -336,10 +343,14 @@ public partial class MainWindow
     DateTime? _timerEnd;
     TimeSpan _timerLeft;
     bool _timerPaused;
-    TextBlock? _timerLabel, _settingsTileLabel;
-    Button? _timerTile, _settingsTile;
+    DateTime? _swStart;
+    TimeSpan _swAccum;
+    TextBlock? _timerLabel, _swLabel, _settingsTileLabel;
+    Button? _timerTile, _swTile, _settingsTile;
 
     bool TimerActive => _timerEnd != null || _timerPaused;
+    bool StopwatchActive => _swStart != null || _swAccum > TimeSpan.Zero;
+    TimeSpan StopwatchElapsed(DateTime now) => _swAccum + (_swStart is DateTime s ? now - s : TimeSpan.Zero);
 
     TimeSpan TimerLeft(DateTime now)
     {
@@ -356,14 +367,32 @@ public partial class MainWindow
         _timerTile.ContextMenuOpening += (_, _) => BuildTimerMenu(_timerTile.ContextMenu);
         TileGrid.Children.Add(_timerTile);
 
-        // Плитка «Настройки»: один клик открывает раздел настроек острова.
-        _settingsTile = MakeTile(style, icons, "\uE713", out _settingsTileLabel);
-        _settingsTile.Focusable = false; _settingsTile.IsTabStop = false;
-        _settingsTile.Click += (_, _) => { Expand(); TabSet.IsChecked = true; };
-        TileGrid.Children.Add(_settingsTile);
+        // Секундомер: клик — старт/пауза, ПКМ — сброс. Пока идёт, время видно справа в свёрнутом острове.
+        _swTile = MakeTile(style, icons, "\uE916", out _swLabel);
+        _swTile.Focusable = false; _swTile.IsTabStop = false;
+        _swTile.Click += (_, _) => ToggleStopwatch();
+        _swTile.ContextMenu = new ContextMenu();
+        _swTile.ContextMenuOpening += (_, _) =>
+        {
+            var m = _swTile.ContextMenu!;
+            m.Items.Clear();
+            var reset = new MenuItem { Header = Tr("Сбросить", "Reset"), IsEnabled = StopwatchActive };
+            reset.Click += (_, _) => { _swStart = null; _swAccum = TimeSpan.Zero; TimersChanged(); };
+            m.Items.Add(reset);
+        };
+        TileGrid.Children.Add(_swTile);
 
-        // 8 плиток в 2 столбца — чуть ниже обычного, чтобы всё поместилось в раскрытый остров.
-        foreach (var child in TileGrid.Children.OfType<Button>()) child.Height = 56;
+        // 8 плиток в 2 столбца делят высоту поровну: под ними остаётся место для кнопки «Настройки».
+        foreach (var child in TileGrid.Children.OfType<Button>()) { child.Height = double.NaN; child.MinHeight = 44; }
+
+        // Кнопка «Настройки» — широкая полоса под плитками: один клик открывает настройки острова.
+        _settingsTile = HomeSettingsTile;
+        var row = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        row.Children.Add(new TextBlock { Text = "\uE713", FontFamily = icons, FontSize = 14, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+        _settingsTileLabel = new TextBlock { FontSize = 11, Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = System.Windows.VerticalAlignment.Center };
+        row.Children.Add(_settingsTileLabel);
+        _settingsTile.Content = row;
+        _settingsTile.Click += (_, _) => { Expand(); TabSet.IsChecked = true; };
         UpdateTimerTiles();
     }
 
@@ -430,6 +459,14 @@ public partial class MainWindow
         TimersChanged();
     }
 
+    void ToggleStopwatch()
+    {
+        var now = DateTime.Now;
+        if (_swStart is DateTime s) { _swAccum += now - s; _swStart = null; }
+        else _swStart = now;
+        TimersChanged();
+    }
+
     void TimersChanged()
     {
         UpdateMini();
@@ -453,15 +490,19 @@ public partial class MainWindow
 
     void UpdateTimerTiles()
     {
-        if (_timerLabel == null || _settingsTileLabel == null) return;
+        if (_timerLabel == null || _swLabel == null || _settingsTileLabel == null) return;
         var now = DateTime.Now;
         _timerLabel.Text = TimerActive
             ? FormatSpan(TimerLeft(now)) + (_timerPaused ? Tr(" · пауза", " · paused") : "")
             : Tr($"Таймер · {_s.TimerMinutes} мин", $"Timer · {_s.TimerMinutes} min");
+        _swLabel.Text = StopwatchActive
+            ? FormatSpan(StopwatchElapsed(now)) + (_swStart == null ? Tr(" · пауза", " · paused") : "")
+            : Tr("Секундомер", "Stopwatch");
         _settingsTileLabel.Text = Tr("Настройки", "Settings");
         if (_timerTile != null)
             _timerTile.ToolTip = Tr("Клик — старт/пауза, колесо — минуты (Shift — по 5), ПКМ — ещё",
                                     "Click — start/pause, wheel — minutes (Shift — by 5), right-click — more");
+        if (_swTile != null) _swTile.ToolTip = Tr("Клик — старт/пауза, ПКМ — сброс", "Click — start/pause, right-click — reset");
         if (_settingsTile != null) _settingsTile.ToolTip = Tr("Открыть настройки Moku", "Open Moku settings");
     }
 }

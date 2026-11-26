@@ -250,11 +250,42 @@ internal static class Program
     }
 
     [STAThread]
+    /// <summary>
+    /// Registers the Internet helper tasks (CI runners are administrators with UAC off), checks that the user can
+    /// start the harmless "on" task without elevation, then removes them. The "off" task is never started here.
+    /// </summary>
+    static int TestInternetTask()
+    {
+        try
+        {
+            Check(InternetSwitchTask.Install() == ToggleResult.Done, "internet helper tasks registered with one elevated setup");
+            Check(InternetSwitchTask.IsInstalled(), "both internet tasks are visible to the current user");
+            var run = InternetSwitchTask.RunOnTaskForTest();
+            Console.WriteLine("INFO harmless 'on' task finished successfully: " + (run?.ToString() ?? "not startable"));
+            Check(run != null, "the current user can start the 'on' task without a UAC prompt");
+            Console.WriteLine($"PASS: {checks} internet helper task checks.");
+            return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+        finally
+        {
+            try
+            {
+                using var cleanup = Process.Start(new ProcessStartInfo(System.IO.Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"),
+                    "-NoProfile -NonInteractive -Command \"Get-ScheduledTask -TaskPath '\\Moku\\' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false\"")
+                    { UseShellExecute = false, CreateNoWindow = true });
+                cleanup?.WaitForExit(30000);
+            }
+            catch { }
+        }
+    }
+
     static int Main(string[] args)
     {
         if (args.Length == 3 && args[0] == "--audio-probe") return RunAudioProbe(args[1],args[2]);
         if (args.Length == 1 && args[0] == "--window-probe") return RunWindowProbe();
         if (args.Length == 1 && args[0] == "--bare-window-probe") return RunWindowProbe(true);
+        if (args.Length == 1 && args[0] == "--internet-task") return TestInternetTask();
         try
         {
             // Load the production compiled resources, without invoking Moku's OnStartup,

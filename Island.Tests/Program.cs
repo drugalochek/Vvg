@@ -24,7 +24,14 @@ Check(SystemPanelPolicy.InternetScript(new[]{"Ethernet","Wi-Fi"}, false).Contain
 Check(SystemPanelPolicy.InternetScript(Array.Empty<string>(), true).Contains("Get-NetAdapter -Physical") && Throws(() => SystemPanelPolicy.InternetScript(Array.Empty<string>(), false)), "internet restore fallback; nothing to disable is an error");
 { string root = AppContext.BaseDirectory; while (!File.Exists(Path.Combine(root, "Island", "MainWindow.Custom.cs")) && Directory.GetParent(root) is { } up) root = up.FullName;
   string custom = File.ReadAllText(Path.Combine(root, "Island", "MainWindow.Custom.cs"));
-  Check(!custom.Contains("Stopwatch", StringComparison.OrdinalIgnoreCase) && !custom.Contains("секундомер", StringComparison.OrdinalIgnoreCase) && !custom.Contains("RecycleBin") && !custom.Contains("Корзина") && custom.Contains("_settingsTile") && custom.Contains("TabSet.IsChecked = true"), "Home: Recycle Bin removed, Settings tile opens settings"); }
+  Check(custom.Contains("ToggleStopwatch()") && custom.Contains("StopwatchElapsed") && custom.Contains("\"Stopwatch\" =>") && !custom.Contains("RecycleBin") && !custom.Contains("Корзина") && custom.Contains("HomeSettingsTile") && custom.Contains("TabSet.IsChecked = true"), "Home: stopwatch is back next to the timer, Settings button opens settings, no Recycle Bin"); }
+{ string off = SystemPanelPolicy.InternetTaskScript(false), on = SystemPanelPolicy.InternetTaskScript(true);
+  Check(off.Contains("Disable-NetAdapter") && !off.Contains("Enable-NetAdapter") && on.Contains("Enable-NetAdapter") && !on.Contains("Disable-NetAdapter"), "internet task: off only disables, on only enables");
+  Check(off.Contains("-notmatch $skip") && on.Contains("-notmatch $skip") && off.Contains("WireGuard") && off.Contains("internet-off.txt") && on.Contains("Remove-Item $f"), "internet task: VPN/virtual adapters skipped, off record restored then cleared");
+  Check(SystemPanelPolicy.InternetTaskName(true, "Ivan Petrov\\x") == "InternetOn-v1-Ivan_Petrov_x" && SystemPanelPolicy.InternetTaskName(false, "") == "InternetOff-v1-user", "internet task names are per user and safe");
+  string inst = SystemPanelPolicy.InternetTaskInstallScript("PC\\O'Neil", "O'Neil");
+  Check(inst.Contains("$u='PC\\O''Neil'") && inst.Contains("-RunLevel Highest") && inst.Contains("Register-ScheduledTask") && inst.Contains(SystemPanelPolicy.EncodePowerShell(off)) && inst.Contains(SystemPanelPolicy.EncodePowerShell(on)) && inst.Contains("FRFX"), "internet task setup: quoted account, highest run level, both fixed scripts, run right for the user");
+  Check(System.Text.Encoding.Unicode.GetString(Convert.FromBase64String(SystemPanelPolicy.EncodePowerShell("Get-Date"))) == "Get-Date", "powershell encoding roundtrip"); }
 Check(SystemPanelPolicy.FallbackUri("taskmanager") == null && SystemPanelPolicy.FallbackUri("arbitrary") == null, "removed / unknown actions have no URI");
 Check(SystemPanelPolicy.GpuLoad(new[]{
     ("pid_1_luid_0x00000000_0x0000D1B4_phys_0_eng_0_engtype_3D", 30.0),

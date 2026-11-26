@@ -82,19 +82,25 @@ internal sealed class SystemMonitor
     }
 
     /// <summary>
-    /// Internet on/off = enable/disable the physical adapters. Windows requires administrator rights for this,
-    /// so the change runs in an elevated, hidden PowerShell and Windows shows its UAC prompt.
+    /// Internet on/off = enable/disable the physical adapters. Windows requires administrator rights for this:
+    /// Moku asks once to set up its Task Scheduler helper (<see cref="InternetSwitchTask"/>), then every click runs
+    /// without a UAC prompt. Only if that helper cannot work (e.g. a standard account) does it fall back to a
+    /// one-off elevated PowerShell, which asks each time.
     /// </summary>
     internal static ToggleResult SetInternet(bool on, IReadOnlyList<string> remembered, out List<string> disabled)
     {
         disabled = new();
-        List<string> names = on ? remembered.ToList() : PhysicalAdapterNames();
-        if (!on && names.Count == 0) return ToggleResult.Unavailable;
+        List<string> current = PhysicalAdapterNames();
+        if (!on && current.Count == 0) return ToggleResult.Unavailable;
+        var viaTask = InternetSwitchTask.Toggle(on);
+        if (viaTask == ToggleResult.Done) { if (!on) disabled = current; return ToggleResult.Done; }
+        if (viaTask == ToggleResult.Cancelled) return ToggleResult.Cancelled;
+        List<string> names = on ? remembered.ToList() : current;
         string script = SystemPanelPolicy.InternetScript(names, on);
         try
         {
             string ps = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
-            string encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+            string encoded = SystemPanelPolicy.EncodePowerShell(script);
             using var process = Process.Start(new ProcessStartInfo(ps, "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand " + encoded)
             { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
             if (process == null) return ToggleResult.Failed;
