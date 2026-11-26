@@ -159,12 +159,12 @@ internal static class SystemPanelPolicy
                 "if($a.Count -eq 0){exit 0};New-Item -ItemType Directory -Force $d|Out-Null;" +
                 "$p=@();if(Test-Path $f){$p=@(Get-Content $f)};" +
                 "Set-Content -Path $f -Value (@($p+@($a|ForEach-Object Name))|Where-Object{$_}|Select-Object -Unique) -Encoding UTF8;" +
-                "$a|Disable-NetAdapter -Confirm:$false";
+                "$a|Disable-NetAdapter -Confirm:$false;exit 0";
         return head +
             "$n=@();if(Test-Path $f){$n=@(Get-Content $f|Where-Object{$_})};" +
             "$t=@(Get-NetAdapter -Physical|Where-Object{$_.Status -eq 'Disabled' -and ($n.Count -eq 0 -or $n -contains $_.Name) -and ($_.Name+' '+$_.InterfaceDescription) -notmatch $skip});" +
             "if($t.Count -gt 0){$t|Enable-NetAdapter -Confirm:$false};" +
-            "Remove-Item $f -ErrorAction SilentlyContinue";
+            "Remove-Item $f -ErrorAction SilentlyContinue;exit 0";  // explicit 0: a silently failed last statement would exit 1
     }
 
     internal static string EncodePowerShell(string script) => Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));

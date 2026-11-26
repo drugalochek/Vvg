@@ -269,10 +269,11 @@ internal static class Program
             {
                 string err = p.StandardError.ReadToEnd(), outp = p.StandardOutput.ReadToEnd();
                 p.WaitForExit(60000);
-                Console.WriteLine($"INFO direct 'on' script exit={p.ExitCode} out={outp.Trim()} err={err.Trim()}");
+                Console.WriteLine($"INFO direct 'on' script exit={p.ExitCode}");
+                Check(p.ExitCode == 0, "the 'on' script exits with 0 when there is nothing to restore");
             }
             Console.WriteLine("INFO session: " + Process.GetCurrentProcess().SessionId + " user=" + Environment.UserDomainName + "\\" + Environment.UserName);
-            Check(run != null, "the current user can start the 'on' task without a UAC prompt");
+            Check(run == true, "the current user starts the 'on' task without a UAC prompt and it succeeds");
             Console.WriteLine($"PASS: {checks} internet helper task checks.");
             return 0;
         }
