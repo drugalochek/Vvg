@@ -626,7 +626,10 @@
                     </Grid>
 
                     <DockPanel Grid.Column="1" LastChildFill="True">
-                        <Button x:Name="HomeSettingsTile" DockPanel.Dock="Bottom" Style="{StaticResource TileBtn}" Height="32" Focusable="False" IsTabStop="False"/>
+                        <UniformGrid x:Name="HomeBottomRow" DockPanel.Dock="Bottom" Columns="2">
+                            <Button x:Name="HomeSettingsTile" Style="{StaticResource TileBtn}" Height="32" Focusable="False" IsTabStop="False"/>
+                            <Button x:Name="HomeBinTile" Style="{StaticResource TileBtn}" Height="32" Focusable="False" IsTabStop="False"/>
+                        </UniformGrid>
                         <UniformGrid x:Name="TileGrid" Columns="2"/>
                     </DockPanel>
                 </Grid>

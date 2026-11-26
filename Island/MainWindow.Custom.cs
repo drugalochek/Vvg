@@ -345,8 +345,9 @@ public partial class MainWindow
     bool _timerPaused;
     DateTime? _swStart;
     TimeSpan _swAccum;
-    TextBlock? _timerLabel, _swLabel, _settingsTileLabel;
-    Button? _timerTile, _swTile, _settingsTile;
+    TextBlock? _timerLabel, _swLabel, _settingsTileLabel, _binLabel;
+    Button? _timerTile, _swTile, _settingsTile, _binTile;
+    long _binItems = -1;
 
     bool TimerActive => _timerEnd != null || _timerPaused;
     bool StopwatchActive => _swStart != null || _swAccum > TimeSpan.Zero;
@@ -385,16 +386,100 @@ public partial class MainWindow
         // 8 плиток в 2 столбца делят высоту поровну: под ними остаётся место для кнопки «Настройки».
         foreach (var child in TileGrid.Children.OfType<Button>()) { child.Height = double.NaN; child.MinHeight = 44; }
 
-        // Кнопка «Настройки» — широкая полоса под плитками: один клик открывает настройки острова.
+        // Полоса под плитками: слева «Настройки» (открывает Параметры Windows), справа «Корзина».
         _settingsTile = HomeSettingsTile;
+        _settingsTile.Content = StripContent(icons, "\uE713", out _settingsTileLabel);
+        _settingsTile.Click += (_, _) => OpenWindowsSettings();
+
+        // Корзина: клик — открыть, ПКМ — открыть/очистить (Windows сама спрашивает подтверждение).
+        _binTile = HomeBinTile;
+        _binTile.Content = StripContent(icons, "\uE74D", out _binLabel);
+        _binTile.Click += (_, _) => OpenRecycleBin();
+        _binTile.MouseEnter += (_, _) => _ = RefreshRecycleBinAsync();
+        _binTile.ContextMenu = new ContextMenu();
+        _binTile.ContextMenuOpening += (_, _) =>
+        {
+            var m = _binTile.ContextMenu!;
+            m.Items.Clear();
+            var open = new MenuItem { Header = Tr("Открыть корзину", "Open Recycle Bin") };
+            open.Click += (_, _) => OpenRecycleBin();
+            var empty = new MenuItem { Header = Tr("Очистить корзину", "Empty Recycle Bin"), IsEnabled = _binItems != 0 };
+            empty.Click += async (_, _) => await EmptyRecycleBinAsync();
+            m.Items.Add(open); m.Items.Add(empty);
+            _ = RefreshRecycleBinAsync();
+        };
+        UpdateTimerTiles();
+        _ = RefreshRecycleBinAsync();
+    }
+
+    static StackPanel StripContent(FontFamily icons, string glyph, out TextBlock label)
+    {
         var row = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-        row.Children.Add(new TextBlock { Text = "\uE713", FontFamily = icons, FontSize = 14, VerticalAlignment = System.Windows.VerticalAlignment.Center });
-        _settingsTileLabel = new TextBlock { FontSize = 11, Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = System.Windows.VerticalAlignment.Center };
-        row.Children.Add(_settingsTileLabel);
-        _settingsTile.Content = row;
-        _settingsTile.Click += (_, _) => { Expand(); TabSet.IsChecked = true; };
+        row.Children.Add(new TextBlock { Text = glyph, FontFamily = icons, FontSize = 14, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+        label = new TextBlock { FontSize = 11, Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = System.Windows.VerticalAlignment.Center,
+                                TextTrimming = TextTrimming.CharacterEllipsis };
+        row.Children.Add(label);
+        return row;
+    }
+
+    // ---- «Настройки» на Главной: открывают Параметры Windows (настройки Moku — вкладка «Настройки» сверху).
+    void OpenWindowsSettings()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:") { UseShellExecute = true });
+            Collapse();
+        }
+        catch (Exception ex) { Log.Error("Could not open Windows Settings", ex); ShowToast(Tr("Настройки", "Settings"), Tr("Не удалось открыть Параметры Windows", "Could not open Windows Settings"), ColorError); }
+    }
+
+    // ---- Корзина: клик открывает, ПКМ — очистить (Windows сама спрашивает подтверждение)
+    void OpenRecycleBin()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), "shell:RecycleBinFolder") { UseShellExecute = false });
+            Collapse();
+        }
+        catch (Exception ex) { Log.Error("Could not open Recycle Bin", ex); ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Не удалось открыть", "Could not open"), ColorError); }
+    }
+
+    async Task RefreshRecycleBinAsync()
+    {
+        long items = await Task.Run(RecycleBinItemCount);
+        _binItems = items;
         UpdateTimerTiles();
     }
+
+    async Task EmptyRecycleBinAsync()
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        _modalOpen = true;
+        int hr;
+        try { hr = SHEmptyRecycleBin(hwnd, null, 0); }   // 0: Windows shows its own confirmation and progress
+        finally { _modalOpen = false; }
+        await RefreshRecycleBinAsync();
+        // S_OK = очищено; E_UNEXPECTED приходит, когда корзина уже пуста; 0x800704C7 — пользователь отменил.
+        if (hr == 0) ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Очищена", "Emptied"), ColorOk);
+        else if (hr != unchecked((int)0x800704C7) && hr != unchecked((int)0x8000FFFF))
+            ShowToast(Tr("Корзина", "Recycle Bin"), Tr("Не удалось очистить", "Could not empty"), ColorError);
+    }
+
+    static long RecycleBinItemCount()
+    {
+        try
+        {
+            var info = new ShQueryRbInfo { Size = Marshal.SizeOf<ShQueryRbInfo>() };
+            return SHQueryRecycleBin(null, ref info) == 0 ? info.NumItems : -1;
+        }
+        catch { return -1; }
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    struct ShQueryRbInfo { public int Size; public long SizeBytes; public long NumItems; }
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHQueryRecycleBin(string? rootPath, ref ShQueryRbInfo info);
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHEmptyRecycleBin(IntPtr hwnd, string? rootPath, uint flags);
 
     static Button MakeTile(Style style, FontFamily icons, string glyph, out TextBlock label)
     {
@@ -490,7 +575,7 @@ public partial class MainWindow
 
     void UpdateTimerTiles()
     {
-        if (_timerLabel == null || _swLabel == null || _settingsTileLabel == null) return;
+        if (_timerLabel == null || _swLabel == null || _settingsTileLabel == null || _binLabel == null) return;
         var now = DateTime.Now;
         _timerLabel.Text = TimerActive
             ? FormatSpan(TimerLeft(now)) + (_timerPaused ? Tr(" · пауза", " · paused") : "")
@@ -499,10 +584,14 @@ public partial class MainWindow
             ? FormatSpan(StopwatchElapsed(now)) + (_swStart == null ? Tr(" · пауза", " · paused") : "")
             : Tr("Секундомер", "Stopwatch");
         _settingsTileLabel.Text = Tr("Настройки", "Settings");
+        _binLabel.Text = _binItems > 0
+            ? Tr($"Корзина · {_binItems}", $"Recycle Bin · {_binItems}")
+            : _binItems == 0 ? Tr("Корзина · пусто", "Recycle Bin · empty") : Tr("Корзина", "Recycle Bin");
         if (_timerTile != null)
             _timerTile.ToolTip = Tr("Клик — старт/пауза, колесо — минуты (Shift — по 5), ПКМ — ещё",
                                     "Click — start/pause, wheel — minutes (Shift — by 5), right-click — more");
         if (_swTile != null) _swTile.ToolTip = Tr("Клик — старт/пауза, ПКМ — сброс", "Click — start/pause, right-click — reset");
-        if (_settingsTile != null) _settingsTile.ToolTip = Tr("Открыть настройки Moku", "Open Moku settings");
+        if (_settingsTile != null) _settingsTile.ToolTip = Tr("Открыть Параметры Windows", "Open Windows Settings");
+        if (_binTile != null) _binTile.ToolTip = Tr("Клик — открыть корзину, ПКМ — очистить", "Click — open Recycle Bin, right-click — empty it");
     }
 }

@@ -138,8 +138,8 @@ public partial class MainWindow
         Section(p, L("ТАЙМЕР", "TIMER"));
         SliderRow(p, L("Таймер по умолчанию", "Default timer"), 1, 180, () => _s.TimerMinutes, v => { _s.TimerMinutes = v; UpdateTimerTiles(); },
             v => v + L(" мин", " min"));
-        Hint(p, L("Плитки «Таймер», «Секундомер» и кнопка «Настройки» — на главной вкладке. Пока идёт таймер или секундомер, время видно справа в свёрнутом острове.",
-                  "Timer, Stopwatch and the Settings button are on the Home tab. While the timer or stopwatch runs, the time shows on the right of the compact island."));
+        Hint(p, L("Плитки «Таймер», «Секундомер», кнопки «Настройки» (открывают Параметры Windows) и «Корзина» — на главной вкладке. Пока идёт таймер или секундомер, время видно справа в свёрнутом острове.",
+                  "Timer and Stopwatch tiles plus the Settings (opens Windows Settings) and Recycle Bin buttons are on the Home tab. While the timer or stopwatch runs, the time shows on the right of the compact island."));
 
         // ---------------- Музыка и уведомления
         p = CatMusic; _buildCat = "music";
