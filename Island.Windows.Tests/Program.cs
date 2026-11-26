@@ -249,7 +249,6 @@ internal static class Program
         Check(analyzer.ActiveBackend == null, "disposed automatic analyzer ignores later media events");
     }
 
-    [STAThread]
     /// <summary>
     /// Registers the Internet helper tasks (CI runners are administrators with UAC off), checks that the user can
     /// start the harmless "on" task without elevation, then removes them. The "off" task is never started here.
@@ -280,6 +279,7 @@ internal static class Program
         }
     }
 
+    [STAThread]
     static int Main(string[] args)
     {
         if (args.Length == 3 && args[0] == "--audio-probe") return RunAudioProbe(args[1],args[2]);
