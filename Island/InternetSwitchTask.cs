@@ -106,4 +106,16 @@ internal static class InternetSwitchTask
         var outcome = RunTask(true);
         return outcome == RunOutcome.Missing ? null : outcome == RunOutcome.Ok;
     }
+
+    /// <summary>Test hook: Task Scheduler's last result, state and principal of a helper task.</summary>
+    internal static string DescribeForTest(bool on)
+    {
+        try
+        {
+            dynamic task = Folder().GetTask(TaskName(on));
+            dynamic principal = task.Definition.Principal;
+            return $"state={(int)task.State} lastResult=0x{(int)task.LastTaskResult:X8} lastRun={task.LastRunTime} logonType={(int)principal.LogonType} runLevel={(int)principal.RunLevel} user={principal.UserId}";
+        }
+        catch (Exception ex) { return "unavailable: " + ex.Message; }
+    }
 }

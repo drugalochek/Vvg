@@ -261,6 +261,17 @@ internal static class Program
             Check(InternetSwitchTask.IsInstalled(), "both internet tasks are visible to the current user");
             var run = InternetSwitchTask.RunOnTaskForTest();
             Console.WriteLine("INFO harmless 'on' task finished successfully: " + (run?.ToString() ?? "not startable"));
+            Console.WriteLine("INFO on task: " + InternetSwitchTask.DescribeForTest(true));
+            var direct = new ProcessStartInfo(System.IO.Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"),
+                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + SystemPanelPolicy.EncodePowerShell(SystemPanelPolicy.InternetTaskScript(true)))
+                { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+            using (var p = Process.Start(direct)!)
+            {
+                string err = p.StandardError.ReadToEnd(), outp = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(60000);
+                Console.WriteLine($"INFO direct 'on' script exit={p.ExitCode} out={outp.Trim()} err={err.Trim()}");
+            }
+            Console.WriteLine("INFO session: " + Process.GetCurrentProcess().SessionId + " user=" + Environment.UserDomainName + "\\" + Environment.UserName);
             Check(run != null, "the current user can start the 'on' task without a UAC prompt");
             Console.WriteLine($"PASS: {checks} internet helper task checks.");
             return 0;
